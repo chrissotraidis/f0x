@@ -14,8 +14,12 @@
   can accelerate developer-only macOS runs, but it is not a production path.
   This blocks archive-first proof and reinforces that mobile must use an
   in-process importer.
-- **MAC-AUDIO-01 — hardware output unverified:** the dedicated audio thread
-  runs, but no speaker/headphone or controller audio test has been performed.
+- **MAC-AUDIO-01 — cartridge audio synthesis is silent in captured PCM:** the
+  cartridge-only build originally omitted the PCM tap from its active ROM
+  audio thread, so captures were empty. The tap now runs, but a GP-route
+  capture contains only zero-valued stereo samples even with CoreAudio active.
+  This establishes a synthesis/task-path failure upstream of speaker output;
+  audible speaker/headphone and controller-audio claims remain unverified.
 - **MAC-RACE-TEX-01 — pre-race null-texture warnings require visual follow-up:**
   the GP route emitted one suppressed `ImportTexture` warning for tiles 5 and
   6 while leaving machine settings, before GP-race initialization. The route

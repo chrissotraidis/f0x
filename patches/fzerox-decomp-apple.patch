@@ -141,3 +141,24 @@ index 78091d8..b085777 100644
      osInvalDCache(slowLoad->curRamAddr, size);
      osCreateMesgQueue(&slowLoad->msgQueue, &slowLoad->msg, 1);
      AudioLoad_Dma(&slowLoad->ioMesg, OS_MESG_PRI_NORMAL, OS_READ, slowLoad->curDevAddr, slowLoad->curRamAddr, size,
+diff --git a/src/audio/rom/lib/thread.c b/src/audio/rom/lib/thread.c
+index 4f39cd8..a5c326d 100644
+--- a/src/audio/rom/lib/thread.c
++++ b/src/audio/rom/lib/thread.c
+@@ -37,5 +37,16 @@ AudioTask* AudioThread_CreateTask(void) {
+     if (gResetTimer < 16) {
+         if (gAiBufLengths[aiBufIndex] != 0) {
++#ifdef PORT
++            /* Match the Expansion Kit audio path: capture the synthesized stereo AI stream
++               before host-side post-processing. This is a no-op unless GDX_PCM_CAPTURE is set. */
++            {
++                extern void gdx_pcm_capture_feed(const s16* frames, unsigned int frameCount,
++                                                 unsigned int sampleRate);
++                gdx_pcm_capture_feed(gAiBuffers[aiBufIndex],
++                                     (unsigned int) gAiBufLengths[aiBufIndex],
++                                     (unsigned int) gAudioBufferParams.samplingFrequency);
++            }
++#endif
+             osAiSetNextBuffer(gAiBuffers[aiBufIndex], gAiBufLengths[aiBufIndex] * 4);
+             if (gAiBuffers[aiBufIndex]) {}
+             if (gAiBufLengths[aiBufIndex]) {}

@@ -50,3 +50,11 @@ Capture the active game window directly during the now-reproducible GP race;
 desktop-wide captures are currently obscured by unrelated system UI. Keep the
 all-black BMP readback issue separate from the renderer gate, then verify it
 independently before relying on it for transition evidence.
+
+## 2026-08-11 — Gate 3 cartridge PCM capture wiring and silence proof
+
+- **Cause fixed:** this Apple baseline is configured with `GDX_EXPANSION_KIT=OFF`, so it compiles `decomp/src/audio/rom/lib/thread.c`. The existing PCM tap was only present in the uncompiled disk/Expansion-Kit audio thread. The active ROM thread now calls `gdx_pcm_capture_feed` immediately before `osAiSetNextBuffer`, under `PORT`; it is inert unless `GDX_PCM_CAPTURE` is set.
+- **Build and unit regression:** `cmake --build build/macos-baseline-clean --target G-Diffuser gdx_pcm_capture_tests --parallel 4` passed. `gdx_pcm_capture_tests` passed all 5 cases and 28 sub-checks.
+- **Runtime result:** a bounded startup capture reached its configured 128,000 stereo frames and wrote a 512,000-byte PCM file, proving the active cartridge feed is connected. That short window was all zero and ended before the scripted delayed Start input.
+- **GP-route result:** a longer captured run emitted `reached_gp_race` and wrote 1,835,008 stereo frames (3,670,016 samples; 7,340,032 bytes). Every sample was zero (`min=0`, `max=0`, `RMS=0`). The process ended before its scripted clean exit and left no crash artifact, so that termination is not attributed to the capture change.
+- **Conclusion:** the earlier empty-file observation was a missing cartridge capture hook; the remaining failure is that the cartridge audio task/synthesis path delivers silence. CoreAudio device output has not been accepted as evidence, and audio remains an open Gate 3 blocker.
