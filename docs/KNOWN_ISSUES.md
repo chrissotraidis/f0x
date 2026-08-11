@@ -16,6 +16,11 @@
   in-process importer.
 - **MAC-AUDIO-01 — hardware output unverified:** the dedicated audio thread
   runs, but no speaker/headphone or controller audio test has been performed.
+- **MAC-RACE-TEX-01 — race-path null-texture warnings require visual follow-up:**
+  the GP race run emitted one suppressed `ImportTexture` warning for tiles 5
+  and 6. The route completed and rendered race display lists, but no direct
+  race image is available yet to judge whether those missing texture addresses
+  have visible impact.
 
 ## Baseline risks requiring proof
 
