@@ -1,0 +1,33 @@
+# Host metadata and local reference material.
+.DS_Store
+/ref/*
+!/ref/README.md
+
+# Build products and Apple packaging/signing material.
+/build/
+/.build/
+/artifacts/
+/DerivedData/
+*.app
+*.ipa
+*.xcarchive
+*.dSYM
+*.mobileprovision
+*.p12
+
+# User-owned game media and locally derived game data.
+*.z64
+*.v64
+*.n64
+*.ndd
+*.o2r
+*.otr
+*.sra
+*.eep
+*.fla
+
+# Runtime-local state.
+/saves/
+/ghosts/
+/logs/
+/mods/
