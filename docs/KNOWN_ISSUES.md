@@ -2,7 +2,19 @@
 
 ## F0X-specific
 
-No F0X build has run yet, so no F0X runtime issue has been established.
+- **MAC-GFX-01 — rendered frame mirror is black after the first task:** on
+  Apple Silicon macOS, the present trace reaches a real `task-render`, but
+  deterministic captures before and after Start are identical all-black
+  320×240 images. The graphics bridge no longer rejects the display-list root,
+  so the next gate is to inspect conversion/geometry/texture diagnostics, not
+  to claim a working title screen.
+- **MAC-ARCHIVE-01 — extracted game archive fails the golden gate:** the
+  existing desktop child-process extractor completes but emits a SHA-256 that
+  differs from the source-configured golden. The runtime correctly discards it
+  and uses the locally authorized raw ROM. This blocks archive-first proof and
+  reinforces that mobile must use an in-process importer.
+- **MAC-AUDIO-01 — hardware output unverified:** the dedicated audio thread
+  runs, but no speaker/headphone or controller audio test has been performed.
 
 ## Baseline risks requiring proof
 
