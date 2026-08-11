@@ -1,3 +1,55 @@
+diff --git a/cmake/dependencies/patches/imgui-fixes-and-config.patch b/cmake/dependencies/patches/imgui-fixes-and-config.patch
+index 6d890e90..de909556 100644
+--- a/cmake/dependencies/patches/imgui-fixes-and-config.patch
++++ b/cmake/dependencies/patches/imgui-fixes-and-config.patch
+@@ -110,3 +110,47 @@ index a1e29e849bc8..ee64116ff0cf 100644
+ +
+ +// handle https://github.com/ocornut/imgui/issues/1641 the old way
+ +#define ImTextureID void*
++
++From 6f1934d7ff7f3c0d81da7dcae6e40c1cfb8154d0 Mon Sep 17 00:00:00 2001
++From: F0X <noreply@example.invalid>
++Date: Mon, 11 Aug 2026 18:35:00 -0500
++Subject: [PATCH 4/4] ImGui SDL2: clamp invalid usable display bounds
++
++SDL can report a non-empty usable display rectangle that extends outside the
++display's full bounds on macOS. Dear ImGui treats that as an invariant failure
++when multi-viewport support is enabled. Intersect the usable rectangle with
++the display rectangle, falling back to the full display if nothing remains.
++
++---
++ backends/imgui_impl_sdl2.cpp | 18 ++++++++++++++++++
++ 1 file changed, 18 insertions(+)
++
++diff --git a/backends/imgui_impl_sdl2.cpp b/backends/imgui_impl_sdl2.cpp
++index 2e6a1ad9d1f1..62153bce22b6 100644
++--- a/backends/imgui_impl_sdl2.cpp
+++++ b/backends/imgui_impl_sdl2.cpp
++@@ -899,6 +899,24 @@ static void ImGui_ImplSDL2_UpdateMonitors()
++             monitor.WorkSize = ImVec2((float)r.w, (float)r.h);
++         }
++ #endif
+++        // SDL may report a non-empty usable rectangle outside the display bounds
+++        // on macOS (for example while desktop work-area state changes). Dear ImGui
+++        // requires WorkPos/WorkSize to be contained by MainPos/MainSize, so preserve
+++        // the usable area only where it intersects this display.
+++        const ImVec2 main_end = monitor.MainPos + monitor.MainSize;
+++        ImVec2 work_end = monitor.WorkPos + monitor.WorkSize;
+++        if (monitor.WorkPos.x < monitor.MainPos.x)
+++            monitor.WorkPos.x = monitor.MainPos.x;
+++        if (monitor.WorkPos.y < monitor.MainPos.y)
+++            monitor.WorkPos.y = monitor.MainPos.y;
+++        if (work_end.x > main_end.x)
+++            work_end.x = main_end.x;
+++        if (work_end.y > main_end.y)
+++            work_end.y = main_end.y;
+++        if (work_end.x > monitor.WorkPos.x && work_end.y > monitor.WorkPos.y)
+++            monitor.WorkSize = work_end - monitor.WorkPos;
+++        else
+++            monitor.WorkPos = monitor.MainPos, monitor.WorkSize = monitor.MainSize;
++ #if SDL_HAS_PER_MONITOR_DPI
++         // FIXME-VIEWPORT: On MacOS SDL reports actual monitor DPI scale, ignoring OS configuration. We may want to set
++         //  DpiScale to cocoa_window.backingScaleFactor here.
 diff --git a/src/fast/backends/gfx_metal.cpp b/src/fast/backends/gfx_metal.cpp
 index a32a12e7..0a6a3303 100644
 --- a/src/fast/backends/gfx_metal.cpp

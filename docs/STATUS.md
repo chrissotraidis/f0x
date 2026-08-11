@@ -10,7 +10,7 @@ runtime evidence. No Apple gameplay claim is made without a dated test entry.
 | 0: reproducible baseline | In progress | G-Diffuser `719fd82`; recursive source clone present locally. Desktop build pending. |
 | 1: macOS ARM64 compile/link | Compiled | Cartridge-only Debug build linked as arm64 Mach-O on 2026-08-11. |
 | 2: fiber proof | macOS verified | `gdx_fiber_smoketest` passed 30,000 deterministic Apple Silicon switches across three stacks on 2026-08-11. |
-| 3: complete macOS Metal race | Partially working | Native Metal process visibly renders the F-Zero X title screen and starts the game fibers/audio thread. Framebuffer BMP readbacks are black despite the visible title; menu/race remain unverified. |
+| 3: complete macOS Metal race | Partially working | Native Metal process visibly renders the F-Zero X title screen, starts the game fibers/audio thread, and survives a scripted Start into game mode 7 with the test-only local archive. Framebuffer BMP readbacks are black despite the visible title; menu/race remain unverified. |
 | 4: macOS application | Not started | No F0X bundle/import shell exists. |
 | 5: iOS/iPadOS build | Not started | No F0X iOS target exists. |
 | 6: physical iPad engine proof | Not tested | No signed device run exists. |

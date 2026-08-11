@@ -10,8 +10,10 @@
 - **MAC-ARCHIVE-01 — extracted game archive fails the golden gate:** the
   existing desktop child-process extractor completes but emits a SHA-256 that
   differs from the source-configured golden. The runtime correctly discards it
-  and uses the locally authorized raw ROM. This blocks archive-first proof and
-  reinforces that mobile must use an in-process importer.
+  and uses the locally authorized raw ROM. A locally generated, ignored archive
+  can accelerate developer-only macOS runs, but it is not a production path.
+  This blocks archive-first proof and reinforces that mobile must use an
+  in-process importer.
 - **MAC-AUDIO-01 — hardware output unverified:** the dedicated audio thread
   runs, but no speaker/headphone or controller audio test has been performed.
 
