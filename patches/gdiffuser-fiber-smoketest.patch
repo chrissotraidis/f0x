@@ -1,0 +1,51 @@
+diff --git a/port/tests/fiber_smoketest.c b/port/tests/fiber_smoketest.c
+new file mode 100644
+index 0000000..d02c86d
+--- /dev/null
++++ b/port/tests/fiber_smoketest.c
+@@ -0,0 +1,45 @@
++#include "gdx_fiber.h"
++
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++enum { kFiberCount = 3, kSwitches = 10000 };
++
++static GdxFiber* sHost;
++static GdxFiber* sFibers[kFiberCount];
++static uint64_t sCanary[kFiberCount];
++static unsigned sSteps[kFiberCount];
++
++static void fiber_main(void* arg) {
++    const unsigned index = (unsigned)(uintptr_t)arg;
++    const uint64_t expected = UINT64_C(0xA5A5000000000000) | index;
++    sCanary[index] = expected;
++    for (;;) {
++        if (sCanary[index] != expected) {
++            fprintf(stderr, "fiber %u canary corrupted\n", index);
++            abort();
++        }
++        if (sSteps[index] < kSwitches) {
++            ++sSteps[index];
++        }
++        gdx_fiber_switch(sHost);
++    }
++}
++
++int main(void) {
++    sHost = gdx_fiber_convert_thread();
++    if (sHost == NULL) return 1;
++    for (unsigned i = 0; i < kFiberCount; ++i) {
++        sFibers[i] = gdx_fiber_create(fiber_main, (void*)(uintptr_t)i, 0);
++        if (sFibers[i] == NULL) return 2;
++    }
++    for (unsigned round = 0; round < kSwitches; ++round) {
++        for (unsigned i = 0; i < kFiberCount; ++i) gdx_fiber_switch(sFibers[i]);
++    }
++    for (unsigned i = 0; i < kFiberCount; ++i) {
++        if (sSteps[i] != kSwitches) return 3;
++    }
++    puts("gdx_fiber_smoketest: PASS");
++    return 0;
++}

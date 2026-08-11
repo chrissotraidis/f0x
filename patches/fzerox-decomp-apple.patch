@@ -1,0 +1,143 @@
+diff --git a/include/global.h b/include/global.h
+index a2d8347..dab8b38 100644
+--- a/include/global.h
++++ b/include/global.h
+@@ -17,7 +17,11 @@
+ #ifndef PORT
+ #define GDX_CK(x)
+ #else
++#if defined(__APPLE__)
++#include <string.h>
++#else
+ extern void *memset(void *, int, unsigned long long);
++#endif
+ extern void gdx_ck(const char* s);
+ extern void gdx_cki(const char* s, int v);
+ extern void gdx_ckp(const char* s, void* p);
+diff --git a/include/libc/stdlib.h b/include/libc/stdlib.h
+index ab96510..07c78d9 100644
+--- a/include/libc/stdlib.h
++++ b/include/libc/stdlib.h
+@@ -18,7 +18,9 @@ typedef struct {
+     /* 0x8 */ long long rem;
+ } lldiv_t;
+ 
+-typedef int ssize_t;
++/* Keep the decomp's 32-bit size semantics without colliding with the host
++ * libc's ssize_t (a 64-bit Darwin type). */
++typedef int gdx_ssize_t;
+ 
+ typedef long wchar_t;
+ 
+diff --git a/include/libc/string.h b/include/libc/string.h
+index 9c6a1cb..4b5329c 100644
+--- a/include/libc/string.h
++++ b/include/libc/string.h
+@@ -4,9 +4,13 @@
+ #include "libc/stddef.h"
+ 
+ 
++#if defined(PORT) && defined(__APPLE__)
++#include <string.h>
++#else
+ const char* strchr(const char* s, int c);
+ size_t strlen(const char* s);
+ void* memcpy(void* s1, const void* s2, size_t n);
++#endif
+ 
+ 
+ #endif
+diff --git a/src/audio/disk/lib/audio.h b/src/audio/disk/lib/audio.h
+index cfba128..90646fe 100644
+--- a/src/audio/disk/lib/audio.h
++++ b/src/audio/disk/lib/audio.h
+@@ -539,8 +539,8 @@ typedef struct AudioSpec {
+     /* 0x24 */ size_t temporarySeqCacheSize;  // size of cache on audio pool to store sequences temporarily
+     /* 0x28 */ size_t temporaryFontCacheSize; // size of cache on audio pool to store soundFonts temporarily
+     /* 0x2C */ size_t temporarySampleBankCacheSize; // size of cache on audio pool to store entire sample banks temporarily
+-    /* 0x30 */ ssize_t persistentSampleCacheSize; // size of cache in the audio misc pool to store individual samples persistently
+-    /* 0x34 */ ssize_t temporarySampleCacheSize; // size of cache in the audio misc pool to store individual samples temporarily
++    /* 0x30 */ gdx_ssize_t persistentSampleCacheSize; // size of cache in the audio misc pool to store individual samples persistently
++    /* 0x34 */ gdx_ssize_t temporarySampleCacheSize; // size of cache in the audio misc pool to store individual samples temporarily
+ } AudioSpec; // size = 0x38
+ 
+ /**
+@@ -572,7 +572,7 @@ typedef struct AudioBufferParameters {
+ typedef struct AudioAllocPool {
+     /* 0x0 */ u8* startRamAddr; // start addr of the pool
+     /* 0x4 */ u8* curRamAddr; // address of the next available memory for allocation
+-    /* 0x8 */ ssize_t size; // size of the pool
++    /* 0x8 */ gdx_ssize_t size; // size of the pool
+     /* 0xC */ s32 numEntries; // number of entries allocated to the pool
+ } AudioAllocPool; // size = 0x10
+ 
+@@ -1203,7 +1203,7 @@ void AudioLoad_ScriptLoad(s32 tableType, s32 id, s8* status);
+ void AudioLoad_ProcessLoads(s32 resetStatus);
+ void AudioLoad_Init(void* heap, size_t heapSize);
+ Sample* AudioLoad_GetFontSample(s32 fontId, s32 instId);
+-void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, ssize_t size);
++void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, gdx_ssize_t size);
+ void AudioLoad_DmaSlowCopyDiskDrive(uintptr_t devAddr, u8* ramAddr, size_t size, s32 lba);
+ void AudioLoad_ProcessAsyncLoadDiskDrive(AudioAsyncLoad* asyncLoad, s32 resetStatus);
+ void AudioLoad_ProcessAsyncLoad(AudioAsyncLoad* asyncLoad, s32 resetStatus);
+@@ -1221,7 +1221,7 @@ void* AudioHeap_AllocZeroed(AudioAllocPool* pool, size_t size);
+ void* AudioHeap_Alloc(AudioAllocPool* pool, size_t size);
+ void* AudioHeap_AllocAttemptExternal(AudioAllocPool* pool, size_t size);
+ void* AudioHeap_AllocDmaMemory(AudioAllocPool* pool, size_t size);
+-void* AudioHeap_AllocCached(s32 tableType, ssize_t size, s32 cache, s32 id);
++void* AudioHeap_AllocCached(s32 tableType, gdx_ssize_t size, s32 cache, s32 id);
+ void* AudioHeap_AllocPermanent(s32 tableType, s32 id, size_t size);
+ void AudioHeap_WritebackDCache(void* ramAddr, size_t size);
+ void* AudioHeap_AllocSampleCache(size_t size, s32 fontId, void* sampleAddr, s8 medium, s32 cache);
+diff --git a/src/audio/disk/lib/heap.c b/src/audio/disk/lib/heap.c
+index 16f75aa..85bf727 100644
+--- a/src/audio/disk/lib/heap.c
++++ b/src/audio/disk/lib/heap.c
+@@ -318,7 +318,7 @@ void AudioHeap_InitTemporaryPoolsAndCaches(AudioCommonPoolSplit* split) {
+     AudioHeap_InitTemporaryCache(&gAudioCtx.sampleBankCache.temporary);
+ }
+ 
+-void* AudioHeap_AllocCached(s32 tableType, ssize_t size, s32 cache, s32 id) {
++void* AudioHeap_AllocCached(s32 tableType, gdx_ssize_t size, s32 cache, s32 id) {
+     AudioCache* loadedCache;
+     AudioTemporaryCache* temporaryCache;
+     AudioAllocPool* temporaryPool;
+diff --git a/src/audio/disk/lib/load.c b/src/audio/disk/lib/load.c
+index f945cd5..25465f0 100644
+--- a/src/audio/disk/lib/load.c
++++ b/src/audio/disk/lib/load.c
+@@ -1939,7 +1939,7 @@ void AudioLoad_ProcessSlowLoads(s32 resetStatus) {
+     }
+ }
+ 
+-void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, ssize_t size) {
++void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, gdx_ssize_t size) {
+     Audio_InvalDCache(slowLoad->curRamAddr, size);
+     osCreateMesgQueue(&slowLoad->msgQueue, &slowLoad->msg, 1);
+     AudioLoad_Dma(&slowLoad->ioMesg, OS_MESG_PRI_NORMAL, OS_READ, slowLoad->curDevAddr, slowLoad->curRamAddr, size,
+diff --git a/src/audio/rom/lib/audio.h b/src/audio/rom/lib/audio.h
+index ff3f011..60eaa06 100644
+--- a/src/audio/rom/lib/audio.h
++++ b/src/audio/rom/lib/audio.h
+@@ -981,7 +981,7 @@ s32 AudioLoad_SyncInitSeqPlayerSkipTicks(s32 seqPlayerIndex, s32 seqId, s32 skip
+ void AudioLoad_ProcessLoads(s32 resetStatus);
+ void AudioLoad_Init(void* heap, size_t heapSize);
+ Sample* AudioLoad_GetFontSample(s32 fontId, s32 instId);
+-void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, ssize_t size);
++void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, gdx_ssize_t size);
+ void AudioLoad_DmaSlowCopyDiskDrive(uintptr_t devAddr, u8* ramAddr, size_t size, s32 lba);
+ void AudioLoad_ProcessAsyncLoad(AudioAsyncLoad* asyncLoad, s32 resetStatus);
+ void AudioLoad_AsyncDma(AudioAsyncLoad* asyncLoad, size_t size);
+diff --git a/src/audio/rom/lib/load.c b/src/audio/rom/lib/load.c
+index 78091d8..b085777 100644
+--- a/src/audio/rom/lib/load.c
++++ b/src/audio/rom/lib/load.c
+@@ -1145,7 +1145,7 @@ void AudioLoad_ProcessSlowLoads(s32 resetStatus) {
+     }
+ }
+ 
+-void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, ssize_t size) {
++void AudioLoad_DmaSlowCopy(AudioSlowLoad* slowLoad, gdx_ssize_t size) {
+     osInvalDCache(slowLoad->curRamAddr, size);
+     osCreateMesgQueue(&slowLoad->msgQueue, &slowLoad->msg, 1);
+     AudioLoad_Dma(&slowLoad->ioMesg, OS_MESG_PRI_NORMAL, OS_READ, slowLoad->curDevAddr, slowLoad->curRamAddr, size,

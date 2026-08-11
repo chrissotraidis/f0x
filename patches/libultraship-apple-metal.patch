@@ -1,0 +1,122 @@
+diff --git a/src/fast/backends/gfx_metal.cpp b/src/fast/backends/gfx_metal.cpp
+index a32a12e7..0a6a3303 100644
+--- a/src/fast/backends/gfx_metal.cpp
++++ b/src/fast/backends/gfx_metal.cpp
+@@ -936,6 +936,12 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale)
+         mFrameUniforms.noiseScale = 1.0f / noise_scale;
+     }
+ 
++    // The taskless VI presentation path can bind the window framebuffer before
++    // the interpreter's normal StartFrame call. Keep this entry point valid for
++    // that first boot frame as well as the usual renderer-driven path.
++    if (!mFrameUniformBuffer) {
++        mFrameUniformBuffer = mDevice->newBuffer(sizeof(FrameUniforms), MTL::ResourceCPUCacheModeDefaultCache);
++    }
+     memcpy(mFrameUniformBuffer->contents(), &mFrameUniforms, sizeof(FrameUniforms));
+ }
+ 
+diff --git a/src/fast/shaders/metal/default.shader.metal b/src/fast/shaders/metal/default.shader.metal
+index cee31eff..ac5261ee 100644
+--- a/src/fast/shaders/metal/default.shader.metal
++++ b/src/fast/shaders/metal/default.shader.metal
+@@ -9,7 +9,7 @@ struct FrameUniforms {
+     float noiseScale;
+ };
+ 
+-// Do not gate these fields behind @if. setFragmentBytes() copies sizeof(DrawUniforms) from the
++// Do not gate these fields behind a conditional directive. setFragmentBytes() copies sizeof(DrawUniforms) from the
+ // one fixed C++ layout in gfx_metal.h for every variant, so a shorter struct here reads the
+ // wrong field at the wrong offset.
+ struct DrawUniforms {
+@@ -28,11 +28,11 @@ struct FragOut {
+ struct Vertex {
+     float4 position [[attribute(@{get_vertex_index()})]];
+     @{update_floats(4)}
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             float2 texCoord@{i} [[attribute(@{get_vertex_index()})]];
+             @{update_floats(2)}
+-            @for(j in 0..2)
++            @for(j in 0 .. 2)
+                 @if(o_clamp[i][j])
+                     @if(j == 0)
+                         float texClampS@{i} [[attribute(@{get_vertex_index()})]];
+@@ -52,7 +52,7 @@ struct Vertex {
+         float4 grayscale [[attribute(@{get_vertex_index()})]];
+         @{update_floats(4)}
+     @end
+-    @for(i in 0..o_inputs)
++    @for(i in 0 .. o_inputs)
+         @if(o_alpha)
+             float4 input@{i + 1} [[attribute(@{get_vertex_index()})]];
+             @{update_floats(4)}
+@@ -64,10 +64,10 @@ struct Vertex {
+ };
+ 
+ struct ProjectedVertex {
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             float2 texCoord@{i};
+-            @for(j in 0..2)
++            @for(j in 0 .. 2)
+                 @if(o_clamp[i][j])
+                     @if(j == 0)
+                         float texClampS@{i};
+@@ -84,7 +84,7 @@ struct ProjectedVertex {
+     @if(o_grayscale)
+         float4 grayscale;
+     @end
+-    @for(i in 0..o_inputs)
++    @for(i in 0 .. o_inputs)
+         @if(o_alpha)
+             float4 input@{i + 1};
+         @else
+@@ -96,10 +96,10 @@ struct ProjectedVertex {
+ 
+ vertex ProjectedVertex vertexShader(Vertex in [[stage_in]]) {
+     ProjectedVertex out;
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             out.texCoord@{i} = in.texCoord@{i};
+-            @for(j in 0..2)
++            @for(j in 0 .. 2)
+                 @if(o_clamp[i][j])
+                     @if(j == 0)
+                         out.texClampS@{i} = in.texClampS@{i};
+@@ -116,7 +116,7 @@ vertex ProjectedVertex vertexShader(Vertex in [[stage_in]]) {
+     @if(o_grayscale)
+         out.grayscale = in.grayscale;
+     @end
+-    @for(i in 0..o_inputs)
++    @for(i in 0 .. o_inputs)
+          out.input@{i + 1} = in.input@{i + 1};
+     @end
+     out.position = in.position;
+@@ -185,7 +185,7 @@ fragment FragOut fragmentShader(
+     , texture2d<float> uTexBlend1 [[texture(5)]]
+ @end
+ ) {
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             @{s = o_clamp[i][0]}
+             @{t = o_clamp[i][1]}
+@@ -230,7 +230,7 @@ fragment FragOut fragmentShader(
+         @{f_range = 1}
+     @end
+ 
+-    @for(c in 0..f_range)
++    @for(c in 0 .. f_range)
+         @if(c == 1)
+             @if(o_alpha)
+                 @if(o_c[c][1][2] == SHADER_COMBINED)
+@@ -305,4 +305,4 @@ fragment FragOut fragmentShader(
+         out.depth = drawUniforms.prim_depth;
+     @end
+     return out;
+-}
+\ No newline at end of file
++}

@@ -1,0 +1,367 @@
+diff --git a/decomp b/decomp
+--- a/decomp
++++ b/decomp
+@@ -1 +1 @@
+-Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809
++Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809-dirty
+diff --git a/libultraship b/libultraship
+--- a/libultraship
++++ b/libultraship
+@@ -1 +1 @@
+-Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71
++Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71-dirty
+diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
+index cab4365..b87f0c6 100644
+--- a/port/CMakeLists.txt
++++ b/port/CMakeLists.txt
+@@ -181,6 +181,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
+     ASSET_REVISION=rev0
+ )
+ 
++# macOS keeps the deprecated-but-present ucontext API behind this opt-in. The
++# existing POSIX fiber backend is exercised unchanged; runtime proof remains a
++# separate gate.
++if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
++    target_compile_definitions(gdiffuser_game PRIVATE _XOPEN_SOURCE=700 _DARWIN_C_SOURCE=1)
++endif()
++
+ # MSVC: silence IDO-era decomp noise, but keep fatal the classes that are UB on x64 and have
+ # caused real crashes: C4715/C4716 (non-void falls off the end — MIPS left the value in $v0,
+ # MSVC returns garbage) and C4013 (implicit decl truncates a 64-bit pointer return to EAX;
+@@ -467,6 +474,9 @@ else()
+     # (needed on older glibc, harmless on newer).
+     find_package(Threads REQUIRED)
+     target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
++endif()
++
++if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+     # Release tarballs carry the dependencies no distribution can be relied on to provide in
+     # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
+     # which beats a wrapper script because the binary stays directly runnable. No effect on a
+@@ -483,6 +493,8 @@ endif()
+ # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
+ if(NOT MSVC)
+     target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
++endif()
++if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+     # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
+     # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
+     # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
+@@ -536,6 +548,17 @@ elseif(GDX_PORT_WARN_FLAGS)
+     target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
+ endif()
+ 
++add_executable(gdx_fiber_smoketest tests/fiber_smoketest.c)
++target_include_directories(gdx_fiber_smoketest PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
++if(WIN32)
++    target_sources(gdx_fiber_smoketest PRIVATE gdx_fiber_win32.c)
++else()
++    target_sources(gdx_fiber_smoketest PRIVATE gdx_fiber_ucontext.c)
++    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
++        target_compile_definitions(gdx_fiber_smoketest PRIVATE _XOPEN_SOURCE=700 _DARWIN_C_SOURCE=1)
++    endif()
++endif()
++
+ # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
+ # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
+ # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
+@@ -764,6 +787,8 @@ if(GDX_BUILD_JP)
+     endif()
+     if(NOT MSVC)
+         target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
++    endif()
++    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+         target_link_options(G-Diffuser-JP PRIVATE
+             "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/gdx_hide_libm.map")
+     endif()
+diff --git a/port/gdx_fiber_ucontext.c b/port/gdx_fiber_ucontext.c
+index 9f35a8b..d528885 100644
+--- a/port/gdx_fiber_ucontext.c
++++ b/port/gdx_fiber_ucontext.c
+@@ -22,6 +22,7 @@
+ #include "gdx_fiber.h"
+ 
+ #include <stdlib.h>
++#include <stdio.h>
+ #include <stdint.h>
+ #include <ucontext.h>
+ #include <sys/mman.h>
+@@ -101,6 +102,7 @@ GdxFiber* gdx_fiber_create(GdxFiberEntry entry, void* arg, size_t stackSize) {
+     mem = mmap(NULL, total, PROT_READ | PROT_WRITE,
+                MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+     if (mem == MAP_FAILED) {
++        perror("gdx_fiber mmap");
+         free(f);
+         return NULL;
+     }
+@@ -110,6 +112,7 @@ GdxFiber* gdx_fiber_create(GdxFiberEntry entry, void* arg, size_t stackSize) {
+     }
+ 
+     if (getcontext(&f->ctx) != 0) {
++        perror("gdx_fiber getcontext");
+         munmap(mem, total);
+         free(f);
+         return NULL;
+@@ -142,7 +145,7 @@ void gdx_fiber_switch(GdxFiber* to) {
+ }
+ 
+ unsigned long gdx_fiber_current_thread_id(void) {
+-#ifdef SYS_gettid
++#if defined(SYS_gettid) && !defined(__APPLE__)
+     return (unsigned long) syscall(SYS_gettid);
+ #else
+     return (unsigned long) (uintptr_t) pthread_self();
+diff --git a/port/gdx_firstboot.cpp b/port/gdx_firstboot.cpp
+index 90116a9..98d7c6e 100644
+--- a/port/gdx_firstboot.cpp
++++ b/port/gdx_firstboot.cpp
+@@ -774,6 +774,21 @@ FirstBootResult FirstBootRun(const char* argv0) {
+     // the managed media/ copy (disk only), else the original file. Demanding the original ROM and IPL
+     // here would drag the wizard back on a fully-installed setup whose originals were deleted.
+     fs::path romInData = dataDir / kRomName;
++#ifndef EXPANSION_KIT
++    // Cartridge-only builds deliberately exclude the 64DD runtime. A verified
++    // cartridge ROM is therefore sufficient for the existing raw-ROM
++    // development path; never demand disk/IPL media that this binary cannot use.
++    {
++        std::string why;
++        if (fileExists(romInData) && validateRom(romInData, why)) {
++            result.status = FirstBootStatus::DevLayout;
++            result.romPath = fs::absolute(romInData, ec).string();
++            gdx_port_logf("[firstboot] cartridge-only build: booting verified ROM %s\n",
++                          result.romPath.c_str());
++            return result;
++        }
++    }
++#endif
+     fs::path diskInData = dataDir / kDiskName;
+     if (st.complete) {
+         std::string why;
+diff --git a/port/gdx_frame_pacer.c b/port/gdx_frame_pacer.c
+index d80931c..849e312 100644
+--- a/port/gdx_frame_pacer.c
++++ b/port/gdx_frame_pacer.c
+@@ -256,6 +256,23 @@ static void gdx_frame_pacer_init_posix(void) {
+ }
+ 
+ static void gdx_sleep_until_ns(int64_t deadlineNs) {
++#if defined(__APPLE__)
++    // Darwin does not expose clock_nanosleep/TIMER_ABSTIME. Recompute the
++    // remaining monotonic interval after EINTR so this retains the absolute
++    // deadline contract instead of treating nanosleep as a one-shot delay.
++    for (;;) {
++        int64_t remainingNs = deadlineNs - gdx_monotonic_now_ns();
++        if (remainingNs <= 0) {
++            return;
++        }
++        struct timespec rel;
++        rel.tv_sec = (time_t)(remainingNs / GDX_PACER_NS_PER_SEC);
++        rel.tv_nsec = (long)(remainingNs % GDX_PACER_NS_PER_SEC);
++        if (nanosleep(&rel, NULL) == 0 || errno != EINTR) {
++            return;
++        }
++    }
++#else
+     struct timespec abs;
+     abs.tv_sec = (time_t)(deadlineNs / GDX_PACER_NS_PER_SEC);
+     abs.tv_nsec = (long)(deadlineNs % GDX_PACER_NS_PER_SEC);
+@@ -270,6 +287,7 @@ static void gdx_sleep_until_ns(int64_t deadlineNs) {
+             return; // unexpected error: give up waiting rather than spin
+         }
+     }
++#endif
+ }
+ 
+ void gdx_frame_pacer_tick(void) {
+diff --git a/port/gen/LinkStubs.c b/port/gen/LinkStubs.c
+index ccb0585..eb611a7 100644
+--- a/port/gen/LinkStubs.c
++++ b/port/gen/LinkStubs.c
+@@ -199,6 +199,12 @@ unsigned char unk_gfx_segment_VRAM_END[1];
+ 
+ #ifndef EXPANSION_KIT /* real definition in leo/mfs (mfs_data.c) under EK */
+ long D_i1_80428618() { return 0; }
++/* The cartridge-only source set still retains a few dormant 64DD references.
++ * Keep their zero-sized behavior explicit instead of dragging the disk runtime
++ * into the first Apple bring-up. */
++unsigned char leoBootID[0x20];
++unsigned long long gspF3DEX2_Rej_fifoTextStart[1];
++unsigned long long gspL3DEX2_fifoTextStart[1];
+ #endif
+ /* D_i2_8010ADE0 (save file "F-ZERO X" signature) is real now: save.c (save-system slice). */
+ /* ending_effects.c is excluded from the build (static GBI lists need
+diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
+index 8c63a17..9ef930b 100644
+--- a/port/n64_gfx_bridge.cpp
++++ b/port/n64_gfx_bridge.cpp
+@@ -11,6 +11,12 @@
+ #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
++#elif defined(__APPLE__)
++/* macOS uses mach_vm_region; unlike Linux it does not expose /proc/self/maps. */
++#include <dlfcn.h>
++#include <mach/mach.h>
++#include <mach/mach_vm.h>
++#include <mach-o/loader.h>
+ #else
+ /* POSIX memory-probe backend: /proc/self/maps snapshot helpers plus the #else branches of
+  * GetMainModuleRange / ReadableByteLimit / ReadableCommandLimit / IsReadableAddress. */
+@@ -1798,6 +1804,38 @@ static void ResetWindowsMemoryRegionCache() {
+         sWindowsMemoryRegions.reserve(64);
+     }
+ }
++#elif defined(__APPLE__)
++// ---------------------------------------------------------------------------------------------
++// Darwin memory probe. mach_vm_region returns the mapped region containing (or immediately after)
++// an address, so callers verify containment before treating the range as readable.
++// ---------------------------------------------------------------------------------------------
++struct DarwinMemoryRegion {
++    uintptr_t begin;
++    uintptr_t end;
++    bool readable;
++};
++
++static bool DarwinMemoryRegionFor(uintptr_t address, DarwinMemoryRegion& out) {
++    mach_vm_address_t regionAddress = static_cast<mach_vm_address_t>(address);
++    mach_vm_size_t regionSize = 0;
++    vm_region_basic_info_data_64_t info = {};
++    mach_msg_type_number_t infoCount = VM_REGION_BASIC_INFO_COUNT_64;
++    mach_port_t objectName = MACH_PORT_NULL;
++    const kern_return_t result = mach_vm_region(
++        mach_task_self(), &regionAddress, &regionSize, VM_REGION_BASIC_INFO_64,
++        reinterpret_cast<vm_region_info_t>(&info), &infoCount, &objectName);
++    if (objectName != MACH_PORT_NULL) {
++        mach_port_deallocate(mach_task_self(), objectName);
++    }
++    if (result != KERN_SUCCESS || regionSize == 0 ||
++        regionSize > UINTPTR_MAX - static_cast<uintptr_t>(regionAddress)) {
++        return false;
++    }
++    out.begin = static_cast<uintptr_t>(regionAddress);
++    out.end = out.begin + static_cast<size_t>(regionSize);
++    out.readable = (info.protection & VM_PROT_READ) != 0;
++    return address >= out.begin && address < out.end;
++}
+ #else
+ // ---------------------------------------------------------------------------------------------
+ // POSIX memory-probe backend: a snapshot of /proc/self/maps with miss-triggered refresh.
+@@ -1914,6 +1952,65 @@ void GetMainModuleRange(uintptr_t& moduleBegin, uintptr_t& moduleEnd) {
+ 
+     moduleBegin = reinterpret_cast<uintptr_t>(module);
+     moduleEnd = moduleBegin + ntHeaders->OptionalHeader.SizeOfImage;
++#elif defined(__APPLE__)
++    Dl_info info = {};
++    if (dladdr(reinterpret_cast<void*>(&GetMainModuleRange), &info) == 0 || info.dli_fbase == nullptr) {
++        return;
++    }
++    const auto* header = reinterpret_cast<const mach_header_64*>(info.dli_fbase);
++    if (header->magic != MH_MAGIC_64) {
++        return;
++    }
++    moduleBegin = reinterpret_cast<uintptr_t>(info.dli_fbase);
++    const uint8_t* command = reinterpret_cast<const uint8_t*>(header + 1);
++    uintptr_t preferredTextBase = 0;
++    for (uint32_t i = 0; i < header->ncmds; ++i) {
++        const auto* load = reinterpret_cast<const load_command*>(command);
++        if (load->cmd == LC_SEGMENT_64) {
++            const auto* segment = reinterpret_cast<const segment_command_64*>(load);
++            if (segment->fileoff == 0 && segment->filesize != 0) {
++                preferredTextBase = static_cast<uintptr_t>(segment->vmaddr);
++                break;
++            }
++        }
++        if (load->cmdsize == 0) {
++            moduleBegin = 0;
++            return;
++        }
++        command += load->cmdsize;
++    }
++    if (preferredTextBase == 0) {
++        moduleBegin = 0;
++        return;
++    }
++    const intptr_t slide = static_cast<intptr_t>(moduleBegin - preferredTextBase);
++    uintptr_t candidateEnd = moduleBegin;
++    command = reinterpret_cast<const uint8_t*>(header + 1);
++    for (uint32_t i = 0; i < header->ncmds; ++i) {
++        const auto* load = reinterpret_cast<const load_command*>(command);
++        if (load->cmd == LC_SEGMENT_64) {
++            const auto* segment = reinterpret_cast<const segment_command_64*>(load);
++            // __PAGEZERO has no readable mapping but carries a giant virtual span; including it
++            // would register a fabricated 4 GB+ module range and defeat the bridge's bounds checks.
++            if ((segment->initprot & VM_PROT_READ) != 0) {
++                const uintptr_t segmentEnd = static_cast<uintptr_t>(static_cast<intptr_t>(segment->vmaddr) + slide) +
++                                             static_cast<uintptr_t>(segment->vmsize);
++                if (segmentEnd > candidateEnd) {
++                    candidateEnd = segmentEnd;
++                }
++            }
++        }
++        if (load->cmdsize == 0) {
++            moduleBegin = 0;
++            return;
++        }
++        command += load->cmdsize;
++    }
++    if (candidateEnd <= moduleBegin) {
++        moduleBegin = 0;
++        return;
++    }
++    moduleEnd = candidateEnd;
+ #else
+     // Mirror "module base + SizeOfImage": take the contiguous run of /proc/self/maps entries whose
+     // pathname is the main executable, using begin-of-first .. end-of-last. dladdr on a local
+@@ -2005,6 +2102,13 @@ size_t ReadableCommandLimit(const void* source, size_t stride = kN64GfxStride) {
+         return 0;
+     }
+ 
++    return static_cast<size_t>((region.end - address) / stride);
++#elif defined(__APPLE__)
++    const uintptr_t address = reinterpret_cast<uintptr_t>(source);
++    DarwinMemoryRegion region;
++    if (!DarwinMemoryRegionFor(address, region) || !region.readable) {
++        return 0;
++    }
+     return static_cast<size_t>((region.end - address) / stride);
+ #else
+     const uintptr_t addr = reinterpret_cast<uintptr_t>(source);
+@@ -2030,6 +2134,12 @@ size_t ReadableByteLimit(uintptr_t address) {
+         return 0;
+     }
+ 
++    return static_cast<size_t>(region.end - address);
++#elif defined(__APPLE__)
++    DarwinMemoryRegion region;
++    if (!DarwinMemoryRegionFor(address, region) || !region.readable) {
++        return 0;
++    }
+     return static_cast<size_t>(region.end - address);
+ #else
+     MapsRegion r;
+@@ -2050,6 +2160,9 @@ bool IsReadableAddress(uintptr_t address) {
+         return false;
+     }
+     return region.readable;
++#elif defined(__APPLE__)
++    DarwinMemoryRegion region;
++    return DarwinMemoryRegionFor(address, region) && region.readable;
+ #else
+     MapsRegion r;
+     if (!PosixRegionFor(address, r)) {
+diff --git a/port/shims.c b/port/shims.c
+index c4598d5..6c99936 100644
+--- a/port/shims.c
++++ b/port/shims.c
+@@ -112,6 +112,11 @@ int LeoTestUnitReady(unsigned char* status) {
+     }
+     return GDX_LEO_ERROR_MEDIUM_NOT_PRESENT;
+ }
++
++// The Data & Files menu asks for this EK-only verdict even in the cartridge
++// configuration. No disk archive exists in this build, so deletion is never
++// eligible.
++int gdx_disk_archive_verified(void) { return 0; }
+ #endif
+ 
+ // libc: BSD byte-compare not in the MSVC CRT. glibc provides both natively (with size_t
