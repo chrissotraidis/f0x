@@ -2,12 +2,11 @@
 
 ## F0X-specific
 
-- **MAC-GFX-01 — rendered frame mirror is black after the first task:** on
-  Apple Silicon macOS, the present trace reaches a real `task-render`, but
-  deterministic captures before and after Start are identical all-black
-  320×240 images. The graphics bridge no longer rejects the display-list root,
-  so the next gate is to inspect conversion/geometry/texture diagnostics, not
-  to claim a working title screen.
+- **MAC-CAPTURE-01 — framebuffer BMP readback is black while the title is visible:**
+  on Apple Silicon macOS, deterministic 320×240 BMP captures are identical
+  black frames even though a fresh desktop capture visibly shows the rendered
+  F-Zero X title screen. The readback path cannot be used as gameplay proof
+  until it is fixed or independently cross-checked.
 - **MAC-ARCHIVE-01 — extracted game archive fails the golden gate:** the
   existing desktop child-process extractor completes but emits a SHA-256 that
   differs from the source-configured golden. The runtime correctly discards it
