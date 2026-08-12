@@ -18,6 +18,14 @@ now has restored raw-ROM machine textures and a contained narrow-window HUD.
 Owner confirmation of presentation stability, player control through a completed
 race, and physical audio remain open.
 
+The desktop archive gate is no longer blocked by a stale golden. Two independent
+bundled-extractor runs produced the same `7d60d975...` container; it passed the
+3,610-entry/version/family gauntlet, installed into Application Support, stayed
+unchanged on warm boot, and drove the packaged GP race with the original ROM
+temporarily absent. That negative-ROM test exposed and fixed a cartridge-only
+first-boot inconsistency: archive validation now precedes the raw-ROM fallback
+and does not depend on a setup marker that older cartridge installs never wrote.
+
 ## Revised goal and execution order
 
 Continue from commit `996973f`; do not reopen the native build, macOS fiber,
@@ -27,7 +35,8 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 1. Metal presentation stability across title/menu/race/resize/fullscreen;
 2. completed controlled race plus save/relaunch/load round-trip;
-3. desktop extraction-golden correction plus safe import through the app shell;
+3. complete first-time import UX proof and replace desktop child extraction with
+   an in-process mobile-capable importer;
 4. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
 5. touch, timing/high refresh, packaging, README, and final audits.
 
@@ -75,11 +84,18 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   km/h. Neither attempt finished: one exploded and one became stuck off the
   crossover. No controller is attached (Bluetooth is off; USB has no gamepad),
   so player-completed race acceptance remains honestly open.
+- The current bundled extractor and recipes are deterministic at SHA-256
+  `7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a`.
+  The candidate contains exactly 3,610 unique records, the expected US-rev0
+  version CRC, and all 33 complete-or-absent families. The installed archive
+  was reused without rewrite on warm boot and completed the packaged GP route
+  with `baserom.us.rev0.z64` absent; the test restored the ROM immediately.
 
 ## Next action
 
-Ask the owner to observe the current packaged build while retaining the direct
-soak regression. Unless flashing recurs, proceed to a player-controlled completed
-race; save/relaunch/load persistence is now independently verified. Keep F0X Home
-as the single preboot surface; extend it only when a concrete recovery or launch
-behavior is missing.
+Re-prove first-time archive creation through F0X's visible import surface, with
+progress and recoverable failure copy, then design the smallest in-process
+extractor boundary shared by macOS and iOS/iPadOS. In parallel, the owner can
+observe the current packaged build for flashing and use a connected controller
+to close the completed-race gate; save/relaunch/load persistence is already
+independently verified.

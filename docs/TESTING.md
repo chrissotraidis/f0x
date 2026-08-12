@@ -197,3 +197,36 @@ extraction golden plus all-black internal BMP readback as separate gates.
 - **Boundary:** this proves native cartridge command processing, DMA, soundfont decoding, task synthesis, and the dedicated producer path. SDL dummy output is deliberately not speaker/headphone evidence; the normal CoreAudio setting was restored after the test.
 - **Normal-output attempt:** the restored CoreAudio configuration stalled before game boot in Apple `AudioComponentInstanceNew` / `HALC_ProxyIOContext::_TellServerAboutStreamUsage`. A two-second process sample places the wait wholly inside CoreAudio device creation, so it is not evidence against the now-proven cartridge synthesis path.
 - **Direct-window attempt:** `race_window_capture.gdx` reached its named GP interval and exited cleanly under SDL dummy audio, but this ad-hoc executable is not enumerated as a selectable window by the available accessibility service. No window image was therefore captured; the old black framebuffer BMPs remain unsuitable as a substitute for visual race proof.
+
+## 2026-08-12 — deterministic archive install and ROM-absent boot
+
+- **Determinism gauntlet:** `tools/o2r_harness/verify_determinism.py` ran the
+  sealed bundle's `Contents/Helpers/gdx-extract` twice against the authorized
+  US-rev0 ROM and packaged recipes. Both outputs were byte-identical at SHA-256
+  `7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a`.
+  `validate_archive.py` found 3,610 records, 3,610 unique paths, version CRC
+  `0x78D90EB3`, and all 33 expected families complete or absent. The generated
+  expected header and family manifest were refreshed from that validated
+  candidate; the earlier golden artifact was unavailable, so no unsupported
+  claim is made about why it differed.
+- **Install and warm boot:** the rebuilt sealed app reported `extracted and
+  installed fzerox.o2r`, mounted the Application Support archive, reached
+  `packaged_gp_race_capture_interval`, and exited 0. A second launch reported
+  `up to date (fzerox.o2r already valid)`, never started Torch, left the
+  archive mtime/size unchanged, reached the same race marker, and exited cleanly.
+- **Regression exposed:** with only the original ROM temporarily renamed, the
+  archive mounted and the setup row said it satisfied the ROM requirement, but
+  `FirstBootRun` still entered setup. The cartridge-only raw-ROM shortcut ran
+  before archive validation and depended on a setup state file that the shortcut
+  never writes.
+- **Fix and negative-ROM proof:** cartridge-only first boot now validates and
+  accepts `fzerox.o2r` before trying the raw-ROM fallback. With the ROM again
+  temporarily absent, logs explicitly reported archive-only first boot, no ROM
+  image, validated archive fallback, `packaged_gp_race_capture_interval`, all 28
+  script commands, and normal window shutdown. A shell trap restored the ROM and
+  removed the temporary name. The rebuilt app and nested helper passed strict
+  ad-hoc signature verification; its plist passed lint.
+- **Boundary:** this proves deterministic desktop extraction, atomic install,
+  warm reuse, and archive-only packaged gameplay. It does not yet prove the
+  complete first-time visible import/progress experience or the required
+  in-process iOS/iPadOS importer.

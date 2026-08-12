@@ -26,13 +26,15 @@
   black frames even though a fresh desktop capture visibly shows the rendered
   F-Zero X title screen. The readback path cannot be used as gameplay proof
   until it is fixed or independently cross-checked.
-- **MAC-ARCHIVE-01 — extracted game archive fails the golden gate:** the
-  existing desktop child-process extractor completes but emits a SHA-256 that
-  differs from the source-configured golden. The runtime correctly discards it
-  and uses the locally authorized raw ROM. A locally generated, ignored archive
-  can accelerate developer-only macOS runs, but it is not a production path.
-  This blocks archive-first proof and reinforces that mobile must use an
-  in-process importer.
+- **MAC-ARCHIVE-01 — desktop archive fixed; in-process/mobile importer remains:**
+  the bundled extractor and recipes reproducibly emit the same 3,610-entry
+  archive (`7d60d975...`) across two independent runs. The refreshed generated
+  golden passes the entry-count, version-CRC, family-completeness, install,
+  warm-boot, and ROM-absent race gates. Cartridge-only first boot now accepts a
+  validated installed archive even when no legacy setup marker exists. Desktop
+  extraction still uses a child process and the complete first-time progress /
+  recovery flow has not yet been re-proved through the visible app interface;
+  iOS/iPadOS must use an in-process implementation.
 - **MAC-AUDIO-01 — physical CoreAudio route remains unverified:** cartridge
   synthesis and the dedicated producer path now emit nonzero captured PCM.
   The reproducible proof uses SDL's dummy device so it does not establish

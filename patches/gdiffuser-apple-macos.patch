@@ -415,7 +415,7 @@ index 9f35a8b..d528885 100644
  #else
      return (unsigned long) (uintptr_t) pthread_self();
 diff --git a/port/gdx_firstboot.cpp b/port/gdx_firstboot.cpp
-index 90116a9..1c65e3a 100644
+index 90116a9..f922293 100644
 --- a/port/gdx_firstboot.cpp
 +++ b/port/gdx_firstboot.cpp
 @@ -161,8 +161,19 @@ fs::path executableDir(const char* argv0) {
@@ -456,14 +456,25 @@ index 90116a9..1c65e3a 100644
      fs::create_directories(dataDir, ec);
      ec.clear();
      result.dataDir = dataDir.string();
-@@ -774,6 +784,21 @@ FirstBootResult FirstBootRun(const char* argv0) {
+@@ -774,6 +784,32 @@ FirstBootResult FirstBootRun(const char* argv0) {
      // the managed media/ copy (disk only), else the original file. Demanding the original ROM and IPL
      // here would drag the wizard back on a fully-installed setup whose originals were deleted.
      fs::path romInData = dataDir / kRomName;
 +#ifndef EXPANSION_KIT
 +    // Cartridge-only builds deliberately exclude the 64DD runtime. A verified
-+    // cartridge ROM is therefore sufficient for the existing raw-ROM
-+    // development path; never demand disk/IPL media that this binary cannot use.
++    // game archive is a complete install by itself; it must not depend on the
++    // setup marker because raw-ROM cartridge installs historically returned
++    // through the development path without writing one. Prefer the archive so
++    // the original ROM remains deletable after a successful extraction.
++    if (gameArchiveSatisfies(dataDir)) {
++        result.status = FirstBootStatus::SetupComplete;
++        gdx_port_logf("[firstboot] cartridge-only build: booting archive-only (ROM served from %s)\n",
++                      kGameArchiveName);
++        return result;
++    }
++
++    // A verified cartridge ROM remains sufficient for the raw-ROM fallback;
++    // never demand disk/IPL media that this binary cannot use.
 +    {
 +        std::string why;
 +        if (fileExists(romInData) && validateRom(romInData, why)) {
@@ -478,7 +489,7 @@ index 90116a9..1c65e3a 100644
      fs::path diskInData = dataDir / kDiskName;
      if (st.complete) {
          std::string why;
-@@ -1140,6 +1165,8 @@ std::string GdxFirstBootDescribeMissing(const std::string& dataDirIn) {
+@@ -1140,6 +1176,8 @@ std::string GdxFirstBootDescribeMissing(const std::string& dataDirIn) {
  bool NativeFilePickerAvailable() {
  #ifdef _WIN32
      return true;
@@ -487,7 +498,7 @@ index 90116a9..1c65e3a 100644
  #else
      return false;
  #endif
-@@ -1163,6 +1190,24 @@ std::string PickIplFile() {
+@@ -1163,6 +1201,24 @@ std::string PickIplFile() {
                            L"64DD IPL ROM (*.n64;*.z64)\0*.n64;*.z64\0All files\0*.*\0");
      return p.string();
  }
@@ -512,7 +523,7 @@ index 90116a9..1c65e3a 100644
  #else
  std::string PickRomFile() {
      return {};
-@@ -1173,6 +1218,9 @@ std::string PickDiskFile() {
+@@ -1173,6 +1229,9 @@ std::string PickDiskFile() {
  std::string PickIplFile() {
      return {};
  }
@@ -1097,6 +1108,28 @@ index ccb0585..eb611a7 100644
  #endif
  /* D_i2_8010ADE0 (save file "F-ZERO X" signature) is real now: save.c (save-system slice). */
  /* ending_effects.c is excluded from the build (static GBI lists need
+diff --git a/port/gen/gdx_o2r_expected.h b/port/gen/gdx_o2r_expected.h
+index 927d50d..e5c1587 100644
+--- a/port/gen/gdx_o2r_expected.h
++++ b/port/gen/gdx_o2r_expected.h
+@@ -4,7 +4,7 @@
+  * GENERATED FILE - do not edit by hand.
+  * Generator : tools/o2r_harness/gen_expected_header.py --profile us
+  * Source     : deterministic gdx-extract output (generic.o2r)
+- * Source SHA : 1b95e89586efb9d3df87e6334586d3c072aff0dba534ed1612354bfc7fa2654a
++ * Source SHA : 7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a
+  * Entry count: 3610
+  * Version CRC: 0x78D90EB3 (us rev0, P0 contract C4)
+  *
+@@ -16,7 +16,7 @@
+ #ifndef GDX_O2R_EXPECTED_H
+ #define GDX_O2R_EXPECTED_H
+ 
+-#define GDX_O2R_EXPECTED_SHA256 "1b95e89586efb9d3df87e6334586d3c072aff0dba534ed1612354bfc7fa2654a"
++#define GDX_O2R_EXPECTED_SHA256 "7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a"
+ #define GDX_O2R_EXPECTED_ENTRY_COUNT 3610
+ 
+ #endif /* GDX_O2R_EXPECTED_H */
 diff --git a/port/main.cpp b/port/main.cpp
 index 118ee0d..8e6c813 100644
 --- a/port/main.cpp
@@ -1410,6 +1443,18 @@ index c4598d5..6c99936 100644
  #endif
  
  // libc: BSD byte-compare not in the MSVC CRT. glibc provides both natively (with size_t
+diff --git a/tools/o2r_harness/family_manifest.json b/tools/o2r_harness/family_manifest.json
+index f5f427a..2f4ebca 100644
+--- a/tools/o2r_harness/family_manifest.json
++++ b/tools/o2r_harness/family_manifest.json
+@@ -136,6 +136,6 @@
+     }
+   },
+   "source_archive": "generic.o2r",
+-  "source_sha256": "1b95e89586efb9d3df87e6334586d3c072aff0dba534ed1612354bfc7fa2654a",
++  "source_sha256": "7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a",
+   "total_entries": 3610
+ }
 diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
 new file mode 100644
 index 0000000..f6ab8d2
