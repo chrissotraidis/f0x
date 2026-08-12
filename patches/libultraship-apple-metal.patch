@@ -1,3 +1,29 @@
+diff --git a/cmake/dependencies/ios.cmake b/cmake/dependencies/ios.cmake
+index aad5c586..5123ff16 100644
+--- a/cmake/dependencies/ios.cmake
++++ b/cmake/dependencies/ios.cmake
+@@ -52,6 +52,13 @@ endif()
+ #=================== libzip ===================
+ find_package(libzip QUIET)
+ if (NOT ${libzip_FOUND})
++    # libzip's link-only check_function_exists() reports memcpy_s in the Simulator SDK even
++    # though the iOS headers do not expose Annex K. Force its portable memcpy compatibility
++    # macro instead of letting the generated config.h call an undeclared function.
++    set(HAVE_MEMCPY_S "" CACHE INTERNAL "memcpy_s is unavailable in iOS headers" FORCE)
++    set(HAVE_STRERROR_S "" CACHE INTERNAL "strerror_s is unavailable in iOS headers" FORCE)
++    set(HAVE_STRERRORLEN_S "" CACHE INTERNAL "strerrorlen_s is unavailable in iOS headers" FORCE)
++    set(HAVE_STRNCPY_S "" CACHE INTERNAL "strncpy_s is unavailable in iOS headers" FORCE)
+     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+     set(BUILD_TOOLS OFF)
+     set(BUILD_REGRESS OFF)
+@@ -59,6 +66,7 @@ if (NOT ${libzip_FOUND})
+     set(BUILD_DOC OFF)
+     set(BUILD_OSSFUZZ OFF)
+     set(BUILD_SHARED_LIBS OFF)
++    set(ENABLE_ZSTD OFF CACHE BOOL "Avoid host zstd when cross-compiling for iOS" FORCE)
+     FetchContent_Declare(
+         libzip
+         GIT_REPOSITORY https://github.com/nih-at/libzip.git
 diff --git a/cmake/dependencies/patches/imgui-fixes-and-config.patch b/cmake/dependencies/patches/imgui-fixes-and-config.patch
 index 6d890e90..de909556 100644
 --- a/cmake/dependencies/patches/imgui-fixes-and-config.patch
@@ -65,10 +91,47 @@ index ac65f1ac..9762206f 100644
          // publishes for modes that must render stock 4:3 (the Expansion Kit editors). The flag
          // is read live because it can flip mid-dispatch and this decision has to track it within
 diff --git a/src/fast/backends/gfx_metal.cpp b/src/fast/backends/gfx_metal.cpp
-index a32a12e7..8879109d 100644
+index a32a12e7..e7ff3b95 100644
 --- a/src/fast/backends/gfx_metal.cpp
 +++ b/src/fast/backends/gfx_metal.cpp
-@@ -936,6 +936,12 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale)
+@@ -75,9 +75,19 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
+     NS::AutoreleasePool* autorelease_pool = NS::AutoreleasePool::alloc()->init();
+ 
+     mLayer = (CA::MetalLayer*)SDL_RenderGetMetalLayer(renderer);
++    if (mLayer == nullptr) {
++        SPDLOG_ERROR("[window-init] SDL_RenderGetMetalLayer returned null: {}", SDL_GetError());
++        autorelease_pool->release();
++        return false;
++    }
+     mLayer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+ 
+     mDevice = mLayer->device();
++    if (mDevice == nullptr) {
++        SPDLOG_ERROR("[window-init] Metal layer has no device");
++        autorelease_pool->release();
++        return false;
++    }
+     mCommandQueue = mDevice->newCommandQueue();
+     mReadbackQueue = mDevice->newCommandQueue();
+ 
+@@ -85,11 +95,14 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
+         MTL::Buffer* new_buffer = mDevice->newBuffer(256 * 32 * 3 * sizeof(float) * 50, MTL::ResourceStorageModeShared);
+         mVertexBufferPool[i] = new_buffer;
+     }
+-
+     autorelease_pool->release();
+     mNonUniformThreadgroupSupported = NonUniformThreadGroupSupported();
+ 
+-    return ImGui_ImplMetal_Init(mDevice);
++    const bool initialized = ImGui_ImplMetal_Init(mDevice);
++    if (!initialized) {
++        SPDLOG_ERROR("[window-init] ImGui Metal renderer initialization failed");
++    }
++    return initialized;
+ }
+ 
+ static void SetupScreenFramebuffer(uint32_t width, uint32_t height);
+@@ -936,6 +949,12 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale)
          mFrameUniforms.noiseScale = 1.0f / noise_scale;
      }
  
@@ -81,7 +144,7 @@ index a32a12e7..8879109d 100644
      memcpy(mFrameUniformBuffer->contents(), &mFrameUniforms, sizeof(FrameUniforms));
  }
  
-@@ -1274,7 +1280,12 @@ void GfxRenderingAPIMetal::ReadFramebufferToCPU(int fb_id, uint32_t width, uint3
+@@ -1274,7 +1293,12 @@ void GfxRenderingAPIMetal::ReadFramebufferToCPU(int fb_id, uint32_t width, uint3
              // First frame on main queue — can't block without deadlock.
              // Return zeros so the caller gets black instead of garbage.
              memset(rgba16_buf, 0, sizeof(uint16_t) * width * height);
@@ -96,10 +159,31 @@ index a32a12e7..8879109d 100644
  
          output_buffer->release();
 diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
-index f619b462..e885815f 100644
+index f619b462..68b67b26 100644
 --- a/src/fast/backends/gfx_sdl2.cpp
 +++ b/src/fast/backends/gfx_sdl2.cpp
-@@ -379,7 +379,6 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
+@@ -265,7 +265,7 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
+         }
+     }
+ 
+-#if defined(__APPLE__)
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     // Implement fullscreening with native macOS APIs
+     if (on != isNativeMacOSFullscreenActive(mWnd)) {
+         toggleNativeMacOSFullscreen(mWnd);
+@@ -370,7 +370,10 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
+     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+ #endif
+ 
+-    SDL_Init(SDL_INIT_VIDEO);
++    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
++        SPDLOG_ERROR("[window-init] SDL video init failed: {}", SDL_GetError());
++        return;
++    }
+ 
+     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
+ 
+@@ -379,7 +382,6 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
  #else
      constexpr bool use_opengl = true;
  #endif
@@ -107,6 +191,44 @@ index f619b462..e885815f 100644
      if (use_opengl) {
          SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
          SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+@@ -429,6 +431,10 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
+     }
+ 
+     mWnd = SDL_CreateWindow(title, posX, posY, mWindowWidth, mWindowHeight, flags);
++    if (mWnd == nullptr) {
++        SPDLOG_ERROR("[window-init] SDL window create failed: {}", SDL_GetError());
++        return;
++    }
+ #ifdef _WIN32
+     // Get Windows window handle and use it to subclass the window procedure.
+     // Needed to circumvent SDLs DPI scaling problems under windows (original does only scale *sometimes*).
+@@ -565,7 +571,7 @@ void GfxWindowBackendSDL2::SetMouseCallbacks(bool (*onMouseButtonDown)(int btn),
+ }
+ 
+ void GfxWindowBackendSDL2::GetDimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     SDL_GetWindowSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
+ #else
+     SDL_GL_GetDrawableSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
+@@ -778,7 +784,7 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
+         case SDL_WINDOWEVENT:
+             switch (event.window.event) {
+                 case SDL_WINDOWEVENT_SIZE_CHANGED:
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+                     SDL_GetWindowSize(mWnd, &mWindowWidth, &mWindowHeight);
+ #else
+                     SDL_GL_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
+@@ -813,7 +819,7 @@ void GfxWindowBackendSDL2::HandleEvents() {
+     }
+ 
+     // resync fullscreen state
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     auto nextFullscreenState = isNativeMacOSFullscreenActive(mWnd);
+     if (mFullScreen != nextFullscreenState) {
+         mFullScreen = nextFullscreenState;
 diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 index e7501b7e..8985d3fe 100644
 --- a/src/fast/interpreter.cpp
@@ -231,3 +353,62 @@ index cee31eff..ac5261ee 100644
 -}
 \ No newline at end of file
 +}
+diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
+index 2fe754be..ad688ce1 100644
+--- a/src/ship/Context.cpp
++++ b/src/ship/Context.cpp
+@@ -462,8 +462,10 @@ std::string Context::GetAppBundlePath() {
+ #endif
+ 
+ #ifdef __IOS__
+-    const char* home = getenv("HOME");
+-    return std::string(home) + "/Documents";
++    {
++        FolderManager folderManager;
++        return folderManager.getMainBundlePath();
++    }
+ #endif
+ 
+ #ifdef NON_PORTABLE
+diff --git a/src/ship/audio/Audio.cpp b/src/ship/audio/Audio.cpp
+index 40140b60..48239b6f 100644
+--- a/src/ship/audio/Audio.cpp
++++ b/src/ship/audio/Audio.cpp
+@@ -1,6 +1,6 @@
+ #include "ship/audio/Audio.h"
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+ #include "ship/audio/CoreAudioAudioPlayer.h"
+ #endif
+ 
+@@ -21,7 +21,7 @@ void Audio::InitAudioPlayer() {
+             mAudioPlayer = std::make_shared<WasapiAudioPlayer>(this->mAudioSettings);
+             break;
+ #endif
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+         case AudioBackend::COREAUDIO:
+             mAudioPlayer = std::make_shared<CoreAudioAudioPlayer>(this->mAudioSettings);
+             break;
+@@ -48,7 +48,7 @@ void Audio::Init() {
+ #ifdef _WIN32
+     mAvailableAudioBackends->push_back(AudioBackend::WASAPI);
+ #endif
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     mAvailableAudioBackends->push_back(AudioBackend::COREAUDIO);
+ #endif
+     mAvailableAudioBackends->push_back(AudioBackend::SDL);
+diff --git a/src/ship/window/gui/Gui.cpp b/src/ship/window/gui/Gui.cpp
+index b2f99bde..41907c02 100644
+--- a/src/ship/window/gui/Gui.cpp
++++ b/src/ship/window/gui/Gui.cpp
+@@ -100,7 +100,6 @@ void Gui::Init() {
+     Context::GetInstance()->GetResourceManager()->GetResourceLoader()->RegisterResourceFactory(
+         std::make_shared<ResourceFactoryBinaryGuiTextureV0>(), RESOURCE_FORMAT_BINARY, "GuiTexture",
+         static_cast<uint32_t>(RESOURCE_TYPE_GUI_TEXTURE), 0);
+-
+     ImGuiWMInit();
+     ImGuiBackendInit();
+ }

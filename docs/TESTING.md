@@ -311,3 +311,38 @@ extraction golden plus all-black internal BMP readback as separate gates.
   backend remains the desktop default/fallback.
 - **Boundary:** macOS linkage and execution are verified. No iOS/iPadOS target,
   Simulator compile, signing, or device run is claimed yet.
+
+## 2026-08-12 — genuine iPad Simulator build and first-run interface
+
+- **Build identity:** F0X was configured through the pinned iOS toolchain with
+  `PLATFORM=SIMULATORARM64`, deployment target 16.0, cartridge-only mode, and
+  `GDX_INPROCESS_TORCH=ON`. Xcode produced a native arm64 Simulator application
+  (`LC_BUILD_VERSION` platform 7) with bundle ID `com.chrissotraidis.f0x`; the
+  integrated F0X/Torch graph built without a child extractor.
+- **Compile closure:** iOS-specific fixes cover duplicate Xcode object basenames,
+  ucontext feature macros, unavailable Annex K probes, Mach VM enumeration,
+  desktop Discord/folder/fullscreen/CoreAudio leakage, and Homebrew zstd
+  cross-link contamination. The shared macOS `F0X.app` rebuilt afterward and
+  passed strict deep signature verification plus plist lint.
+- **Crash reproduction and fix:** PID 8811 aborted at
+  `ImFontAtlas::AddFontFromFileTTF` because the fonts were not in the actual app
+  bundle and the iOS bundle lookup returned Documents. The rebuilt package
+  contains both TTFs under `F0X.app/fonts`, distinguishes immutable bundle
+  resources from writable Documents, checks each font before asking ImGui to
+  load it, and supplies a default-font fallback. Subsequent launches logged
+  `ImGui init complete` and stayed alive.
+- **Visible product proof:** on the one booted iPad Pro 11-inch (M5) Simulator,
+  the live Metal surface renders a stable landscape F0X First-Time Setup panel.
+  The panel uses larger mobile spacing and controls, shows a canonical path
+  under the app's Documents sandbox, and exposes `Choose ROM...` rather than an
+  impossible iOS drag-and-drop instruction. Activating it visibly presented the
+  native Files document picker.
+- **Report reconciliation:** the later supplied 611-line crash report is the
+  same 08:24 PID 8811 font incident and contains no second failure signature;
+  it is superseded by the later live process and package evidence above.
+- **Boundary:** Simulator compilation, launch, landscape setup rendering, and
+  Files-picker presentation are verified. No authorized ROM was selected in the
+  Simulator, so in-process iOS extraction, archive activation, title/gameplay,
+  touch gameplay, lifecycle, audio, physical signing, and physical iPad are not
+  yet claimed. The owner also continues to report regular visible flashing on
+  the macOS game despite automated black-frame soaks, so that gate remains open.

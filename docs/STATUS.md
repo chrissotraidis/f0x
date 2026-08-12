@@ -12,9 +12,9 @@ runtime evidence. No Apple gameplay claim is made without a dated test entry.
 | 2: fiber proof | macOS verified | `gdx_fiber_smoketest` passed 30,000 deterministic Apple Silicon switches across three stacks on 2026-08-11. |
 | 3: complete macOS Metal race | Stability and save persistence verified | The signed packaged app boots an authorized raw ROM, deterministically traverses modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, and directly renders a live GP race. The repeating black strobe was reproduced at 38/60 direct window captures and reduced to 0/120 after keeping live Metal render targets off the unsynchronized readback queue. Additional current-build samples passed 0/80 across two window sizes and 0/60 in fullscreen. A race HUD portrait crash from a physical-address/module-address collision was fixed. Two real Options-menu writes across two launches proved the 32 KiB SRAM is loaded and persisted exactly. Player-controlled race completion remains open. Cartridge synthesis produces nonzero PCM under SDL dummy output; audible output remains unverified. |
 | 4: macOS application | macOS interface foundation verified | The sealed `F0X.app` passes strict ad-hoc signature validation, keeps mutable state in Application Support, and now opens on a branded F0X Home surface with verified-data state, Play, Manage Game Data, Open Data Folder, startup display settings, recovery guidance, and Quit. Management reuses the validated import screen in-process and guards against click-through. Release signing/notarization and broader settings remain open. |
-| 5: iOS/iPadOS build | Not started | No F0X iOS target exists. |
+| 5: iOS/iPadOS build | Simulator verified | A genuine arm64 iOS 16+ `F0X.app` builds with the Xcode Simulator SDK, launches on the iPad Pro 11-inch (M5) Simulator through SDL + Metal, stays alive on the first-time setup surface, uses sandbox Documents for mutable data, and presents a native Files picker. This is not physical-device evidence. |
 | 6: physical iPad engine proof | Not tested | No signed device run exists. |
-| 7–8: product import / in-process Torch | macOS in-process integration verified | The bundled desktop extractor produces a byte-deterministic, fully validated 3,610-entry archive whose golden is `7d60d975...`. F0X visibly presents consent/progress, installs and hot-mounts it, and reaches a GP race without the ROM. With `GDX_INPROCESS_TORCH=ON`, the sealed F0X executable links Torch statically, consumes ROM bytes without `fork`/`exec`, installs that exact golden, hot-mounts it, and reaches the same packaged GP race. The default desktop child path remains available; iOS compilation and on-device import remain open. |
+| 7–8: product import / in-process Torch | macOS complete; iOS picker/compile verified | The bundled desktop extractor produces a byte-deterministic, fully validated 3,610-entry archive whose golden is `7d60d975...`. With `GDX_INPROCESS_TORCH=ON`, both the sealed macOS app and the genuine arm64 Simulator app link Torch statically without child processes. The iPad setup surface presents Apple's Files picker and a writable Documents destination; selecting an authorized ROM and completing extraction on iOS remain unverified. |
 | Touch / lifecycle / 60 Hz / high refresh | Not started | Deferred until controller-first engine proof. |
 | 64DD Expansion Kit | Deferred | Cartridge-only build is the first Apple target. |
 
@@ -37,13 +37,14 @@ stale inference from the research.
 The active loop resumes at the first unproven product behavior, not at an
 already-passed compile or fiber gate:
 
-1. Obtain owner confirmation that the current packaged Metal build no longer
-   flashes; retain the automated windowed/resize/fullscreen soak as regression.
+1. Keep the owner's continuing flashing report open; the automated
+   windowed/resize/fullscreen black-frame soak is useful regression evidence but
+   does not supersede repeated visible flashing on the owner's screen.
 2. Prove player control through a completed race, then save creation, clean
    relaunch, and load persistence.
-3. Compile the integrated in-process F0X/Torch graph for iOS, preserving the
-   current validation/progress/atomic-install contract.
-4. Establish iOS/iPadOS build closure, then a physical-iPad controller race,
+3. Complete an authorized Simulator ROM selection and in-process extraction,
+   then reach a stable title/race with the integrated iOS graph.
+4. Build/sign for iPhoneOS and establish a physical-iPad controller race,
    lifecycle, and audio.
 5. Only after physical engine proof: touch UX, timing/high refresh, release
    packaging, README, and final audits.

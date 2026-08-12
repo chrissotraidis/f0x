@@ -2,6 +2,17 @@
 
 ## Current gate
 
+Gate 5 now has a genuine arm64 iOS Simulator target. It links the same F0X,
+libultraship/Fast3D, Metal, and in-process Torch graph; launches on the single
+booted iPad Pro 11-inch (M5) Simulator; uses sandbox Documents for mutable data;
+renders a stable landscape, touch-sized first-time setup panel; and presents the
+native Files picker from `Choose ROM...`. The first iOS launch originally
+aborted in `AddFontFromFileTTF`: Xcode had copied fonts to a literal variable
+directory and libultraship conflated Documents with bundle resources. Fonts now
+ship inside `F0X.app`, bundle/data paths are distinct, and missing fonts fall
+back without asserting. Authorized ROM selection, iOS extraction, game boot,
+physical signing/device execution, controller, audio, and lifecycle remain open.
+
 Gate 4 now has a verified interface foundation: F0X has a reproducible, sealed
 arm64 `F0X.app` that macOS directly launches, with mutable data separated from
 bundle contents. Normal launches open on F0X Home with ready/data state, Play,
@@ -12,7 +23,8 @@ The later repeating strobe was traced to transition readback permanently moving
 a live game framebuffer onto a second Metal command queue while the window
 sampled it on the main queue. The isolated current build passed 120 consecutive
 race captures, 80 resize captures, and 60 fullscreen captures with no black
-frames; owner confirmation remains the final stability check.
+frames. The owner continues to report regular visible flashing, so the product
+gate remains open; the soak does not override direct observation.
 Gate 3 now has direct packaged-app race visuals, but the captured raw-ROM race
 now has restored raw-ROM machine textures and a contained narrow-window HUD.
 Owner confirmation of presentation stability, player control through a completed
@@ -53,8 +65,8 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 1. Metal presentation stability across title/menu/race/resize/fullscreen;
 2. completed controlled race plus save/relaunch/load round-trip;
-3. compile the integrated in-process F0X/Torch graph for iOS;
-4. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
+3. complete Simulator ROM import, in-process extraction, and title/race boot;
+4. iPhoneOS build/signing and physical-iPad controller/lifecycle/audio proof;
 5. touch, timing/high refresh, packaging, README, and final audits.
 
 ## Verified state
@@ -125,9 +137,9 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 ## Next action
 
-Compile the integrated in-process dependency graph for iOS/iPadOS and expose the
-first concrete platform/compiler blockers. Keep final archive validation and
-atomic activation in the port layer. In parallel, the owner can
-observe the current packaged build for flashing and use a connected controller
-to close the completed-race gate; save/relaunch/load persistence is already
-independently verified.
+Exercise the native Files picker with an authorized ROM, prove in-process Torch
+extraction and atomic archive activation in the Simulator sandbox, then boot the
+title/race. Keep the owner's flashing report open while investigating a
+human-visible presentation signal beyond the black-frame classifier. After the
+Simulator product path, configure an iPhoneOS build and move to physical-iPad
+controller/lifecycle/audio proof.
