@@ -15,6 +15,7 @@ audio output and direct race visuals still open.
 
 ## Next action
 
-Capture the active game window during the reproducible GP route. Keep the
+Make the G-Diffuser executable accessible to a window-capture service, then
+capture the active game window during the reproducible GP route. Keep the
 black framebuffer-readback problem separate from desktop/window visual proof;
 CoreAudio route/volume validation remains an external host-service gate.
