@@ -46,12 +46,19 @@
 
 ## Current next experiment
 
-Run the deterministic GP input route inside the signed, packaged `F0X.app` and
-capture the app window during the race interval. The bundle is now directly
-enumerable by the macOS UI service and its drawable ordering is fixed, removing
-the two limitations that invalidated the earlier direct-window attempt. Keep
-the all-black internal BMP readback issue separate from this direct visual
-proof.
+Use `scripts/macos-packaged-race.gdx` as the regression while fixing raw-ROM
+fallback texture resolution. Repeat the direct app-window inspection at its
+named race interval and require an intact HUD and textured machines before
+moving to a player-controlled completed race. Keep the extraction golden and
+the all-black internal BMP readback as separate gates.
+
+## 2026-08-12 — Signed packaged raw-ROM GP race proof
+
+- **Regression harness:** the input-script language now has `WAITTITLE`, which holds neutral input until title mode is accepting Start (`gGameMode == 0`, update state, attract demo inactive, and the title readiness counter at least 95). This replaces a fixed boot delay that could let attract mode consume Start. `scripts/macos-packaged-race.gdx` then gates every major transition on its game mode.
+- **Build and seal:** `cmake --build build/macos-f0x-bundle --target G-Diffuser -j 6` completed. The rebuilt app and nested extractor passed `codesign --verify --deep --strict --verbose=2`.
+- **Route proof:** the signed app booted the authorized local US rev0 `.z64` after rejecting the mismatched extracted archive, loaded the 28-command script, traversed game modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, emitted `packaged_gp_race_capture_interval`, and completed all commands with no `WAITTITLE` or `WAITMODE` timeout.
+- **Direct visual proof:** direct inspection of the raised `F0X (Metal)` app window showed an active GP race: a track, the player's craft, rival craft, and lap / position / energy HUD were visibly rendered. This closes the former direct-window evidence gap and independently confirms the internal black BMPs are not representative of the live Metal window.
+- **Visual failure retained:** the same image has large black/clipped areas through the right and bottom HUD and visibly incomplete machine surfaces. Runtime logs report missing `machine_custom_gfx` filepath resources and null TMEM texture addresses. This is race-reached proof, not a visually correct or player-controlled completed-race pass.
 
 ## 2026-08-12 — Gate 4 macOS F0X application-bundle foundation
 

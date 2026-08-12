@@ -1,0 +1,30 @@
+# Packaged raw-ROM GP route. WAITTITLE follows the game's real readiness state;
+# each later transition is mode-gated so input cannot run ahead.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 120
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 9 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 1 5400
+LOG packaged_gp_race_capture_interval
+WAIT 3600
+QUIT

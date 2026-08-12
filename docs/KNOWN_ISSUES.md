@@ -21,12 +21,13 @@
   latency on a physical output device. A subsequent normal-CoreAudio launch
   stalled inside Apple audio-device creation before F0X booted; this is an
   external host-service boundary, not a synthesis failure.
-- **MAC-RACE-TEX-01 — pre-race null-texture warnings require visual follow-up:**
-  the GP route emitted one suppressed `ImportTexture` warning for tiles 5 and
-  6 while leaving machine settings, before GP-race initialization. The route
-  completed and rendered race display lists, but no direct race image is
-  available yet to judge whether those missing texture addresses have visible
-  impact.
+- **MAC-RACE-TEX-01 — packaged raw-ROM race has visible texture/HUD defects:**
+  a direct packaged-app image now proves the GP race is live, but portions of
+  the right/bottom HUD are black or clipped and machine surfaces lack expected
+  detail. The same run reports absent `machine_custom_gfx` filepath resources
+  during machine selection and null texture addresses for TMEM tiles 5, 6, 3,
+  4, and 2. The deterministic route is preserved as a regression; Gate 3 stays
+  open until the direct image is visually intact.
 
 ## Remaining platform risks
 

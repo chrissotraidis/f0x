@@ -739,6 +739,90 @@ index b4af69a..ad90c32 100644
  
      // Missing loose assets must never block boot. ImGui's default font already includes Font
      // Awesome through libultraship, so it is a complete fallback.
+diff --git a/port/gdx_input_script.c b/port/gdx_input_script.c
+index cef7cfb..1b79c48 100644
+--- a/port/gdx_input_script.c
++++ b/port/gdx_input_script.c
+@@ -30,6 +30,12 @@
+ //       current=<cur>)" and playback CONTINUES with the next command — a stuck wait never
+ //       aborts the whole script.
+ //
++//   WAITTITLE [timeout_frames]
++//       Neutral input until the title screen is actually accepting Start: title
++//       mode, game-mode state UPDATE, attract demo inactive, and the title's own
++//       readiness counter at least 95 (the same threshold that draws PUSH START).
++//       This avoids timing a raw-ROM boot with a magic WAIT duration.
++//
+ //   LOG <text...>
+ //       Emits "[autotest] <text>" via gdx_port_logf the moment playback reaches this line
+ //       (i.e. at the scripted poll, not at parse time). <text> is the rest of the line verbatim.
+@@ -77,6 +83,9 @@
+ // locally as a plain int — same boundary idiom n64_gfx_bridge.cpp uses — so this TU has no decomp
+ // header dependency.
+ extern int gGameMode;
++extern short gGameModeChangeState;
++extern signed char gTitleDemoState;
++extern int D_i4_8011D790;
+ 
+ // main.cpp: closes the LUS window via the same path SDL_QUIT/WM_CLOSE take.
+ extern void gdx_request_quit(void);
+@@ -108,6 +117,7 @@ extern void gdx_request_frame_dump(const char* label);
+ typedef enum GdxScriptOp {
+     GDX_SCRIPT_OP_HOLD,     // WAIT / PRESS / STICK / INPUT all reduce to "hold this pad state N polls"
+     GDX_SCRIPT_OP_WAITMODE,
++    GDX_SCRIPT_OP_WAITTITLE,
+     GDX_SCRIPT_OP_LOG,
+     GDX_SCRIPT_OP_SHOT,
+     GDX_SCRIPT_OP_QUIT
+@@ -297,6 +307,13 @@ static int gdx_script_parse_line(char* line) {
+         }
+         return gdx_script_push(GDX_SCRIPT_OP_WAITMODE, 0, 0, 0, timeout, (int) mode, NULL);
+     }
++    if (gdx_ci_streq(kw, "WAITTITLE")) {
++        int timeout = GDX_SCRIPT_DEFAULT_WAITMODE_TIMEOUT;
++        if (*rest != '\0' && sscanf(rest, "%d", &timeout) != 1) {
++            return 0;
++        }
++        return gdx_script_push(GDX_SCRIPT_OP_WAITTITLE, 0, 0, 0, timeout, 0, NULL);
++    }
+     if (gdx_ci_streq(kw, "LOG")) {
+         return gdx_script_push(GDX_SCRIPT_OP_LOG, 0, 0, 0, 0, 0, rest);
+     }
+@@ -433,6 +450,34 @@ void gdx_input_script_override(GdxInputPad* pad) {
+                 }
+                 return; // still waiting: this poll consumed with neutral input
+             }
++            case GDX_SCRIPT_OP_WAITTITLE: {
++                const int titleReady = ((gGameMode & 0x1F) == 0) && (gGameModeChangeState == 0) &&
++                                       (gTitleDemoState == 0) && (D_i4_8011D790 >= 95);
++                pad->buttons = 0;
++                pad->stickX = 0;
++                pad->stickY = 0;
++                if (titleReady) {
++                    s_ip++;
++                    s_counter = -1;
++                    continue;
++                }
++                if (s_counter < 0) {
++                    s_counter = 0;
++                }
++                s_counter++;
++                {
++                    const int timeout = (cmd->frames > 0) ? cmd->frames : GDX_SCRIPT_DEFAULT_WAITMODE_TIMEOUT;
++                    if (s_counter >= timeout) {
++                        gdx_port_logf("[autotest] WAITTITLE timeout (mode=%d change=%d demo=%d counter=%d)\n",
++                                      gGameMode & 0x1F, (int) gGameModeChangeState, (int) gTitleDemoState,
++                                      D_i4_8011D790);
++                        s_ip++;
++                        s_counter = -1;
++                        continue;
++                    }
++                }
++                return;
++            }
+             case GDX_SCRIPT_OP_LOG: {
+                 gdx_port_logf("[autotest] %s\n", cmd->text);
+                 s_ip++;
 diff --git a/port/gen/LinkStubs.c b/port/gen/LinkStubs.c
 index ccb0585..eb611a7 100644
 --- a/port/gen/LinkStubs.c

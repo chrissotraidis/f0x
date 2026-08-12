@@ -10,7 +10,7 @@ runtime evidence. No Apple gameplay claim is made without a dated test entry.
 | 0: reproducible baseline | Verified | G-Diffuser `719fd82` and recursive dependency pins are documented; the maintained patch series clean-applies and reverse-checks against the local source checkout. |
 | 1: macOS ARM64 compile/link | macOS verified | Cartridge-only Debug executables and the sealed `F0X.app` bundle build as native arm64 Mach-O with Metal on Apple Silicon. |
 | 2: fiber proof | macOS verified | `gdx_fiber_smoketest` passed 30,000 deterministic Apple Silicon switches across three stacks on 2026-08-11. |
-| 3: complete macOS Metal race | Partially working | The branded F0X Metal bundle now visibly holds the F-Zero X title screen after the host acquires its drawable before synchronous game rendering. A test-only local archive deterministically traverses title, menu, course selection, machine selection, machine settings, and GP race mode before a clean exit. Framebuffer BMP readbacks remain black despite the visible title. Cartridge synthesis and the dedicated producer generate nonzero PCM in a bounded SDL dummy-device run; audible output remains unverified. |
+| 3: complete macOS Metal race | Partially working | The signed packaged app now boots an authorized raw ROM, deterministically traverses modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, and directly renders a live GP race with track, racers, player craft, and HUD. The direct image also shows missing/cropped HUD and machine-texture regions, matching raw-fallback null-texture warnings; visual correctness and a player-controlled completed race remain open. Cartridge synthesis and the dedicated producer generate nonzero PCM in a bounded SDL dummy-device run; audible output remains unverified. |
 | 4: macOS application | Partially working | A clean, ad-hoc-signed `F0X.app` Debug bundle passes strict macOS signature validation, carries correct F0X metadata, keeps mutable state in `~/Library/Application Support/F0X`, directly launches its branded Metal cartridge-ROM setup window, and now visibly renders a stable title screen from authorized local game data. Completed import, saves, Developer ID signing/notarization, and distribution remain unproven. |
 | 5: iOS/iPadOS build | Not started | No F0X iOS target exists. |
 | 6: physical iPad engine proof | Not tested | No signed device run exists. |
@@ -37,8 +37,8 @@ stale inference from the research.
 The active loop resumes at the first unproven product behavior, not at an
 already-passed compile or fiber gate:
 
-1. Capture direct packaged-app visuals through the existing deterministic GP
-   route and verify a playable race.
+1. Correct the packaged raw-ROM race's missing/cropped HUD and machine textures,
+   then prove player control through a completed race.
 2. Prove save creation, clean relaunch, and load persistence.
 3. Correct the desktop extraction golden mismatch and prove safe, atomic ROM
    import through the F0X UI.
