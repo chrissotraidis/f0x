@@ -2,12 +2,16 @@
 
 ## F0X-specific
 
-- **MAC-PRESENT-02 — Metal strobe fix awaits owner confirmation:** transition
-  capture moved a live game framebuffer permanently to Metal's readback queue,
-  while the main queue sampled it without a cross-queue dependency. The measured
-  38/60 black-frame baseline became 0/120 in race, 0/80 across resize, and 0/60
-  in fullscreen after keeping that target on the main queue. Keep this issue
-  open until the owner confirms the originally observed flashing is gone.
+- **MAC-PRESENT-02 — stale duplicate bundle likely explained the continuing strobe:**
+  the renderer fixes remain supported by the original 0/120 race, 0/80 resize,
+  and 0/60 fullscreen samples plus a new 462-frame race video with no black
+  frame or brightness jump. The owner's continuing report aligned with the
+  build directory containing an obsolete `G-Diffuser.app` beside
+  current `F0X.app`; both declared `com.chrissotraidis.f0x`, so Launch Services
+  could reopen the pre-Home, pre-strobe-fix binary. That is a concrete mechanism,
+  not proof of the exact path the owner launched. Packaged builds now remove
+  only that legacy product, and Finder's registered current app passed a fresh
+  544-frame Home soak. Keep owner confirmation open after this corrected launch.
 - **MAC-RACE-CRASH-01 — physical segment-base collision fixed, regression retained:**
   a valid segment-4 RDRAM offset shared low address bits with the PIE executable;
   the generic resolver chose read-only `__TEXT`, and HUD portrait DMA crashed in
@@ -37,7 +41,8 @@
   default focus even though ImGui widgets are not individually exposed to macOS
   accessibility. F0X now has a verified opt-in static/in-memory backend and the
   default desktop child backend remains available. The combined static graph has
-  not yet been compiled or executed on iOS/iPadOS.
+  is now compiled and executed in the iPad Simulator; physical iPad extraction
+  and gameplay remain unverified.
 - **MAC-AUDIO-01 — physical CoreAudio route remains unverified:** cartridge
   synthesis and the dedicated producer path now emit nonzero captured PCM.
   The reproducible proof uses SDL's dummy device so it does not establish

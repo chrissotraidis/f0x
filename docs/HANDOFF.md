@@ -33,8 +33,16 @@ The later repeating strobe was traced to transition readback permanently moving
 a live game framebuffer onto a second Metal command queue while the window
 sampled it on the main queue. The isolated current build passed 120 consecutive
 race captures, 80 resize captures, and 60 fullscreen captures with no black
-frames. The owner continues to report regular visible flashing, so the product
-gate remains open; the soak does not override direct observation.
+frames. The owner's continuing report subsequently aligned with a second,
+obsolete `G-Diffuser.app` in the same build directory: it shared the F0X bundle
+identifier but predated both Home and the strobe fix, so Launch Services could
+open the wrong product. This is the strongest concrete explanation found, not
+proof of the exact path previously launched. The packaged build now deletes only
+that legacy bundle.
+Dense videos of the current app passed 462 live-race frames and, after explicit
+Launch Services registration plus Finder launch, 544 Home frames without a
+near-black frame or brightness jump. Owner confirmation of this corrected launch
+remains open; the previous report must not be relabeled as imaginary.
 Gate 3 now has direct packaged-app race visuals, but the captured raw-ROM race
 now has restored raw-ROM machine textures and a contained narrow-window HUD.
 Owner confirmation of presentation stability, player control through a completed
@@ -54,8 +62,9 @@ process. Standard keyboard navigation/default focus is enabled on Setup and Home
 Torch now also exposes `GdxRunInProcessO2R`: it accepts ROM bytes, recipes,
 unique staging output, version, and a pollable asset counter. The static-library
 harness reproduced the exact `7d60d975...` archive twice sequentially in one
-process and refuses to overwrite a non-empty output. It is not yet linked into
-the default desktop backend or compiled for iOS.
+process and refuses to overwrite a non-empty output. It is integrated behind
+`GDX_INPROCESS_TORCH` on macOS and iOS; the desktop child backend remains the
+default fallback.
 
 That API is now integrated behind `GDX_INPROCESS_TORCH`. The opt-in macOS bundle
 links Torch statically into F0X, reuses the parent build's YAML/spdlog/tinyxml
@@ -74,7 +83,8 @@ PCM-synthesis, bundle-sealing, or title-stability gates without contradictory
 evidence. Preserve the G-Diffuser → libultraship/Fast3D → Metal architecture and
 the ROM-free public boundary. Work one falsifiable gate at a time:
 
-1. Metal presentation stability across title/menu/race/resize/fullscreen;
+1. owner confirmation of the corrected, unambiguous F0X bundle launch while
+   retaining Metal presentation regression across title/menu/race/resize/fullscreen;
 2. completed controlled race plus save/relaunch/load round-trip;
 3. close the remaining uninterrupted native picker-selection-to-race interaction;
 4. iPhoneOS build/signing and physical-iPad controller/lifecycle/audio proof;
@@ -112,6 +122,12 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   to Home. The sealed archive resolver now uses FirstBootRun's already-resolved
   executable directory, so relative shell launches and Finder launches locate
   `Contents/Resources/gdiffuser.o2r` identically.
+- The macOS packaged build removes the exact obsolete `port/G-Diffuser.app`
+  product before linking `F0X.app`. Both products previously used
+  `com.chrissotraidis.f0x`, allowing Finder/Launch Services to launch the stale
+  pre-Home binary. After rebuilding and explicitly registering only current
+  `F0X.app`, Finder launched the expected Home surface and its dense capture was
+  stable.
 - `scripts/macos-sram-toggle.gdx` uses the game's own Options menu to toggle a
   persisted setting. The first launch loaded the existing 32 KiB SRAM and
   changed its SHA-256 from `aaf4cc30...` to `a13e7eb3...`; the second launch

@@ -46,8 +46,9 @@
 
 ## Current next experiment
 
-Use the current F0X Home build for owner flashing confirmation, then run a
-player-controlled completed race and save/relaunch/load round trip. Keep
+Have the owner confirm the corrected Finder launch after legacy-bundle removal,
+then run a player-controlled completed race. The save/relaunch/load round trip
+is already verified. Keep
 `scripts/macos-packaged-race.gdx` as the boot/race regression and keep the
 extraction golden plus all-black internal BMP readback as separate gates.
 
@@ -144,7 +145,35 @@ extraction golden plus all-black internal BMP readback as separate gates.
   live nested checkouts.
 - **Boundary:** this is a functional macOS interface foundation, not a release
   sign-off. Owner UX/flashing confirmation, broader accessibility review,
-  Developer ID/notarization, and player-completed race/save persistence remain.
+  Developer ID/notarization and a player-completed race remain.
+
+## 2026-08-12 — Duplicate-bundle launch and dense Metal-video regression
+
+- **Contradiction audited:** the owner continued to report regular flashing and
+  an absent interface, while the exact current `F0X.app` visibly showed Home and
+  passed the earlier direct-image samples. The build directory contained both
+  current `F0X.app` and an older `G-Diffuser.app`. Their executables had different
+  SHA-256 values, the legacy binary did not contain `F0X Home`, and both plists
+  declared `com.chrissotraidis.f0x`. Spotlight had indexed both products.
+- **Smallest durable fix:** the macOS packaged target now depends on a cleanup
+  target that removes only `${CMAKE_CURRENT_BINARY_DIR}/G-Diffuser.app`. A full
+  packaged rebuild completed, left only `F0X.app`, and passed strict deep
+  ad-hoc signature validation plus plist lint. The maintained G-Diffuser patch
+  passed its reverse-apply check.
+- **Normal-launch proof:** Launch Services was refreshed to current `F0X.app`,
+  and `/usr/bin/open` launched the expected `F0X (Metal)` Home surface from that
+  exact bundle. Spotlight then returned only the current app for the bundle ID.
+- **Dense presentation proof:** `scripts/analyze-metal-capture.swift` decodes a
+  window video with AVFoundation, samples the inner viewport, and fails on a
+  mean-luma near-black frame or a large adjacent-frame brightness change. A live
+  scripted race produced 462 frames over 8.000 seconds (luma 97.30–98.05,
+  maximum adjacent difference 1.35); the Finder-launched Home produced 544
+  frames over 9.500 seconds (luma 8.20–8.22, maximum adjacent difference 0.13).
+  Both had zero near-black frames and zero brightness jumps.
+- **Boundary:** the stale duplicate provides a concrete mechanism that can
+  explain the owner seeing the unfixed, interface-free binary while current-build
+  captures were stable; it does not prove which path was launched. Owner
+  confirmation after this corrected launch is still required.
 
 ## 2026-08-12 — SRAM relaunch round trip
 

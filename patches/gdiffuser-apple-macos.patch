@@ -122,7 +122,7 @@ index cab4365..2e7802d 100644
      gdx_gui.cpp
      gdx_menu.cpp
      gdx_menu_registry.cpp
-@@ -296,6 +342,83 @@ if(GDX_EXPANSION_KIT)
+@@ -296,6 +342,94 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
  
@@ -148,6 +148,17 @@ index cab4365..2e7802d 100644
 +    target_compile_definitions(G-Diffuser PRIVATE GDX_MACOS_BUNDLE=1)
 +    set(GDIFFUSER_PACKAGE_DATA_DIR "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Resources")
 +    set(GDIFFUSER_PACKAGE_HELPER_DIR "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Helpers")
++
++    # OUTPUT_NAME changed after early developer builds had already emitted
++    # G-Diffuser.app. Leaving that obsolete bundle beside F0X.app gives Launch
++    # Services two apps with the same bundle identifier and can reopen the stale
++    # pre-Home/pre-presentation-fix binary. Remove only that exact legacy product
++    # before each packaged build; the current target always emits F0X.app.
++    add_custom_target(gdx_remove_legacy_macos_bundle
++        COMMAND "${CMAKE_COMMAND}" -E remove_directory
++                "${CMAKE_CURRENT_BINARY_DIR}/G-Diffuser.app"
++        VERBATIM)
++    add_dependencies(G-Diffuser gdx_remove_legacy_macos_bundle)
 +elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 +    set(MACOSX_BUNDLE_EXECUTABLE_NAME "F0X")
 +    set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x")

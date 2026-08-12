@@ -1,0 +1,73 @@
+F0X macOS duplicate-bundle and dense presentation evidence
+Date: 2026-08-12
+Host: Apple Silicon macOS
+
+Contradictory state
+-------------------
+The owner continued to see rapid flashing and no F0X interface while direct
+inspection of the current sealed product showed F0X Home and stable gameplay.
+
+Two generated macOS products were present in the same build directory:
+
+  build/macos-f0x-bundle/port/F0X.app
+  build/macos-f0x-bundle/port/G-Diffuser.app
+
+Both Info.plists declared CFBundleIdentifier=com.chrissotraidis.f0x and
+CFBundleName=F0X. Their executables were different:
+
+  F0X.app/Contents/MacOS/F0X
+  SHA-256 6301135301988cfdcb4d60ba5d40151b0dfc5d99195fce660e09e1169365fadf
+  contained string: F0X Home
+
+  G-Diffuser.app/Contents/MacOS/G-Diffuser
+  SHA-256 984fde896205a593c1b5f4e75d2c87221e8bd21209410d67b0ffc11bf289978d
+  did not contain string: F0X Home
+
+Spotlight returned both paths for the bundle identifier. This does not prove
+which path the owner launched, but it is a concrete mechanism for macOS to
+resolve F0X to the obsolete pre-Home, pre-presentation-fix product.
+
+Dense capture results
+---------------------
+The current product ran scripts/macos-metal-stability.gdx through a live race.
+A direct 8-second window video analyzed with
+scripts/analyze-metal-capture.swift produced:
+
+  frames=462 duration_seconds=8.000
+  mean_luma_min=97.30 mean_luma_max=98.05
+  max_black_fraction=0.0422 near_black_frames=0
+  max_adjacent_difference=1.35 brightness_jumps=0
+
+The obsolete bundle was removed, current F0X.app was explicitly registered,
+and /usr/bin/open launched that exact app into the visible Home surface. A new
+direct window video produced:
+
+  frames=544 duration_seconds=9.500
+  mean_luma_min=8.20 mean_luma_max=8.22
+  max_black_fraction=0.6611 near_black_frames=0
+  max_adjacent_difference=0.13 brightness_jumps=0
+
+The dark Home background explains its low mean luma; the signal remained stable
+and never crossed the analyzer's near-black mean-frame threshold.
+
+Durable regression
+------------------
+The macOS packaged build now makes G-Diffuser depend on
+gdx_remove_legacy_macos_bundle, which deletes only the exact generated path
+port/G-Diffuser.app before F0X.app is linked.
+
+A fake legacy bundle and marker were created, the cleanup target was run, and
+the directory was absent afterward (`legacy_cleanup_target=pass`). Ninja's
+target query showed F0X's linker has an order-only dependency on
+port/gdx_remove_legacy_macos_bundle.
+
+The complete packaged rebuild succeeded after adding the cleanup. The current
+app passed strict deep code-signature validation and plist lint. The maintained
+G-Diffuser patch passed its reverse-apply check.
+
+Boundary
+--------
+Current F0X.app is stable under these dense signals and the ambiguous legacy
+product is gone. Owner confirmation after launching this corrected product is
+still required; this evidence does not erase or contradict what was seen before
+the duplicate-bundle cause was removed.
