@@ -2,6 +2,21 @@
 
 ## F0X-specific
 
+- **IOS-TOUCH-01 — gameplay touch controls are absent:** F0X currently has only
+  SDL finger-to-ImGui mouse translation for setup/menu interaction. No UIKit
+  gameplay overlay, analog steering, racing buttons, multi-touch, touch settings,
+  layout editor, opacity, lifecycle release, or physical-controller handoff is
+  compiled. The pinned HarkinianPad patches are references, not installed
+  functionality. The exact implementation contract is in
+  `TOUCH_CONTROLS_IMPLEMENTATION.md`.
+- **IOS-LIFECYCLE-01 — mobile lifecycle is unverified:** background/foreground,
+  simulation/audio/presentation suspension, config/save flush, input clearing,
+  interruption, memory pressure, and resume have not received F0X runtime proof.
+- **IOS-HARDWARE-01 — physical mobile acceptance externally blocked here:** the
+  current Mac reports no connected device and zero valid signing identities.
+  Simulator and unsigned device-SDK builds do not establish physical rendering,
+  controller, touch, audible audio, saves, lifecycle, performance, or thermals.
+
 - **MAC-PRESENT-02 — stale duplicate bundle likely explained the continuing strobe:**
   the renderer fixes remain supported by the original 0/120 race, 0/80 resize,
   and 0/60 fullscreen samples plus a new 462-frame race video with no black
@@ -30,7 +45,7 @@
   black frames even though a fresh desktop capture visibly shows the rendered
   F-Zero X title screen. The readback path cannot be used as gameplay proof
   until it is fixed or independently cross-checked.
-- **MAC-ARCHIVE-01 — desktop archive fixed; in-process/mobile importer remains:**
+- **MAC-ARCHIVE-01 — desktop and Simulator importer fixed; physical import remains:**
   the bundled extractor and recipes reproducibly emit the same 3,610-entry
   archive (`7d60d975...`) across two independent runs. The refreshed generated
   golden passes the entry-count, version-CRC, family-completeness, install,
@@ -40,9 +55,10 @@
   hot-mount, and same-process game continuation; keyboard navigation supplies
   default focus even though ImGui widgets are not individually exposed to macOS
   accessibility. F0X now has a verified opt-in static/in-memory backend and the
-  default desktop child backend remains available. The combined static graph has
-  is now compiled and executed in the iPad Simulator; physical iPad extraction
-  and gameplay remain unverified.
+  default desktop child backend remains available. The combined static graph is
+  now compiled and executed in the iPad Simulator. One uninterrupted Files
+  picker-to-race process is verified; physical iPad extraction/gameplay and
+  invalid/cancel/storage-pressure failure paths remain unverified.
 - **MAC-AUDIO-01 — physical CoreAudio route remains unverified:** cartridge
   synthesis and the dedicated producer path now emit nonzero captured PCM.
   The reproducible proof uses SDL's dummy device so it does not establish
@@ -72,6 +88,7 @@
 - Upstream G-Diffuser public documentation and its platform matrix remain
   Windows/Linux-oriented; F0X's Apple behavior is carried by the maintained
   patch series and must remain regression-tested against pin `719fd82`.
-- Current mobile extraction cannot retain the desktop child-process model.
+- Current iOS extraction correctly uses in-process Torch; physical-device memory,
+  cancellation, interruption, and storage-pressure behavior remain open.
 - The packaged cartridge build has validated and booted an authorized local US
   rev0 `.z64`; byte-swapped `.v64` import is not yet a product-supported claim.

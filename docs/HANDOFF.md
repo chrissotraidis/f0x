@@ -1,5 +1,25 @@
 # Handoff
 
+> **Superseded navigation:** this historical narrative preserves the detailed
+> implementation history. The canonical continuation is now
+> [`NEXT_BUILDER.md`](NEXT_BUILDER.md), with touch specifics in
+> [`TOUCH_CONTROLS_IMPLEMENTATION.md`](TOUCH_CONTROLS_IMPLEMENTATION.md) and the
+> paste-ready loop in [`BUILDER_GOAL_LOOP.md`](BUILDER_GOAL_LOOP.md).
+
+## 2026-08-12 reconciliation after the entries below
+
+One uninterrupted native Files-picker selection-to-race interaction is now
+verified in a single Simulator F0X process: the app selected the authorized ROM
+from Files storage, copied it into its new sandbox as `baserom.us.rev0.z64`,
+validated SHA-1 `5f658e88ffa9de23cba6986a8fd3d3a90d7b4340`, ran in-process Torch, installed
+the verified 3,610-entry archive, and visibly rendered a live race. This closes
+the older “separate picker and extraction proofs” caveat below.
+
+Gameplay touch controls and their menu options are not implemented. The pinned
+HarkinianPad checkout is only a reference. The current machine still has no
+connected physical Apple device and no signing identity, so physical iPad/iPhone
+acceptance remains open.
+
 ## Current gate
 
 Gate 5 now has Simulator gameplay proof from the genuine arm64 iOS target. It
@@ -178,10 +198,8 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 ## Next action
 
-The unsigned iPhoneOS build is ready for a machine with an Apple Development
-identity and a connected iPad; on this host, physical installation is externally
-blocked. Continue locally with the two honest product gaps that do not require
-that hardware: one uninterrupted native Files-picker selection-to-race
-interaction, and the owner's continuing macOS flashing report. The latter needs
-a human-visible presentation signal beyond the existing black-frame classifier
-before it can be called fixed.
+This section belonged to the older checkpoint: its picker-to-race item is now
+closed by the reconciliation at the top of this file. The active local task is
+the touch implementation in `NEXT_BUILDER.md`; the unsigned iPhoneOS build still
+awaits a machine with an Apple Development identity and connected iPad, and the
+owner's macOS flashing confirmation remains open.

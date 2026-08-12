@@ -430,3 +430,73 @@ extraction golden plus all-black internal BMP readback as separate gates.
   unsigned. This is device-SDK compile/package evidence only; signing,
   installation, launch, controller gameplay, lifecycle, audible output, and
   physical iPad acceptance remain untested.
+
+## 2026-08-12 — uninterrupted native Files picker to visible race
+
+- **Clean product state:** the installed Simulator app's generated Documents
+  data was cleared while an authorized ROM was retained only in the Simulator's
+  Files-provider storage. The app was installed and launched once on the single
+  booted iPad Pro 11-inch (M5) Simulator; the run used one F0X PID.
+- **Actual picker interaction:** the visible `Choose ROM...` action presented
+  Apple's Files picker. `On My iPad > F0X Import Test` was opened and the
+  authorized US-rev0 `.z64` was selected. F0X copied it into its new sandbox as
+  `baserom.us.rev0.z64` and verified SHA-1
+  `5f658e88ffa9de23cba6986a8fd3d3a90d7b4340`.
+- **Same-process extraction:** choosing `Build game data and continue` used
+  `in-process Torch (ROM bytes, no fork/exec)`, validated and atomically installed
+  the 3,610-entry archive at the established SHA-256, hot-mounted it, and
+  continued without relaunching.
+- **Direct visible result:** the same process visibly rendered a live landscape
+  GP race on the Simulator Metal surface. The captured frame shows the player's
+  craft, track, field, position/lap/speed/energy HUD, and minimap. The process was
+  then explicitly terminated and the same PID exited.
+- **Boundary:** this closes the prior uninterrupted picker-selection-to-race gap
+  for Simulator. It does not prove physical Files-provider behavior, device
+  extraction performance, touch gameplay, lifecycle, audible output, signing,
+  or physical iPad acceptance. The private screenshot/log remain ignored build
+  artifacts; the compact tracked summary is
+  `docs/evidence/ios-picker-to-race/2026-08-12.txt`.
+
+## 2026-08-12 — touch implementation audit
+
+- **Audit result:** no gameplay touch implementation exists in current F0X.
+  SDL finger events translate only to ImGui mouse interaction. No
+  `gdx_touch_controls` bridge, UIKit gameplay overlay, racing controls, touch
+  CVars/settings, editor, phone/tablet profiles, lifecycle cancel, or controller
+  handoff is compiled.
+- **Reference boundary:** HarkinianPad `1197472` contains proven UIKit overlay,
+  editor, profile, menu-lifecycle, and opacity patterns, but its patches target
+  Shipwright and synthesize keyboard inputs. They have not been applied to F0X
+  and must be adapted to F0X's direct `input_bridge.c` N64 pad seam.
+- **Source-proven mapping:** current F-Zero X code uses A for acceleration, B
+  for boost, C-down for brake, Z/R for slide/attack, C-right for camera change,
+  and C-up for look-back. This mapping is now fixed in
+  `TOUCH_CONTROLS_IMPLEMENTATION.md` for the next builder.
+- **Boundary:** this is a read-only implementation audit and documentation
+  checkpoint, not a touch build or runtime pass.
+
+## 2026-08-12 — next-builder documentation checkpoint
+
+- **Scope reconciliation:** README, platform/build/data/performance/architecture
+  docs, the status ledger, known issues, and the historical handoff were checked
+  against current source, commits, tracked evidence, the latest private
+  picker-to-race artifact, current device/signing state, and HarkinianPad
+  `1197472`. Stale Gate-0, “Apple not built,” and “picker still open” claims were
+  removed. Touch remains explicitly not implemented.
+- **New source-of-truth references:** `NEXT_BUILDER.md` records verified/open/
+  blocked state and the exact remaining queue;
+  `TOUCH_CONTROLS_IMPLEMENTATION.md` records source-proven F-Zero mappings,
+  HarkinianPad adaptation boundaries, architecture, file sequence, and acceptance
+  tests; `BUILDER_GOAL_LOOP.md` holds the paste-ready autonomous continuation.
+- **Command verification:** generated Xcode projects expose the `G-Diffuser`
+  scheme and the latest successful Simulator logs use explicit `xcodebuild`
+  project/scheme/SDK/destination syntax. `BUILDING.md` now records those concrete
+  commands and the ios-cmake pin instead of the obsolete untested plan.
+- **Integrity checks:** `git diff --check` passed; all 18 tracked Markdown files
+  passed relative-link validation; the five maintained patch artifacts passed
+  reverse-apply checks against their current source trees; the tracked-file scan
+  found no ROM/archive/save/app/IPA/provisioning/key extension and no private-key
+  or certificate marker.
+- **Boundary:** documentation does not close touch, physical hardware, audible
+  audio, lifecycle, completed-race, timing, packaging, README-quality, or
+  Expansion Kit acceptance. It makes those gates executable by the next builder.

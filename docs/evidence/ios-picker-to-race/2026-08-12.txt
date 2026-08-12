@@ -1,0 +1,27 @@
+F0X uninterrupted iPad Simulator Files picker-to-race evidence
+Date: 2026-08-12
+Simulator: iPad Pro 11-inch (M5), iOS 26.5
+
+One clean F0X launch used one process (PID 33866) for the complete product flow:
+
+1. F0X presented its native Files picker from Choose ROM...
+2. On My iPad > F0X Import Test was opened.
+3. The authorized US-rev0 .z64 was selected.
+4. F0X copied it into its new Documents sandbox as baserom.us.rev0.z64.
+5. F0X verified SHA-1 5f658e88ffa9de23cba6986a8fd3d3a90d7b4340.
+6. Build game data and continue was activated.
+7. The same process ran in-process Torch with ROM bytes and no fork/exec.
+8. The validated 3,610-entry fzerox.o2r was atomically installed and hot-mounted.
+9. The same process visibly rendered a live landscape GP race through Metal.
+10. The process was explicitly terminated and PID 33866 exited.
+
+The ignored direct screenshot showed the player's craft, track, rival field,
+minimap, and live position/lap/speed/energy HUD. It is intentionally not tracked
+because it is a private local gameplay artifact.
+
+Boundary
+--------
+This closes the uninterrupted Files-picker selection-to-race interaction on
+Simulator. It is not physical-device, touch, lifecycle, audible-output, signing,
+performance, or thermal evidence. No ROM, derived archive, save, Simulator
+container path, or private gameplay image is tracked.
