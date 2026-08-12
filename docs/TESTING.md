@@ -346,3 +346,32 @@ extraction golden plus all-black internal BMP readback as separate gates.
   touch gameplay, lifecycle, audio, physical signing, and physical iPad are not
   yet claimed. The owner also continues to report regular visible flashing on
   the macOS game despite automated black-frame soaks, so that gate remains open.
+
+## 2026-08-12 — iPad Simulator in-process extraction and GP race
+
+- **Authorized local input:** an ignored US-rev0 ROM was copied only into the
+  installed Simulator app's Documents sandbox. It was never added to the source
+  tree, build product, patch ledger, or Git history.
+- **In-process extraction:** the genuine arm64 Simulator app logged `backend:
+  in-process Torch (ROM bytes, no fork/exec)`, installed `fzerox.o2r [us/rev0]`
+  with 3,610 entries and verified SHA-256, and mounted it from Documents. The
+  archive matched the established golden
+  `7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a`.
+- **Game route and direct visual proof:** the unchanged 28-command packaged GP
+  script reached `packaged_gp_race_capture_interval`. Direct inspection of the
+  live Simulator showed the Blue Falcon on the starting grid with the race HUD
+  and 30-racer field on the landscape Metal surface. The script then requested
+  quit, completed all commands, and the F0X window closed normally.
+- **Archive-only negative run:** the ROM was temporarily renamed inside the
+  sandbox for a second launch. F0X explicitly logged `booting archive-only`,
+  `asset extraction: up to date`, and `no ROM image found`; it again reached the
+  packaged GP race marker, completed all 28 commands, and closed normally. The
+  app process and console wrapper were stopped and the single local ROM was
+  restored to its original sandbox path.
+- **Boundary:** this proves iOS in-process extraction, validated atomic archive
+  activation, archive-only reuse, game-mode traversal, and visible Simulator
+  race output. Native Files-picker presentation was proven separately. Because
+  the test injected the authorized ROM directly into Documents, this is not yet
+  one uninterrupted manual picker-selection-to-race proof. It also is not touch,
+  lifecycle, audible-output, signing, or physical-iPad evidence. The owner's
+  separate macOS flashing report remains open.

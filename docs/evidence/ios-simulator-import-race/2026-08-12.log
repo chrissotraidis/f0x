@@ -1,0 +1,44 @@
+F0X iPad Simulator import/race evidence — 2026-08-12
+
+Run 1: authorized US-rev0 ROM present in the installed app's Documents sandbox
+
+[firstboot] cartridge-only build: booting verified ROM .../Documents/baserom.us.rev0.z64
+[extract] ROM matched profile us/rev0 -> fzerox.o2r.
+[extract] backend: in-process Torch (ROM bytes, no fork/exec)
+[extract] installed fzerox.o2r [us/rev0] (3610 entries, sha256 verified).
+[G-Diffuser] asset extraction: extracted and installed fzerox.o2r
+[autotest] packaged_gp_race_capture_interval
+[autotest] QUIT requested
+[autotest] script complete (28 commands)
+[G-Diffuser] window closed; exiting
+[audio-thread] dedicated audio thread stopping
+
+Direct live-Simulator inspection at the race marker showed the Blue Falcon on
+the starting grid with the race HUD and 30-racer field in landscape.
+
+Run 2: the same ROM temporarily renamed inside Documents
+
+[firstboot] cartridge-only build: booting archive-only (ROM served from fzerox.o2r)
+[extract] fzerox.o2r already verified this boot; skipping re-hash.
+[G-Diffuser] asset extraction: up to date (fzerox.o2r already valid)
+[rom] no ROM image found; booting archive-only (assets served from fzerox.o2r; raw-ROM fallback disabled by absence)
+[G-Diffuser] no ROM loaded; continuing archive-only boot (fzerox.o2r validated). Any raw-ROM fallback read will be logged/zero-filled.
+[autotest] packaged_gp_race_capture_interval
+[autotest] QUIT requested
+[autotest] script complete (28 commands)
+[G-Diffuser] window closed; exiting
+[audio-thread] dedicated audio thread stopping
+
+Postcondition
+
+- The F0X process and simctl console wrapper were no longer running.
+- The ignored local ROM was restored to its original Documents path.
+- The temporary archive-only-test name was absent.
+- No ROM, generated archive, save, or Simulator container path is tracked.
+
+Boundary
+
+This proves the iOS in-process extraction/archive/gameplay path and a separate
+archive-only negative boot. Native Files-picker presentation was proven in a
+separate live interaction; this log does not claim one uninterrupted manual
+picker-selection-to-race run or physical-device evidence.

@@ -12,9 +12,9 @@ runtime evidence. No Apple gameplay claim is made without a dated test entry.
 | 2: fiber proof | macOS verified | `gdx_fiber_smoketest` passed 30,000 deterministic Apple Silicon switches across three stacks on 2026-08-11. |
 | 3: complete macOS Metal race | Stability and save persistence verified | The signed packaged app boots an authorized raw ROM, deterministically traverses modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, and directly renders a live GP race. The repeating black strobe was reproduced at 38/60 direct window captures and reduced to 0/120 after keeping live Metal render targets off the unsynchronized readback queue. Additional current-build samples passed 0/80 across two window sizes and 0/60 in fullscreen. A race HUD portrait crash from a physical-address/module-address collision was fixed. Two real Options-menu writes across two launches proved the 32 KiB SRAM is loaded and persisted exactly. Player-controlled race completion remains open. Cartridge synthesis produces nonzero PCM under SDL dummy output; audible output remains unverified. |
 | 4: macOS application | macOS interface foundation verified | The sealed `F0X.app` passes strict ad-hoc signature validation, keeps mutable state in Application Support, and now opens on a branded F0X Home surface with verified-data state, Play, Manage Game Data, Open Data Folder, startup display settings, recovery guidance, and Quit. Management reuses the validated import screen in-process and guards against click-through. Release signing/notarization and broader settings remain open. |
-| 5: iOS/iPadOS build | Simulator verified | A genuine arm64 iOS 16+ `F0X.app` builds with the Xcode Simulator SDK, launches on the iPad Pro 11-inch (M5) Simulator through SDL + Metal, stays alive on the first-time setup surface, uses sandbox Documents for mutable data, and presents a native Files picker. This is not physical-device evidence. |
+| 5: iOS/iPadOS build | Simulator gameplay verified | A genuine arm64 iOS 16+ `F0X.app` builds with the Xcode Simulator SDK and launches on the iPad Pro 11-inch (M5) Simulator through SDL + Metal. It uses sandbox Documents for mutable data, presents a native Files picker, performs in-process extraction, hot-mounts the validated archive, and visibly reaches a live landscape GP race. This is not physical-device evidence. |
 | 6: physical iPad engine proof | Not tested | No signed device run exists. |
-| 7–8: product import / in-process Torch | macOS complete; iOS picker/compile verified | The bundled desktop extractor produces a byte-deterministic, fully validated 3,610-entry archive whose golden is `7d60d975...`. With `GDX_INPROCESS_TORCH=ON`, both the sealed macOS app and the genuine arm64 Simulator app link Torch statically without child processes. The iPad setup surface presents Apple's Files picker and a writable Documents destination; selecting an authorized ROM and completing extraction on iOS remain unverified. |
+| 7–8: product import / in-process Torch | macOS complete; iOS sandbox path verified | The bundled desktop extractor produces a byte-deterministic, fully validated 3,610-entry archive whose golden is `7d60d975...`. With `GDX_INPROCESS_TORCH=ON`, both the sealed macOS app and the genuine arm64 Simulator app link Torch statically without child processes. In the Simulator sandbox, the iOS graph extracted an authorized US-rev0 ROM in process, atomically installed the verified 3,610-entry archive, and reached a visible GP race. A second run removed the ROM and independently reached the race from the archive alone. Native Files-picker presentation is separately verified; an uninterrupted manual picker-selection-to-race interaction remains open. |
 | Touch / lifecycle / 60 Hz / high refresh | Not started | Deferred until controller-first engine proof. |
 | 64DD Expansion Kit | Deferred | Cartridge-only build is the first Apple target. |
 
@@ -42,8 +42,9 @@ already-passed compile or fiber gate:
    does not supersede repeated visible flashing on the owner's screen.
 2. Prove player control through a completed race, then save creation, clean
    relaunch, and load persistence.
-3. Complete an authorized Simulator ROM selection and in-process extraction,
-   then reach a stable title/race with the integrated iOS graph.
+3. Complete one uninterrupted native Files-picker selection-to-race interaction;
+   the separately verified picker and Simulator extraction/gameplay paths must
+   not be conflated.
 4. Build/sign for iPhoneOS and establish a physical-iPad controller race,
    lifecycle, and audio.
 5. Only after physical engine proof: touch UX, timing/high refresh, release

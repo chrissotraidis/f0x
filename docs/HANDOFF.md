@@ -2,16 +2,24 @@
 
 ## Current gate
 
-Gate 5 now has a genuine arm64 iOS Simulator target. It links the same F0X,
-libultraship/Fast3D, Metal, and in-process Torch graph; launches on the single
-booted iPad Pro 11-inch (M5) Simulator; uses sandbox Documents for mutable data;
-renders a stable landscape, touch-sized first-time setup panel; and presents the
-native Files picker from `Choose ROM...`. The first iOS launch originally
-aborted in `AddFontFromFileTTF`: Xcode had copied fonts to a literal variable
-directory and libultraship conflated Documents with bundle resources. Fonts now
-ship inside `F0X.app`, bundle/data paths are distinct, and missing fonts fall
-back without asserting. Authorized ROM selection, iOS extraction, game boot,
-physical signing/device execution, controller, audio, and lifecycle remain open.
+Gate 5 now has Simulator gameplay proof from the genuine arm64 iOS target. It
+links the same F0X, libultraship/Fast3D, Metal, and in-process Torch graph;
+launches on the single booted iPad Pro 11-inch (M5) Simulator; uses sandbox
+Documents for mutable data; and presents the native Files picker from `Choose
+ROM...`. From an authorized ROM already placed in that sandbox, the app logged
+`in-process Torch (ROM bytes, no fork/exec)`, atomically installed the verified
+3,610-entry golden archive, traversed the packaged GP route, and visibly rendered
+a live landscape race. A second run temporarily removed the ROM and independently
+reached the same race from the validated archive alone, then exited cleanly and
+restored the local ROM. Picker presentation and extraction/gameplay are therefore
+separate proofs; a single uninterrupted manual picker-selection-to-race run is
+still open. Physical signing/device execution, controller, audio, lifecycle, and
+touch gameplay also remain open.
+
+The first iOS launch originally aborted in `AddFontFromFileTTF`: Xcode had copied
+fonts to a literal variable directory and libultraship conflated Documents with
+bundle resources. Fonts now ship inside `F0X.app`, bundle/data paths are distinct,
+and missing fonts fall back without asserting.
 
 Gate 4 now has a verified interface foundation: F0X has a reproducible, sealed
 arm64 `F0X.app` that macOS directly launches, with mutable data separated from
@@ -58,14 +66,15 @@ still builds and seals.
 
 ## Revised goal and execution order
 
-Continue from commit `996973f`; do not reopen the native build, macOS fiber,
+Continue from the current `main` checkpoint (the Simulator-shell implementation
+landed in `382159c`); do not reopen the native build, macOS fiber,
 PCM-synthesis, bundle-sealing, or title-stability gates without contradictory
 evidence. Preserve the G-Diffuser → libultraship/Fast3D → Metal architecture and
 the ROM-free public boundary. Work one falsifiable gate at a time:
 
 1. Metal presentation stability across title/menu/race/resize/fullscreen;
 2. completed controlled race plus save/relaunch/load round-trip;
-3. complete Simulator ROM import, in-process extraction, and title/race boot;
+3. close the remaining uninterrupted native picker-selection-to-race interaction;
 4. iPhoneOS build/signing and physical-iPad controller/lifecycle/audio proof;
 5. touch, timing/high refresh, packaging, README, and final audits.
 
@@ -134,12 +143,18 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   install. The generated archive matched `7d60d975...`, hot-mounted in the same
   process, and completed the packaged race route. The ordinary child-backend
   build was rebuilt afterward and still seals successfully.
+- The genuine arm64 iPad Simulator app ran Torch inside the F0X process against
+  an authorized sandbox ROM, installed the exact 3,610-entry golden archive,
+  reached `packaged_gp_race_capture_interval`, and visibly rendered a live GP
+  race. With that ROM temporarily renamed, the next launch explicitly selected
+  archive-only mode, skipped extraction, reached the same marker, completed all
+  28 commands, and closed normally. The test ROM was restored afterward.
 
 ## Next action
 
-Exercise the native Files picker with an authorized ROM, prove in-process Torch
-extraction and atomic archive activation in the Simulator sandbox, then boot the
-title/race. Keep the owner's flashing report open while investigating a
-human-visible presentation signal beyond the black-frame classifier. After the
-Simulator product path, configure an iPhoneOS build and move to physical-iPad
-controller/lifecycle/audio proof.
+Inspect available Apple device/signing state, then configure the iPhoneOS build
+and move toward physical-iPad controller/lifecycle/audio proof. In parallel with
+that gate sequence, keep two honest product gaps open: one uninterrupted native
+Files-picker selection-to-race interaction, and the owner's continuing macOS
+flashing report. The latter needs a human-visible presentation signal beyond the
+existing black-frame classifier before it can be called fixed.
