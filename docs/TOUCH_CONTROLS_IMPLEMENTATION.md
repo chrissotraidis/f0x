@@ -6,21 +6,36 @@ HarkinianPad reference at `1197472`.
 
 ## Current truth
 
-F0X has **no gameplay touch controller today**.
+F0X has a gameplay touch controller, implemented and Simulator-verified at its
+core on 2026-08-12 (evidence: `docs/evidence/touch-ios/2026-08-12.txt`).
 
-- `ref/G-Diffuser/libultraship/src/fast/backends/gfx_sdl2.cpp` translates a
-  single SDL finger into ImGui mouse input for setup/menu interaction. That is
-  not an N64 pad, not analog steering, and not gameplay multi-touch.
-- There is no F0X UIKit overlay, virtual stick, racing button layout, layout
-  editor, touch opacity setting, touch/gamepad handoff, or interruption cancel.
-- `ref/harkinianpad` and its patches are references only. None of those touch
-  sources is compiled into F0X.
-- Existing F0X settings pages are General, Graphics, Audio, Controls/Input
-  Editor, Input Viewer, Enhancements, Workshop, Online, and Dev Tools. No Touch
-  Controls menu exists.
+- `port/gdx_touch_controls.h` is the cross-platform API; `port/gdx_touch_state.c`
+  is the platform-neutral atomic pad-state/layout/profile core; the iOS
+  implementation is `port/gdx_touch_controls_ios.mm` and the desktop build uses
+  `port/gdx_touch_controls_stub.c`. Exactly one is compiled (see
+  `port/CMakeLists.txt`).
+- `port/input_bridge.c` merges one touch snapshot into port 1 immediately after
+  the single ControlDeck read and before developer overrides; the touch layer
+  never computes edges.
+- The UIKit overlay renders the hand-authored tablet layout and writes direct
+  atomic N64 pad state (no keyboard synthesis). `gdx_touch_merge_tests` passes
+  87 sub-checks. On the iPad Simulator, START/L/ACCEL/BOOST/BRAKE/D-pad produced
+  the exact N64 bits, the analog stick reported continuous values, the •••
+  button opened/closed the GdxMenu with overlay hide/restore, auto-hide reacted
+  to SDL-visible gamepads, and a touch-driven GP flow reached a live race.
+- `ref/harkinianpad` and its patches remain references only; the F0X overlay is
+  an original adaptation that writes the N64 pad seam directly instead of
+  synthesizing keyboard events.
+- The Settings -> Controls page now registers the Touch Controls section
+  (hidden when `gdx_touch_controls_available()==0`); the widgets compile and
+  register but their rendering has not yet been captured in a live screenshot
+  (the embedded ImGui Input Editor page would not scroll under synthetic
+  clicks). The layout editor, NSUserDefaults profile persistence, phone
+  defaults, and physical-device multi-touch acceptance are implemented but not
+  yet exercised live.
 
-Do not claim touch as implemented until source, build, live input, and UI
-evidence all exist.
+Claim touch as Simulator-verified only for the control set and game flow above;
+physical acceptance remains open.
 
 ## What to reuse from HarkinianPad
 

@@ -500,3 +500,60 @@ extraction golden plus all-black internal BMP readback as separate gates.
 - **Boundary:** documentation does not close touch, physical hardware, audible
   audio, lifecycle, completed-race, timing, packaging, README-quality, or
   Expansion Kit acceptance. It makes those gates executable by the next builder.
+
+## 2026-08-12 — touch system implemented and Simulator-verified
+
+- **Scope:** the full F0X touch layer landed as one coherent unit: a
+  cross-platform API (`port/gdx_touch_controls.h`), a platform-neutral atomic
+  state/layout/profile core (`port/gdx_touch_state.c`), a UIKit overlay
+  (`port/gdx_touch_controls_ios.mm`), a neutral stub for desktop
+  (`port/gdx_touch_controls_stub.c`), the port-1 merge in `input_bridge.c`
+  (immediately after the one ControlDeck read, before developer overrides),
+  the per-frame host tick and menu/gamepad host callbacks in `main.cpp`, touch
+  CVars in `GdxMenu::GdxMenu()`, and the Settings -> Controls -> Touch Controls
+  section in `gdx_menu_registry.cpp`.
+- **Deterministic regression:** `gdx_touch_merge_tests` passed 87 sub-checks
+  against the unmodified `gdx_touch_state.c`: every N64 button bit OR-merges and
+  clears; the normalized stick maps continuously to -80..80 with circle
+  clamping, sign correctness, deadzone, and `stickActive`; an inactive touch
+  stick preserves the physical analog and an active one owns only the two axes;
+  simultaneous accelerator + steering + brake/boost/Z/R merge; cancel clears
+  buttons and stick; layout overrides apply by id, clamp into the safe rect,
+  clamp scale into 70%..150%, and never hide protected controls (stick,
+  accelerator, Start, permanent menu); the versioned profile text round-trips.
+- **macOS neutral regression:** the rebuilt sealed `F0X.app` (stub touch path)
+  passed `codesign --verify --deep --strict`, and the packaged GP script still
+  traversed modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, reached
+  `packaged_gp_race_capture_interval`, completed all 28 commands, and exited 0.
+  `gdx_fiber_smoketest` still passes.
+- **Simulator build:** the genuine arm64 Simulator app compiled and linked with
+  the UIKit overlay (ARC on), installed, and launched on the single booted
+  iPad Pro 11-inch (M5) Simulator.
+- **Live overlay and input chain:** the overlay renders the hand-authored
+  tablet layout (stick, D-pad, ACCEL/BOOST/BRAKE, SLIDE L/R, START,
+  VIEW/LOOK/C-left/L, and the permanent ••• button). Real synthesized UIKit
+  touches produced the exact N64 state input_bridge.c merges: START=0x1000,
+  L=0x0020, ACCEL=0x8000, BOOST=0x4000, BRAKE=0x0004, D-pad down=0x0400, and
+  continuous analog stick values that change with the drag and clear on
+  release.
+- **Gameplay flow:** touch START advanced the title; a complete touch-driven GP
+  route reached a live race (SELECT MODE -> GP RACE -> STANDARD -> JACK CUP /
+  MUTE CITY -> BLUE FALCON -> machine settings -> starting grid), where holding
+  ACCEL accelerated the craft from 0 to 41 km/h before a wall stall.
+- **Menu and auto-hide:** the ••• button opened the live GdxMenu (log: "touch
+  menu visible -> gameplay overlay hidden") and closed it ("menu closed ->
+  overlay restored"). With the Simulator's two SDL-visible MFi gamepads
+  connected, `gSettings.Touch.AutoHideWithController=1` hid the gameplay
+  overlay; setting it to 0 restored it for touch testing.
+- **Device build:** the unsigned arm64 iPhoneOS app rebuilt successfully with
+  the touch sources and passed the ROM-free payload scan (0 prohibited files).
+- **Patch replay:** `patches/gdiffuser-apple-macos.patch` was regenerated and
+  verified: reverse-check against the tested working tree passes, and the full
+  five-patch series applies cleanly to a pristine pinned clone with the touch
+  files byte-identical to the tested tree.
+- **Boundary:** Simulator-only. The Settings page's Touch Controls widgets are
+  compiled and registered (the Controls page itself renders), but synthetic
+  clicks could not scroll the embedded ImGui Input Editor page to reveal them;
+  the layout editor, NSUserDefaults profile persistence, phone defaults, and
+  physical-device multi-touch acceptance remain to be exercised. The private
+  gameplay screenshots are local artifacts and are not tracked.

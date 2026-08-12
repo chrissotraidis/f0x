@@ -2,13 +2,21 @@
 
 ## F0X-specific
 
-- **IOS-TOUCH-01 — gameplay touch controls are absent:** F0X currently has only
-  SDL finger-to-ImGui mouse translation for setup/menu interaction. No UIKit
-  gameplay overlay, analog steering, racing buttons, multi-touch, touch settings,
-  layout editor, opacity, lifecycle release, or physical-controller handoff is
-  compiled. The pinned HarkinianPad patches are references, not installed
-  functionality. The exact implementation contract is in
-  `TOUCH_CONTROLS_IMPLEMENTATION.md`.
+- **IOS-TOUCH-01 — gameplay touch controls are implemented; physical and
+  settings-page acceptance remain open:** the UIKit overlay now writes direct
+  atomic N64 pad state merged at the port-1 seam, with hand-authored phone/
+  tablet defaults, settings CVars, auto-hide with physical controller,
+  opacity, haptics, permanent menu access, menu-state hiding, a layout editor
+  with versioned `NSUserDefaults` profiles, and lifecycle cancel paths. The
+  Simulator verified the complete control set and a touch-driven GP flow to a
+  live race; `gdx_touch_merge_tests` passes 87 sub-checks. Open: rendering of
+  the Settings -> Controls -> Touch Controls widgets could not be captured by
+  synthetic clicks (the embedded ImGui Input Editor page did not scroll), the
+  editor and profile persistence have not been exercised on-device, phone
+  defaults have not been run on a phone Simulator, and true multi-touch
+  contact stress, controller handoff, interruptions, and long sessions require
+  physical iPad/iPhone acceptance. SDL finger-to-ImGui mouse translation is
+  unchanged.
 - **IOS-LIFECYCLE-01 — mobile lifecycle is unverified:** background/foreground,
   simulation/audio/presentation suspension, config/save flush, input clearing,
   interruption, memory pressure, and resume have not received F0X runtime proof.

@@ -20,7 +20,7 @@ index 789b053..a0cc2a8 100644
      if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
          return 0;
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..2e7802d 100644
+index cab4365..e4ff308 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
 @@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
@@ -122,7 +122,25 @@ index cab4365..2e7802d 100644
      gdx_gui.cpp
      gdx_menu.cpp
      gdx_menu_registry.cpp
-@@ -296,6 +342,94 @@ if(GDX_EXPANSION_KIT)
+@@ -287,6 +333,17 @@ add_executable(G-Diffuser
+     "${CMAKE_CURRENT_SOURCE_DIR}/../torch/lib/libmio0/mio0.c"
+     $<TARGET_OBJECTS:gdiffuser_game>)
+ 
++# Touch controls: the platform-neutral atomic state core is compiled on every
++# platform (input_bridge.c and the deterministic test both drive it); exactly
++# one of the UIKit overlay (iOS) or the neutral stub (everything else) is
++# compiled so all call sites stay platform-neutral.
++target_sources(G-Diffuser PRIVATE gdx_touch_state.c)
++if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
++    target_sources(G-Diffuser PRIVATE gdx_touch_controls_ios.mm)
++else()
++    target_sources(G-Diffuser PRIVATE gdx_touch_controls_stub.c)
++endif()
++
+ if(GDX_EXPANSION_KIT)
+     # All four files reference EK-only symbols (gdx_ek_assets_fill, machine_create labels, EK
+     # overlay .data), so they must not build in US-only configs.
+@@ -296,6 +353,94 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
  
@@ -217,7 +235,7 @@ index cab4365..2e7802d 100644
  target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
  
  if(WIN32)
-@@ -337,30 +460,38 @@ add_custom_command(
+@@ -337,30 +482,38 @@ add_custom_command(
  add_custom_target(gdiffuser_engine_o2r DEPENDS "${GDIFFUSER_ENGINE_O2R}")
  add_dependencies(G-Diffuser gdiffuser_engine_o2r)
  add_custom_command(TARGET G-Diffuser POST_BUILD
@@ -262,7 +280,7 @@ index cab4365..2e7802d 100644
      VERBATIM)
  
  # Keep the project license and every bundled/static dependency notice with binary releases.
-@@ -369,10 +500,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -369,10 +522,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
              "${CMAKE_SOURCE_DIR}/LICENSE"
              "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
@@ -275,7 +293,7 @@ index cab4365..2e7802d 100644
      VERBATIM)
  
  # gdx-extract, the standalone deterministic O2R extractor first boot spawns as a child process.
-@@ -381,48 +512,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -381,48 +534,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
  # clashes with libultraship's spdlog/fmt (docs/investigation/.../W0_TORCH_DEPENDENCIES.md).
  # GDX_DETERMINISTIC=ON => byte-identical archives for identical ROM + recipes. CMP0091=NEW lets
  # Torch's /MT runtime take effect so the exe needs no VC++ redist.
@@ -365,7 +383,7 @@ index cab4365..2e7802d 100644
  # The EK slice manifest ships beside the recipes so the runtime disk step can pass it to
  # `gdx-extract disk -m`.
  set(GDX_EK_SLICE_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/gen/ek_slice_manifest.txt")
-@@ -449,6 +585,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -449,6 +607,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
              --ek-yaml-dir "${CMAKE_SOURCE_DIR}/fzerox-expansion-kit/assets/yaml/jp"
      VERBATIM)
  
@@ -391,7 +409,7 @@ index cab4365..2e7802d 100644
  target_include_directories(G-Diffuser PRIVATE
      "${CMAKE_CURRENT_SOURCE_DIR}"   # for "resource/ResourceFactories.h"
      "${DECOMP}/include"
-@@ -457,7 +612,16 @@ target_include_directories(G-Diffuser PRIVATE
+@@ -457,7 +634,16 @@ target_include_directories(G-Diffuser PRIVATE
  )
  
  target_link_libraries(G-Diffuser PRIVATE cxd4_rsp)
@@ -409,7 +427,7 @@ index cab4365..2e7802d 100644
  
  if(WIN32)
      # user32: MessageBox; Comdlg32: ROM picker; Comctl32: extraction progress marquee.
-@@ -467,6 +631,9 @@ else()
+@@ -467,6 +653,9 @@ else()
      # (needed on older glibc, harmless on newer).
      find_package(Threads REQUIRED)
      target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -419,7 +437,7 @@ index cab4365..2e7802d 100644
      # Release tarballs carry the dependencies no distribution can be relied on to provide in
      # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
      # which beats a wrapper script because the binary stays directly runnable. No effect on a
-@@ -483,6 +650,8 @@ endif()
+@@ -483,6 +672,8 @@ endif()
  # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
  if(NOT MSVC)
      target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
@@ -428,7 +446,7 @@ index cab4365..2e7802d 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +705,17 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +727,30 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -443,10 +461,23 @@ index cab4365..2e7802d 100644
 +    endif()
 +endif()
 +
++# Touch state/merge regression: compiles gdx_touch_state.c UNMODIFIED and drives
++# its public API plus the layout/profile core. No game objects, no libultraship,
++# no decomp headers.
++add_executable(gdx_touch_merge_tests
++    tests/touch_merge_tests.c
++    gdx_touch_state.c)
++target_include_directories(gdx_touch_merge_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
++if(MSVC)
++    target_compile_options(gdx_touch_merge_tests PRIVATE /W3)
++elseif(GDX_PORT_WARN_FLAGS)
++    target_compile_options(gdx_touch_merge_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
++endif()
++
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -764,6 +944,8 @@ if(GDX_BUILD_JP)
+@@ -764,6 +979,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -1601,7 +1632,7 @@ index cef7cfb..1b79c48 100644
                  gdx_port_logf("[autotest] %s\n", cmd->text);
                  s_ip++;
 diff --git a/port/gdx_menu.cpp b/port/gdx_menu.cpp
-index e6d2ef7..f7edcd3 100644
+index e6d2ef7..ac0ca70 100644
 --- a/port/gdx_menu.cpp
 +++ b/port/gdx_menu.cpp
 @@ -198,14 +198,16 @@ void GdxModifiedMarker(bool changed) {
@@ -1623,6 +1654,1937 @@ index e6d2ef7..f7edcd3 100644
  #else
      std::string cmd = "xdg-open '" + dir + "' >/dev/null 2>&1 &";
      (void)std::system(cmd.c_str());
+@@ -552,6 +554,16 @@ GdxMenu::GdxMenu() : Ship::GuiWindow("gOpenMenuBar", false, "G-Diffuser Menu") {
+     CVarRegisterInteger("gEnhancements.Practice.ShowLapDeltas", 0);
+     CVarRegisterInteger("gEnhancements.Practice.PhotoMode", 0);
+ 
++    // TOUCH (iOS overlay). Registered on every platform so the config keys always
++    // exist; the Settings page hides the whole section when
++    // gdx_touch_controls_available() is 0, so these are inert on desktop builds.
++    // Registered here (not in main.cpp) so the values are in place before the
++    // first Settings page draws; main.cpp reads them live every frame.
++    CVarRegisterInteger("gSettings.Touch.Enabled", 1);
++    CVarRegisterFloat("gSettings.Touch.Opacity", 0.55f);
++    CVarRegisterInteger("gSettings.Touch.AutoHideWithController", 1);
++    CVarRegisterInteger("gSettings.Touch.Haptics", 1);
++
+     // WORKSHOP. TexturePacks on lets the Tier-B shim (n64_gfx_bridge.cpp) rewrite a common-asset
+     // load to a mounted pack's "textures/pack/<key>" resource.
+     CVarRegisterInteger("gEnhancements.Workshop.TexturePacks", 0);
+diff --git a/port/gdx_menu_registry.cpp b/port/gdx_menu_registry.cpp
+index 6a59d4d..1386e69 100644
+--- a/port/gdx_menu_registry.cpp
++++ b/port/gdx_menu_registry.cpp
+@@ -58,6 +58,13 @@ using namespace gdxmenu;
+ // including the bridge header (this TU needs nothing else from it); the signature matches exactly.
+ // Drives DISABLE_FOR_RACE_IN_PROGRESS.
+ extern "C" int gdx_input_in_gameplay(void);
++// Touch-controls bridge (port/gdx_touch_controls.h). The whole Touch Controls
++// section hides when the platform has no overlay (gdx_touch_controls_available()
++// is 0 on macOS/Linux/Windows).
++extern "C" int gdx_touch_controls_available(void);
++extern "C" void gdx_touch_controls_begin_layout_editor(void);
++extern "C" void gdx_touch_controls_reset_current_layout(void);
++extern "C" void gdx_touch_controls_set_haptics_enabled(int enabled);
+ 
+ // From port/n64_gfx_bridge.cpp: frame-interpolation telemetry for the "subframes last tick" line.
+ extern "C" int gdx_gfx_interp_last_subframes(void);
+@@ -569,6 +576,98 @@ void GdxMenu::RegisterMenu() {
+                   })
+                   .SearchTerms("controller keyboard mouse deadzone sensitivity mapping bindings remap port"));
+ 
++    // ═════════════════════════════════════════════════════════════════════════════════════════
++    // SETTINGS -> Controls -> Touch Controls (iOS/iPadOS gameplay overlay)
++    // The whole block hides on platforms without the bridge. Callbacks apply
++    // live: the frame loop reads the CVars every tick, and the editor/reset
++    // actions reach the overlay through the C API. Opacity never changes the
++    // controls' frames or hit areas, only their alpha.
++    // ═════════════════════════════════════════════════════════════════════════════════════════
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Touch Controls", .type = GdxUI::WIDGET_SEPARATOR_TEXT }
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                  }));
++
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Touch Controls", .cVar = "gSettings.Touch.Enabled",
++                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
++                  .Options(UIWidgets::CheckboxOptions().DefaultValue(true).Tooltip(
++                      "Shows the touch controller. Disable it when using a physical controller; "
++                      "the ••• menu button stays available."))
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                  })
++                  .SearchTerms("touch gameplay overlay virtual buttons stick race"));
++
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Touch Control Opacity", .cVar = "gSettings.Touch.Opacity",
++                          .type = GdxUI::WIDGET_CVAR_SLIDER_FLOAT }
++                  .Options(UIWidgets::FloatSliderOptions{ .flags = ImGuiSliderFlags_AlwaysClamp }
++                               .IsPercentage()
++                               .Min(0.25f)
++                               .Max(1.0f)
++                               .Step(0.01f)
++                               .DefaultValue(0.55f)
++                               .ShowButtons(false)
++                               .LabelPosition(UIWidgets::LabelPositions::Near)
++                               .Tooltip("Opacity of the touch controls. Input areas and hit "
++                                        "targets are unchanged."))
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                  })
++                  .SearchTerms("transparency alpha"));
++
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Auto-hide with Physical Controller",
++                          .cVar = "gSettings.Touch.AutoHideWithController",
++                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
++                  .Options(UIWidgets::CheckboxOptions().DefaultValue(true).Tooltip(
++                      "Hides the touch controls while an SDL gamepad is connected and restores "
++                      "them immediately and neutrally when it disconnects."))
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                  })
++                  .SearchTerms("gamepad pad joystick handoff auto hide"));
++
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Haptics", .cVar = "gSettings.Touch.Haptics",
++                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
++                  .Options(UIWidgets::CheckboxOptions().DefaultValue(true).Tooltip(
++                      "Vibrates briefly when a touch control is pressed or an editor action "
++                      "completes."))
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                  })
++                  .Callback([](WidgetInfo&) {
++                      gdx_touch_controls_set_haptics_enabled(
++                          CVarGetInteger("gSettings.Touch.Haptics", 1));
++                  })
++                  .SearchTerms("feedback vibrate"));
++
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Customize Touch Layout", .type = GdxUI::WIDGET_BUTTON }
++                  .Options(UIWidgets::ButtonOptions().Tooltip(
++                      "Closes Settings and opens the layout editor. Tap a control to select it, "
++                      "drag to move it, resize from 70% to 150%, Hide/Show optional buttons, or "
++                      "Reset the phone/tablet defaults."))
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                  })
++                  .Callback([](WidgetInfo&) { gdx_touch_controls_begin_layout_editor(); })
++                  .SearchTerms("editor move resize hide show customize layout"));
++
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Reset Current Layout", .type = GdxUI::WIDGET_BUTTON }
++                  .Options(UIWidgets::ButtonOptions().Tooltip(
++                      "Removes the saved phone/tablet layout profile and rebuilds the current "
++                      "device class from the built-in defaults."))
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                  })
++                  .Callback([](WidgetInfo&) { gdx_touch_controls_reset_current_layout(); })
++                  .SearchTerms("restore defaults reset profile"));
++
+     // ═════════════════════════════════════════════════════════════════════════════════════════
+     // SETTINGS -> Input Viewer (2 columns)
+     // ═════════════════════════════════════════════════════════════════════════════════════════
+diff --git a/port/gdx_touch_controls.h b/port/gdx_touch_controls.h
+new file mode 100644
+index 0000000..0d620f3
+--- /dev/null
++++ b/port/gdx_touch_controls.h
+@@ -0,0 +1,200 @@
++// port/gdx_touch_controls.h — cross-platform touch-controls API for F0X.
++//
++// One small state-oriented API is exposed to the port. Exactly one implementation
++// is compiled (see port/CMakeLists.txt):
++//   - gdx_touch_controls_ios.mm   on iOS/iPadOS (UIKit overlay, atomic N64 pad state)
++//   - gdx_touch_controls_stub.c   everywhere else (neutral no-ops)
++//
++// The shared atomic pad state, the normalized analog-stick mapping, the N64 pad
++// merge helper, the layout profile core, and the deterministic profile
++// encode/decode live in gdx_touch_state.c so the same code paths are exercised
++// by the iOS bridge, the neutral stub, and the standalone
++// gdx_touch_merge_tests regression.
++//
++// N64 button bits are the identical standard OSContPad bitmask used by the decomp
++// (decomp/include/controller.h) and libultraship. The touch layer never computes
++// pressed/released edges: gdx_update_port_inputs() in input_bridge.c remains the
++// sole owner of edges, digital-stick thresholds, repeats, and game-frame
++// alignment.
++
++#ifndef GDX_TOUCH_CONTROLS_H
++#define GDX_TOUCH_CONTROLS_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#if defined(_WIN32)
++#define GDX_TOUCH_API
++#elif defined(__GNUC__) || defined(__clang__)
++#define GDX_TOUCH_API __attribute__((visibility("default")))
++#else
++#define GDX_TOUCH_API
++#endif
++
++// ── One frame of touch pad state, resolved to the N64 range the game expects ──
++typedef struct GdxTouchPadState {
++    unsigned short buttons;   // N64 OSContPad bitmask (see bits below)
++    signed char stickX;       // -80..80
++    signed char stickY;       // -80..80
++    unsigned char stickActive; // 1 only while a live touch owns the analog stick
++} GdxTouchPadState;
++
++// Standard N64 OSContPad button bits (identical in decomp/include/controller.h and
++// libultraship libultra/controller.h).
++#define GDX_TOUCH_BTN_CRIGHT 0x0001
++#define GDX_TOUCH_BTN_CLEFT  0x0002
++#define GDX_TOUCH_BTN_CDOWN  0x0004
++#define GDX_TOUCH_BTN_CUP    0x0008
++#define GDX_TOUCH_BTN_R      0x0010
++#define GDX_TOUCH_BTN_L      0x0020
++#define GDX_TOUCH_BTN_DRIGHT 0x0100
++#define GDX_TOUCH_BTN_DLEFT  0x0200
++#define GDX_TOUCH_BTN_DDOWN  0x0400
++#define GDX_TOUCH_BTN_DUP    0x0800
++#define GDX_TOUCH_BTN_START  0x1000
++#define GDX_TOUCH_BTN_Z      0x2000
++#define GDX_TOUCH_BTN_B      0x4000
++#define GDX_TOUCH_BTN_A      0x8000
++
++// ── Public API (implemented once per platform) ────────────────────────────────
++
++// 1 when this build ships the UIKit touch overlay. The Settings page hides the
++// whole Touch Controls section when this is 0, so desktop builds stay neutral.
++GDX_TOUCH_API int gdx_touch_controls_available(void);
++
++// Called once after the game has booted (post-setup, pre-frame-loop) so the
++// overlay never covers first-time setup or the F0X Home surface.
++GDX_TOUCH_API void gdx_touch_controls_start(void);
++
++// Called once per host frame from the main loop. menuVisible is the live
++// GdxMenu visibility; physicalGamepadConnected is 1 when the Auto-hide-with-
++// controller policy should suppress the overlay (main.cpp folds the CVar and the
++// real SDL gamepad presence together); enabled/opacity are the live CVars.
++GDX_TOUCH_API void gdx_touch_controls_tick(int menuVisible,
++                                           int physicalGamepadConnected,
++                                           int enabled,
++                                           float opacity);
++
++// Reads one atomic snapshot of the touch pad state. Called from
++// gdx_controller_poll() immediately after the ControlDeck read.
++GDX_TOUCH_API void gdx_touch_controls_read(GdxTouchPadState* outState);
++
++// Clears every button and the stick, and releases every live UIKit touch view
++// state. Safe to call from any thread; the UIKit part hops to the main thread.
++GDX_TOUCH_API void gdx_touch_controls_cancel_all(void);
++
++// Enters layout-editor mode: cancels all gameplay input, closes the in-game menu
++// if open, shows every control at full opacity, and hands the overlay to the
++// editor. No gameplay emission while editing.
++GDX_TOUCH_API void gdx_touch_controls_begin_layout_editor(void);
++
++// Removes the current device-class profile overrides and rebuilds from the code
++// defaults.
++GDX_TOUCH_API void gdx_touch_controls_reset_current_layout(void);
++
++// Optional haptic confirmation (CVar gSettings.Touch.Haptics). Inert on the
++// stub platform.
++GDX_TOUCH_API void gdx_touch_controls_set_haptics_enabled(int enabled);
++
++// Releases all input and detaches the overlay. Called at clean shutdown.
++GDX_TOUCH_API void gdx_touch_controls_shutdown(void);
++
++// ── Platform-neutral state core (gdx_touch_state.c) ──────────────────────────
++// The bridge, the stub, and the deterministic tests all drive the same core, so
++// merge/cancel/stick/profile behavior is tested against the code the iOS overlay
++// actually runs.
++
++// OR / AND-not a single button bit from a live touch. pressed=0 on touch-up,
++// touch-cancel, removal, state transition, and shutdown.
++GDX_TOUCH_API void gdx_touch_state_set_button(int buttonBit, int pressed);
++
++// Continuous analog stick input. x/y are normalized -1..1 (raw thumb deltas,
++// already divided by the stick's deflection radius). The core clamps the vector
++// to the unit circle, applies a modest deadzone, and maps continuously to the
++// N64 -80..80 range. A deadzone/release value publishes stickActive=0.
++GDX_TOUCH_API void gdx_touch_state_set_stick(float x, float y);
++
++// Releases the stick (neutral + inactive).
++GDX_TOUCH_API void gdx_touch_state_release_stick(void);
++
++// Clears every button and the stick atomically.
++GDX_TOUCH_API void gdx_touch_state_cancel_all(void);
++
++// Atomic snapshot read.
++GDX_TOUCH_API void gdx_touch_state_read(GdxTouchPadState* outState);
++
++// The exact merge input_bridge.c performs at the port-1 seam: buttons OR into the
++// live pad; an active touch stick replaces only the two analog axes; an inactive
++// touch stick leaves the physical analog untouched.
++GDX_TOUCH_API void gdx_touch_merge_pad(unsigned short* ioButtons,
++                                       signed char* ioStickX,
++                                       signed char* ioStickY,
++                                       const GdxTouchPadState* touch);
++
++// ── Layout profile core ───────────────────────────────────────────────────────
++// Hand-authored per-device defaults are rebuilt first, then saved overrides are
++// applied by control id, then every center is clamped into the live safe area
++// and every scalar size into [0.70, 1.50]. Hidden is ignored for protected
++// controls (stick, accelerator, Start, permanent menu). The same function runs
++// on device and in the deterministic tests.
++
++enum {
++    GDX_TOUCH_CTL_STICK = 0,
++    GDX_TOUCH_CTL_ACCEL,
++    GDX_TOUCH_CTL_BOOST,
++    GDX_TOUCH_CTL_BRAKE,
++    GDX_TOUCH_CTL_SLIDE_L,
++    GDX_TOUCH_CTL_SLIDE_R,
++    GDX_TOUCH_CTL_START,
++    GDX_TOUCH_CTL_VIEW, // C-right
++    GDX_TOUCH_CTL_LOOK, // C-up
++    GDX_TOUCH_CTL_CLEFT,
++    GDX_TOUCH_CTL_L,
++    GDX_TOUCH_CTL_DPAD,
++    GDX_TOUCH_CTL_MENU, // permanent; never editable or hideable
++    GDX_TOUCH_CTL_COUNT
++};
++
++typedef struct GdxTouchControlSpec {
++    int controlId;     // one of GDX_TOUCH_CTL_*
++    float centerX;     // normalized 0..1 within the safe-area rect
++    float centerY;     // normalized 0..1 within the safe-area rect
++    float scale;       // 0.70..1.50 multiplier on the device-class base size
++    int hidden;        // 0/1; ignored for protected controls
++} GdxTouchControlSpec;
++
++GDX_TOUCH_API int gdx_touch_layout_can_hide(int controlId);
++
++// Applies overrides onto defaults and clamps. safeX0/safeY0/safeW/safeH are the
++// normalized safe-area rect; degenerate (empty) rects fall back to the full
++// 0..1 range. out must have room for defaultCount entries.
++GDX_TOUCH_API void gdx_touch_layout_apply(const GdxTouchControlSpec* defaults,
++                                          int defaultCount,
++                                          const GdxTouchControlSpec* overrides,
++                                          int overrideCount,
++                                          float safeX0,
++                                          float safeY0,
++                                          float safeW,
++                                          float safeH,
++                                          GdxTouchControlSpec* out,
++                                          int outCapacity);
++
++// Deterministic versioned profile serialization used by the iOS NSUserDefaults
++// keys ("F0X.TouchLayout.phone-v1" / "F0X.TouchLayout.tablet-v1"). Text lines:
++//   "v1 <id> <centerX> <centerY> <scale> <hidden>"
++// Encode returns the number of chars written (excluding NUL) or 0 on truncation.
++// Decode returns the number of specs read.
++GDX_TOUCH_API int gdx_touch_profile_encode(const GdxTouchControlSpec* specs,
++                                           int count,
++                                           char* out,
++                                           int outCapacity);
++GDX_TOUCH_API int gdx_touch_profile_decode(const char* text,
++                                           GdxTouchControlSpec* out,
++                                           int outCapacity);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // GDX_TOUCH_CONTROLS_H
+diff --git a/port/gdx_touch_controls_ios.mm b/port/gdx_touch_controls_ios.mm
+new file mode 100644
+index 0000000..87ea923
+--- /dev/null
++++ b/port/gdx_touch_controls_ios.mm
+@@ -0,0 +1,1290 @@
++// port/gdx_touch_controls_ios.mm — iOS/iPadOS UIKit touch-controls overlay.
++//
++// F0X-specific adaptation of the proven HarkinianPad product patterns
++// (ref/harkinianpad, pinned at 1197472): a transparent UIKit overlay attached to
++// the SDL-created UIWindow, independent hand-authored phone/tablet default
++// geometries, per-control UIKit touch tracking, safe-area clamping, normalized
++// versioned persisted profiles, a permanent ••• menu control, menu/editor/
++// lifecycle cancellation, opacity without hit-geometry changes, and optional
++// haptics.
++//
++// The critical difference from HarkinianPad: this overlay writes DIRECT atomic
++// N64 pad state (port/gdx_touch_state.c) instead of synthesizing SDL keyboard
++// events. The game receives truthful button-current and continuous analog
++// (-80..80) state through input_bridge.c's existing port-1 seam; edges,
++// digital-stick thresholds, and repeats stay in gdx_update_port_inputs().
++
++#import <UIKit/UIKit.h>
++
++#include <algorithm>
++#include <cmath>
++#include <vector>
++
++#include "gdx_touch_controls.h"
++
++// Host callback provided by port/main.cpp: toggles the live GdxMenu GuiWindow
++// (not a bare CVar write — a constructed GuiWindow owns its visibility).
++extern "C" void gdx_touch_menu_toggle(void);
++
++// Shared haptic confirmation, defined at the bottom of this file; used by the
++// button press path and the editor Done action before its definition.
++void gdx_touch_controls_haptic_feedback(void);
++
++static void gdx_main_sync(void (^block)(void)) {
++    if ([NSThread isMainThread]) {
++        block();
++    } else {
++        dispatch_sync(dispatch_get_main_queue(), block);
++    }
++}
++
++// ── Shared manager state (host-frame values; the atomic pad state lives in
++//    gdx_touch_state.c) ────────────────────────────────────────────────────────
++static BOOL sStarted = NO;
++static BOOL sDesiredEnabled = YES;
++static BOOL sMenuVisible = NO;
++static BOOL sControllerAutoHidden = NO;
++static CGFloat sOpacity = 0.55f;
++static BOOL sHapticsEnabled = YES;
++static BOOL sEditorRequested = NO;
++static BOOL sLifecycleObserversInstalled = NO;
++
++// ── GdxTouchButton: one N64 button, true per-control UIKit touch tracking ─────
++@interface GdxTouchButton : UIControl
++@property(nonatomic) int buttonBit;          // N64 bit (GDX_TOUCH_BTN_*)
++@property(nonatomic, copy) NSString* controlKey; // layout spec id (stringified GDX_TOUCH_CTL_*)
++@property(nonatomic) BOOL inputPressed;
++@property(nonatomic) BOOL usesPillShape;
++@property(nonatomic, strong) UIColor* idleColor;
++@property(nonatomic, strong) UIColor* pressedColor;
++@property(nonatomic, readonly) UILabel* label;
++
++- (instancetype)initWithLabel:(NSString*)label
++                        bit:(int)bit
++                        key:(NSString*)key
++                        pill:(BOOL)pill;
++- (void)cancelInput;
++- (void)applyOpacity:(CGFloat)opacity editing:(BOOL)editing;
++@end
++
++@implementation GdxTouchButton {
++    UILabel* _label;
++}
++
++- (UILabel*)label {
++    return _label;
++}
++
++- (instancetype)initWithLabel:(NSString*)label bit:(int)bit key:(NSString*)key pill:(BOOL)pill {
++    self = [super initWithFrame:CGRectZero];
++    if (self != nil) {
++        self.buttonBit = bit;
++        self.controlKey = key;
++        self.usesPillShape = pill;
++        self.multipleTouchEnabled = YES;
++        self.idleColor = [UIColor colorWithWhite:0.04 alpha:0.38];
++        self.pressedColor = [UIColor colorWithWhite:0.72 alpha:0.48];
++        self.backgroundColor = self.idleColor;
++        self.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.58].CGColor;
++        self.layer.borderWidth = 2.0;
++        self.accessibilityLabel = label;
++        self.accessibilityIdentifier = key;
++        self.isAccessibilityElement = YES;
++
++        _label = [[UILabel alloc] initWithFrame:CGRectZero];
++        _label.text = label;
++        _label.textColor = [UIColor colorWithWhite:1.0 alpha:0.92];
++        _label.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightSemibold];
++        _label.textAlignment = NSTextAlignmentCenter;
++        _label.adjustsFontSizeToFitWidth = YES;
++        _label.minimumScaleFactor = 0.5;
++        _label.userInteractionEnabled = NO;
++        [self addSubview:_label];
++
++        [self addTarget:self
++                      action:@selector(inputDown)
++            forControlEvents:UIControlEventTouchDown | UIControlEventTouchDragEnter];
++        [self addTarget:self
++                      action:@selector(inputUp)
++            forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside |
++                             UIControlEventTouchCancel | UIControlEventTouchDragExit];
++    }
++    return self;
++}
++
++- (void)layoutSubviews {
++    [super layoutSubviews];
++    self.layer.cornerRadius =
++        self.usesPillShape ? CGRectGetHeight(self.bounds) * 0.48
++                           : MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds)) * 0.5;
++    _label.frame = self.bounds;
++}
++
++- (void)setIdleColor:(UIColor*)idleColor pressedColor:(UIColor*)pressedColor {
++    self.idleColor = idleColor;
++    self.pressedColor = pressedColor;
++    [self refreshColors];
++}
++
++- (void)refreshColors {
++    self.backgroundColor = self.inputPressed ? self.pressedColor : self.idleColor;
++}
++
++- (void)inputDown {
++    if (self.inputPressed) {
++        return;
++    }
++    self.inputPressed = YES;
++    [self refreshColors];
++    gdx_touch_state_set_button(self.buttonBit, 1);
++    gdx_touch_controls_haptic_feedback();
++}
++
++- (void)inputUp {
++    if (!self.inputPressed) {
++        return;
++    }
++    self.inputPressed = NO;
++    [self refreshColors];
++    gdx_touch_state_set_button(self.buttonBit, 0);
++}
++
++- (void)cancelInput {
++    [self inputUp];
++}
++
++- (void)applyOpacity:(CGFloat)opacity editing:(BOOL)editing {
++    self.alpha = editing ? 1.0 : opacity;
++}
++
++@end
++
++// ── GdxTouchStick: continuous analog stick (-80..80 after the core mapping) ───
++@interface GdxTouchStick : UIControl
++@property(nonatomic, strong) UIView* knob;
++@property(nonatomic, copy) NSString* controlKey;
++- (void)cancelInput;
++@end
++
++@implementation GdxTouchStick {
++    UITouch* _activeTouch;
++    BOOL _pressed;
++}
++
++- (instancetype)initWithKey:(NSString*)key {
++    self = [super initWithFrame:CGRectZero];
++    if (self != nil) {
++        self.controlKey = key;
++        self.multipleTouchEnabled = NO;
++        self.backgroundColor = [UIColor colorWithWhite:0.04 alpha:0.30];
++        self.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.42].CGColor;
++        self.layer.borderWidth = 2.0;
++        self.accessibilityLabel = @"Control Stick";
++        self.accessibilityIdentifier = key;
++        self.isAccessibilityElement = YES;
++
++        self.knob = [[UIView alloc] initWithFrame:CGRectZero];
++        self.knob.userInteractionEnabled = NO;
++        self.knob.backgroundColor = [UIColor colorWithRed:0.34 green:0.62 blue:0.82 alpha:0.68];
++        self.knob.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.62].CGColor;
++        self.knob.layer.borderWidth = 2.0;
++        [self addSubview:self.knob];
++    }
++    return self;
++}
++
++- (void)layoutSubviews {
++    [super layoutSubviews];
++    self.layer.cornerRadius = MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds)) * 0.5;
++    const CGFloat knobSize = MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds)) * 0.43;
++    self.knob.bounds = CGRectMake(0.0, 0.0, knobSize, knobSize);
++    if (!_pressed) {
++        self.knob.center = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
++    }
++}
++
++- (CGFloat)deflectionRadius {
++    return MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds)) * 0.34;
++}
++
++- (void)updateForPoint:(CGPoint)point {
++    const CGPoint center = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
++    const CGFloat radius = [self deflectionRadius];
++    CGFloat dx = point.x - center.x;
++    CGFloat dy = point.y - center.y;
++    const CGFloat distance = hypot(dx, dy);
++    if (distance > radius && distance > 0.0) {
++        dx = dx / distance * radius;
++        dy = dy / distance * radius;
++    }
++    self.knob.center = CGPointMake(center.x + dx, center.y + dy);
++    // Normalized -1..1 deltas; the state core clamps to the unit circle, applies
++    // the deadzone, and maps continuously to -80..80.
++    gdx_touch_state_set_stick((float)(dx / radius), (float)(dy / radius));
++}
++
++- (void)touchesBegan:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event {
++    UITouch* touch = touches.anyObject;
++    if (touch != nil && _activeTouch == nil) {
++        _activeTouch = touch;
++        _pressed = YES;
++        [self updateForPoint:[touch locationInView:self]];
++    }
++}
++
++- (void)touchesMoved:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event {
++    for (UITouch* touch in touches) {
++        if (touch == _activeTouch) {
++            [self updateForPoint:[touch locationInView:self]];
++        }
++    }
++}
++
++- (void)touchesEnded:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event {
++    [self cancelInput];
++}
++
++- (void)touchesCancelled:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event {
++    [self cancelInput];
++}
++
++- (void)cancelInput {
++    _activeTouch = nil;
++    _pressed = NO;
++    gdx_touch_state_release_stick();
++    self.knob.center = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
++}
++
++- (void)applyOpacity:(CGFloat)opacity editing:(BOOL)editing {
++    self.alpha = editing ? 1.0 : opacity;
++}
++
++@end
++
++// ── Device-class data ─────────────────────────────────────────────────────────
++// Hand-authored per-device defaults. Sizes are base point sizes at scale 1.0;
++// the layout editor rescales them 70%..150%. Positions are normalized within
++// the safe-area rect (0..1 each axis).
++typedef struct GdxBaseSpec {
++    int controlId;
++    float x;
++    float y;
++    float baseSize;     // square side (or pill width, see below)
++    float baseHeight;   // pill controls only; 0 means square
++} GdxBaseSpec;
++
++static const GdxBaseSpec kTabletSpecs[] = {
++    { GDX_TOUCH_CTL_STICK,    0.150f, 0.740f, 150.0f, 0.0f },
++    { GDX_TOUCH_CTL_ACCEL,    0.880f, 0.740f, 68.0f, 0.0f },
++    { GDX_TOUCH_CTL_BOOST,    0.730f, 0.620f, 64.0f, 0.0f },
++    { GDX_TOUCH_CTL_BRAKE,    0.870f, 0.520f, 64.0f, 0.0f },
++    { GDX_TOUCH_CTL_SLIDE_L,  0.600f, 0.400f, 88.0f, 54.0f },
++    { GDX_TOUCH_CTL_SLIDE_R,  0.940f, 0.470f, 88.0f, 54.0f },
++    { GDX_TOUCH_CTL_START,    0.470f, 0.130f, 46.0f, 0.0f },
++    { GDX_TOUCH_CTL_VIEW,     0.960f, 0.300f, 46.0f, 0.0f },
++    { GDX_TOUCH_CTL_LOOK,     0.900f, 0.220f, 46.0f, 0.0f },
++    { GDX_TOUCH_CTL_CLEFT,    0.970f, 0.400f, 42.0f, 0.0f },
++    { GDX_TOUCH_CTL_L,        0.100f, 0.360f, 42.0f, 64.0f },
++    { GDX_TOUCH_CTL_DPAD,     0.290f, 0.560f, 52.0f, 0.0f },
++};
++
++static const GdxBaseSpec kPhoneSpecs[] = {
++    { GDX_TOUCH_CTL_STICK,    0.130f, 0.760f, 116.0f, 0.0f },
++    { GDX_TOUCH_CTL_ACCEL,    0.870f, 0.760f, 54.0f, 0.0f },
++    { GDX_TOUCH_CTL_BOOST,    0.700f, 0.620f, 50.0f, 0.0f },
++    { GDX_TOUCH_CTL_BRAKE,    0.860f, 0.520f, 50.0f, 0.0f },
++    { GDX_TOUCH_CTL_SLIDE_L,  0.520f, 0.380f, 70.0f, 44.0f },
++    { GDX_TOUCH_CTL_SLIDE_R,  0.930f, 0.450f, 70.0f, 44.0f },
++    { GDX_TOUCH_CTL_START,    0.440f, 0.130f, 42.0f, 0.0f },
++    { GDX_TOUCH_CTL_VIEW,     0.950f, 0.290f, 40.0f, 0.0f },
++    { GDX_TOUCH_CTL_LOOK,     0.880f, 0.210f, 40.0f, 0.0f },
++    { GDX_TOUCH_CTL_CLEFT,    0.960f, 0.390f, 38.0f, 0.0f },
++    { GDX_TOUCH_CTL_L,        0.080f, 0.360f, 38.0f, 54.0f },
++    { GDX_TOUCH_CTL_DPAD,     0.250f, 0.560f, 44.0f, 0.0f },
++};
++
++static const float kDpadRadius = 48.0f; // tablet center-to-button distance
++static const float kDpadRadiusPhone = 38.0f;
++
++// ── GdxTouchOverlay: the editable gameplay surface ────────────────────────────
++@interface GdxTouchOverlay : UIView
++@property(nonatomic, strong) GdxTouchStick* stick;
++@property(nonatomic, strong) GdxTouchButton* btnAccel;
++@property(nonatomic, strong) GdxTouchButton* btnBoost;
++@property(nonatomic, strong) GdxTouchButton* btnBrake;
++@property(nonatomic, strong) GdxTouchButton* btnSlideL;
++@property(nonatomic, strong) GdxTouchButton* btnSlideR;
++@property(nonatomic, strong) GdxTouchButton* btnStart;
++@property(nonatomic, strong) GdxTouchButton* btnView;
++@property(nonatomic, strong) GdxTouchButton* btnLook;
++@property(nonatomic, strong) GdxTouchButton* btnCLeft;
++@property(nonatomic, strong) GdxTouchButton* btnL;
++@property(nonatomic, strong) GdxTouchButton* dUp;
++@property(nonatomic, strong) GdxTouchButton* dDown;
++@property(nonatomic, strong) GdxTouchButton* dLeft;
++@property(nonatomic, strong) GdxTouchButton* dRight;
++@property(nonatomic, strong) NSArray<UIView*>* editableControls;
++@property(nonatomic, strong) NSMutableArray<UIGestureRecognizer*>* editGestures;
++@property(nonatomic, strong) NSMutableDictionary<NSString*, NSArray<NSNumber*>*>* layoutCenters;
++@property(nonatomic, strong) NSMutableDictionary<NSString*, NSNumber*>* layoutScales;
++@property(nonatomic, strong) NSMutableSet<NSString*>* hiddenControls;
++@property(nonatomic, strong) NSMutableDictionary<NSString*, NSValue*>* defaultSizes;
++@property(nonatomic, copy) NSString* layoutProfile;
++@property(nonatomic) BOOL layoutEditing;
++@property(nonatomic) CGFloat touchControlsOpacity;
++@property(nonatomic, strong) UIView* selectedControl;
++@property(nonatomic, strong) UIView* editorPanel;
++@property(nonatomic, strong) UILabel* editorLabel;
++@property(nonatomic, strong) UISlider* sizeSlider;
++@property(nonatomic, strong) UIButton* visibilityButton;
++@property(nonatomic, strong) UIButton* resetButton;
++@property(nonatomic, strong) UIButton* doneButton;
++
++- (void)cancelAllInputs;
++- (void)setTouchOpacity:(CGFloat)opacity;
++- (void)beginLayoutEditing;
++- (void)endLayoutEditing;
++- (void)resetCurrentLayout;
++@end
++
++@implementation GdxTouchOverlay {
++    BOOL _layoutNeedsProfileLoad;
++    BOOL _lastCompact;
++}
++
++- (instancetype)initWithFrame:(CGRect)frame {
++    self = [super initWithFrame:frame];
++    if (self != nil) {
++        self.backgroundColor = UIColor.clearColor;
++        self.multipleTouchEnabled = YES;
++        self.touchControlsOpacity = 0.55f;
++        _layoutNeedsProfileLoad = YES;
++
++        self.stick = [[GdxTouchStick alloc] initWithKey:@"0"];
++        self.btnAccel = [[GdxTouchButton alloc] initWithLabel:@"ACCEL" bit:GDX_TOUCH_BTN_A key:@"1" pill:NO];
++        self.btnBoost = [[GdxTouchButton alloc] initWithLabel:@"BOOST" bit:GDX_TOUCH_BTN_B key:@"2" pill:NO];
++        self.btnBrake = [[GdxTouchButton alloc] initWithLabel:@"BRAKE" bit:GDX_TOUCH_BTN_CDOWN key:@"3" pill:NO];
++        self.btnSlideL = [[GdxTouchButton alloc] initWithLabel:@"SLIDE L" bit:GDX_TOUCH_BTN_Z key:@"4" pill:YES];
++        self.btnSlideR = [[GdxTouchButton alloc] initWithLabel:@"SLIDE R" bit:GDX_TOUCH_BTN_R key:@"5" pill:YES];
++        self.btnStart = [[GdxTouchButton alloc] initWithLabel:@"START" bit:GDX_TOUCH_BTN_START key:@"6" pill:NO];
++        self.btnView = [[GdxTouchButton alloc] initWithLabel:@"VIEW" bit:GDX_TOUCH_BTN_CRIGHT key:@"7" pill:NO];
++        self.btnLook = [[GdxTouchButton alloc] initWithLabel:@"LOOK" bit:GDX_TOUCH_BTN_CUP key:@"8" pill:NO];
++        self.btnCLeft = [[GdxTouchButton alloc] initWithLabel:@"C◀" bit:GDX_TOUCH_BTN_CLEFT key:@"9" pill:NO];
++        self.btnL = [[GdxTouchButton alloc] initWithLabel:@"L" bit:GDX_TOUCH_BTN_L key:@"10" pill:YES];
++        self.dUp = [[GdxTouchButton alloc] initWithLabel:@"▲" bit:GDX_TOUCH_BTN_DUP key:@"11" pill:NO];
++        self.dDown = [[GdxTouchButton alloc] initWithLabel:@"▼" bit:GDX_TOUCH_BTN_DDOWN key:@"11" pill:NO];
++        self.dLeft = [[GdxTouchButton alloc] initWithLabel:@"◀" bit:GDX_TOUCH_BTN_DLEFT key:@"11" pill:NO];
++        self.dRight = [[GdxTouchButton alloc] initWithLabel:@"▶" bit:GDX_TOUCH_BTN_DRIGHT key:@"11" pill:NO];
++
++        [self.btnAccel setIdleColor:[UIColor colorWithRed:0.08 green:0.35 blue:0.88 alpha:0.58]
++                       pressedColor:[UIColor colorWithRed:0.14 green:0.48 blue:1.00 alpha:0.88]];
++        [self.btnBoost setIdleColor:[UIColor colorWithRed:0.05 green:0.55 blue:0.24 alpha:0.58]
++                       pressedColor:[UIColor colorWithRed:0.10 green:0.76 blue:0.34 alpha:0.88]];
++        [self.btnBrake setIdleColor:[UIColor colorWithRed:0.62 green:0.22 blue:0.10 alpha:0.58]
++                       pressedColor:[UIColor colorWithRed:0.86 green:0.36 blue:0.18 alpha:0.88]];
++        [self.btnSlideL setIdleColor:[UIColor colorWithRed:0.85 green:0.45 blue:0.08 alpha:0.55]
++                        pressedColor:[UIColor colorWithRed:1.00 green:0.62 blue:0.16 alpha:0.88]];
++        [self.btnSlideR setIdleColor:[UIColor colorWithRed:0.85 green:0.45 blue:0.08 alpha:0.55]
++                        pressedColor:[UIColor colorWithRed:1.00 green:0.62 blue:0.16 alpha:0.88]];
++        [self.btnStart setIdleColor:[UIColor colorWithRed:0.68 green:0.12 blue:0.16 alpha:0.52]
++                       pressedColor:[UIColor colorWithRed:0.94 green:0.22 blue:0.26 alpha:0.88]];
++        [self.btnView setIdleColor:[UIColor colorWithRed:0.95 green:0.67 blue:0.12 alpha:0.48]
++                      pressedColor:[UIColor colorWithRed:1.00 green:0.78 blue:0.20 alpha:0.86]];
++        [self.btnLook setIdleColor:[UIColor colorWithRed:0.95 green:0.67 blue:0.12 alpha:0.48]
++                      pressedColor:[UIColor colorWithRed:1.00 green:0.78 blue:0.20 alpha:0.86]];
++        [self.btnCLeft setIdleColor:[UIColor colorWithRed:0.95 green:0.67 blue:0.12 alpha:0.48]
++                       pressedColor:[UIColor colorWithRed:1.00 green:0.78 blue:0.20 alpha:0.86]];
++        [self.btnL setIdleColor:[UIColor colorWithWhite:0.16 alpha:0.52]
++                   pressedColor:[UIColor colorWithWhite:0.62 alpha:0.86]];
++
++        self.editableControls = @[
++            self.stick, self.btnAccel, self.btnBoost, self.btnBrake,
++            self.btnSlideL, self.btnSlideR, self.btnStart,
++            self.btnView, self.btnLook, self.btnCLeft, self.btnL,
++            self.dUp, self.dDown, self.dLeft, self.dRight,
++        ];
++        self.layoutCenters = [NSMutableDictionary dictionary];
++        self.layoutScales = [NSMutableDictionary dictionary];
++        self.hiddenControls = [NSMutableSet set];
++        self.defaultSizes = [NSMutableDictionary dictionary];
++        self.editGestures = [NSMutableArray array];
++
++        for (UIView* control in self.editableControls) {
++            [self addSubview:control];
++        }
++        [self installLayoutEditor];
++    }
++    return self;
++}
++
++- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent*)event {
++    UIView* hit = [super hitTest:point withEvent:event];
++    return hit == self ? nil : hit;
++}
++
++- (BOOL)isCompact {
++    return CGRectGetHeight(self.bounds) < 560.0;
++}
++
++- (NSString*)profileForCompact:(BOOL)compact {
++    return compact ? @"phone-v1" : @"tablet-v1";
++}
++
++- (NSString*)storageKeyForProfile:(NSString*)profile {
++    return [@"F0X.TouchLayout." stringByAppendingString:profile];
++}
++
++// Rebuild defaults, then apply the working overrides (loaded profile plus any
++// live editor edits) and clamp into the live safe area — exactly the
++// platform-neutral gdx_touch_layout_apply contract. The profile is loaded into
++// layoutCenters/layoutScales/hiddenControls once per device class and written
++// back only on editor Done / Reset, so unsaved editor state survives layout
++// passes and old profiles stay forward-compatible with new defaults.
++- (std::vector<GdxTouchControlSpec>)resolvedSpecs {
++    const BOOL compact = [self isCompact];
++    const GdxBaseSpec* bases = compact ? kPhoneSpecs : kTabletSpecs;
++    const int baseCount = compact ? (int)(sizeof(kPhoneSpecs) / sizeof(kPhoneSpecs[0]))
++                                  : (int)(sizeof(kTabletSpecs) / sizeof(kTabletSpecs[0]));
++
++    std::vector<GdxTouchControlSpec> defaults;
++    defaults.reserve((size_t)baseCount);
++    for (int i = 0; i < baseCount; i++) {
++        GdxTouchControlSpec spec;
++        spec.controlId = bases[i].controlId;
++        spec.centerX = bases[i].x;
++        spec.centerY = bases[i].y;
++        spec.scale = 1.0f;
++        spec.hidden = 0;
++        defaults.push_back(spec);
++    }
++
++    std::vector<GdxTouchControlSpec> overrides;
++    for (int i = 0; i < baseCount; i++) {
++        NSString* key = [NSString stringWithFormat:@"%d", bases[i].controlId];
++        NSArray<NSNumber*>* center = self.layoutCenters[key];
++        if (center == nil) {
++            continue; // no override: the code default stands
++        }
++        GdxTouchControlSpec spec;
++        spec.controlId = bases[i].controlId;
++        spec.centerX = (center.count == 2) ? center[0].floatValue : bases[i].x;
++        spec.centerY = (center.count == 2) ? center[1].floatValue : bases[i].y;
++        spec.scale = (self.layoutScales[key] != nil) ? self.layoutScales[key].floatValue : 1.0f;
++        spec.hidden = [self.hiddenControls containsObject:key] ? 1 : 0;
++        overrides.push_back(spec);
++    }
++
++    std::vector<GdxTouchControlSpec> resolved(defaults.size());
++    gdx_touch_layout_apply(defaults.data(), (int)defaults.size(), overrides.data(),
++                           (int)overrides.size(), 0.0f, 0.0f, 1.0f, 1.0f,
++                           resolved.data(), (int)resolved.size());
++    return resolved;
++}
++
++- (void)loadProfileIfNeeded {
++    const BOOL compact = [self isCompact];
++    NSString* profile = [self profileForCompact:compact];
++    if (_layoutNeedsProfileLoad || ![self.layoutProfile isEqualToString:profile]) {
++        self.layoutProfile = profile;
++        [self.layoutCenters removeAllObjects];
++        [self.layoutScales removeAllObjects];
++        [self.hiddenControls removeAllObjects];
++        id storedText =
++            [NSUserDefaults.standardUserDefaults objectForKey:[self storageKeyForProfile:profile]];
++        if ([storedText isKindOfClass:NSString.class]) {
++            GdxTouchControlSpec parsed[GDX_TOUCH_CTL_COUNT];
++            const int parsedCount = gdx_touch_profile_decode(
++                ((NSString*)storedText).UTF8String, parsed, GDX_TOUCH_CTL_COUNT);
++            for (int i = 0; i < parsedCount; i++) {
++                NSString* key = [NSString stringWithFormat:@"%d", parsed[i].controlId];
++                self.layoutCenters[key] = @[ @(parsed[i].centerX), @(parsed[i].centerY) ];
++                self.layoutScales[key] = @(parsed[i].scale);
++                if (parsed[i].hidden) {
++                    [self.hiddenControls addObject:key];
++                }
++            }
++        }
++        _layoutNeedsProfileLoad = NO;
++    }
++}
++
++- (void)applyLayout {
++    [self loadProfileIfNeeded];
++    const BOOL compact = [self isCompact];
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGFloat width = CGRectGetWidth(self.bounds);
++    const CGFloat height = CGRectGetHeight(self.bounds);
++    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
++
++    std::vector<GdxTouchControlSpec> resolved = [self resolvedSpecs];
++    const GdxBaseSpec* bases = compact ? kPhoneSpecs : kTabletSpecs;
++    const int baseCount = compact ? (int)(sizeof(kPhoneSpecs) / sizeof(kPhoneSpecs[0]))
++                                  : (int)(sizeof(kTabletSpecs) / sizeof(kTabletSpecs[0]));
++
++    for (int i = 0; i < baseCount; i++) {
++        const GdxTouchControlSpec* spec = nullptr;
++        for (size_t j = 0; j < resolved.size(); j++) {
++            if (resolved[j].controlId == bases[i].controlId) {
++                spec = &resolved[j];
++                break;
++            }
++        }
++        if (spec == nullptr) {
++            continue;
++        }
++        const CGFloat size = bases[i].baseSize * spec->scale;
++        const CGFloat pillHeight = bases[i].baseHeight > 0.0f ? bases[i].baseHeight * spec->scale : 0.0f;
++        const CGPoint center =
++            CGPointMake(safeRect.origin.x + spec->centerX * safeRect.size.width,
++                        safeRect.origin.y + spec->centerY * safeRect.size.height);
++
++        UIView* view = [self viewForControlId:bases[i].controlId];
++        if (bases[i].controlId == GDX_TOUCH_CTL_DPAD) {
++            [self layoutDpadGroup:center size:size compact:compact hidden:spec->hidden];
++        } else if (view != nil) {
++            view.bounds = CGRectMake(0.0, 0.0, size, pillHeight > 0.0f ? pillHeight : size);
++            view.center = center;
++            const BOOL hidden = self.layoutEditing ? NO : (spec->hidden != 0);
++            view.hidden = hidden;
++        }
++    }
++
++    [self applyOpacityEditingAware];
++    [self layoutEditorPanel];
++    [self bringSubviewToFront:self.editorPanel];
++    _lastCompact = compact;
++}
++
++- (void)applyOpacityEditingAware {
++    for (UIView* control in self.editableControls) {
++        control.alpha = self.layoutEditing ? 1.0 : self.touchControlsOpacity;
++    }
++}
++
++- (void)layoutDpadGroup:(CGPoint)center size:(CGFloat)size compact:(BOOL)compact hidden:(BOOL)hidden {
++    const CGFloat radius = (compact ? kDpadRadiusPhone : kDpadRadius) *
++                           (compact ? size / 44.0f : size / 52.0f);
++    const CGFloat buttonSize = size;
++    NSArray<GdxTouchButton*>* group = @[ self.dUp, self.dDown, self.dLeft, self.dRight ];
++    const CGPoint offsets[4] = {
++        CGPointMake(0.0, -radius),
++        CGPointMake(0.0, radius),
++        CGPointMake(-radius, 0.0),
++        CGPointMake(radius, 0.0),
++    };
++    for (NSUInteger i = 0; i < group.count; i++) {
++        GdxTouchButton* button = group[i];
++        button.bounds = CGRectMake(0.0, 0.0, buttonSize, buttonSize);
++        button.center = CGPointMake(center.x + offsets[i].x, center.y + offsets[i].y);
++        button.hidden = self.layoutEditing ? NO : hidden;
++    }
++}
++
++- (UIView*)viewForControlId:(int)controlId {
++    switch (controlId) {
++        case GDX_TOUCH_CTL_STICK: return self.stick;
++        case GDX_TOUCH_CTL_ACCEL: return self.btnAccel;
++        case GDX_TOUCH_CTL_BOOST: return self.btnBoost;
++        case GDX_TOUCH_CTL_BRAKE: return self.btnBrake;
++        case GDX_TOUCH_CTL_SLIDE_L: return self.btnSlideL;
++        case GDX_TOUCH_CTL_SLIDE_R: return self.btnSlideR;
++        case GDX_TOUCH_CTL_START: return self.btnStart;
++        case GDX_TOUCH_CTL_VIEW: return self.btnView;
++        case GDX_TOUCH_CTL_LOOK: return self.btnLook;
++        case GDX_TOUCH_CTL_CLEFT: return self.btnCLeft;
++        case GDX_TOUCH_CTL_L: return self.btnL;
++        default: return nil;
++    }
++}
++
++- (void)layoutSubviews {
++    [super layoutSubviews];
++    const BOOL compact = [self isCompact];
++    if (compact != _lastCompact) {
++        _layoutNeedsProfileLoad = YES; // device class changed (rotation on phone)
++    }
++    [self applyLayout];
++}
++
++- (void)cancelAllInputs {
++    [self.stick cancelInput];
++    for (UIView* control in self.editableControls) {
++        if ([control isKindOfClass:GdxTouchButton.class]) {
++            [(GdxTouchButton*)control cancelInput];
++        }
++    }
++}
++
++- (void)setTouchOpacity:(CGFloat)opacity {
++    const CGFloat clamped = std::max(0.25f, std::min(1.0f, (float)opacity));
++    if (fabs(clamped - self.touchControlsOpacity) < 0.001f) {
++        return;
++    }
++    self.touchControlsOpacity = clamped;
++    [self applyOpacityEditingAware];
++}
++
++// ── Layout editor ─────────────────────────────────────────────────────────────
++- (UIButton*)editorButtonWithTitle:(NSString*)title action:(SEL)action {
++    UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
++    [button setTitle:title forState:UIControlStateNormal];
++    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
++    button.titleLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
++    button.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.14];
++    button.layer.cornerRadius = 10.0;
++    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
++    return button;
++}
++
++- (void)installLayoutEditor {
++    self.editorPanel = [[UIView alloc] initWithFrame:CGRectZero];
++    self.editorPanel.backgroundColor = [UIColor colorWithWhite:0.04 alpha:0.88];
++    self.editorPanel.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.24].CGColor;
++    self.editorPanel.layer.borderWidth = 1.0;
++    self.editorPanel.layer.cornerRadius = 16.0;
++    self.editorPanel.hidden = YES;
++
++    self.editorLabel = [[UILabel alloc] initWithFrame:CGRectZero];
++    self.editorLabel.textColor = UIColor.whiteColor;
++    self.editorLabel.numberOfLines = 2;
++    self.editorLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
++    [self.editorPanel addSubview:self.editorLabel];
++
++    self.sizeSlider = [[UISlider alloc] initWithFrame:CGRectZero];
++    self.sizeSlider.minimumValue = 0.70f;
++    self.sizeSlider.maximumValue = 1.50f;
++    self.sizeSlider.value = 1.0f;
++    self.sizeSlider.minimumTrackTintColor = [UIColor colorWithRed:0.28 green:0.68 blue:1.0 alpha:1.0];
++    [self.sizeSlider addTarget:self
++                        action:@selector(editorSizeChanged:)
++              forControlEvents:UIControlEventValueChanged];
++    [self.editorPanel addSubview:self.sizeSlider];
++
++    self.visibilityButton = [self editorButtonWithTitle:@"Hide" action:@selector(toggleSelectedVisibility)];
++    self.resetButton = [self editorButtonWithTitle:@"Reset" action:@selector(resetCurrentLayout)];
++    self.doneButton = [self editorButtonWithTitle:@"Done" action:@selector(endLayoutEditing)];
++    self.doneButton.backgroundColor = [UIColor colorWithRed:0.10 green:0.48 blue:0.92 alpha:0.88];
++    self.resetButton.accessibilityLabel = @"Reset touch layout";
++    self.doneButton.accessibilityLabel = @"Done editing touch layout";
++    [self.editorPanel addSubview:self.visibilityButton];
++    [self.editorPanel addSubview:self.resetButton];
++    [self.editorPanel addSubview:self.doneButton];
++    [self addSubview:self.editorPanel];
++
++    for (UIView* control in self.editableControls) {
++        UIPanGestureRecognizer* pan =
++            [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(moveControl:)];
++        UITapGestureRecognizer* tap =
++            [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(selectControlGesture:)];
++        pan.enabled = NO;
++        tap.enabled = NO;
++        [control addGestureRecognizer:pan];
++        [control addGestureRecognizer:tap];
++        [self.editGestures addObject:pan];
++        [self.editGestures addObject:tap];
++    }
++}
++
++- (void)layoutEditorPanel {
++    if (self.editorPanel.hidden) {
++        return;
++    }
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGFloat width = CGRectGetWidth(self.bounds);
++    const BOOL compact = [self isCompact];
++    const CGFloat panelWidth =
++        MIN(width - safe.left - safe.right - (compact ? 8.0 : 16.0), compact ? 560.0 : 720.0);
++    const CGFloat panelHeight = compact ? 50.0 : 86.0;
++    self.editorPanel.frame =
++        CGRectMake(CGRectGetMidX(self.bounds) - panelWidth * 0.5,
++                   safe.top + (compact ? 4.0 : 8.0), panelWidth, panelHeight);
++    self.editorPanel.layer.cornerRadius = compact ? 12.0 : 16.0;
++
++    const CGFloat inset = compact ? 5.0 : 12.0;
++    const CGFloat buttonWidth = compact ? 54.0 : 70.0;
++    const CGFloat gap = compact ? 4.0 : 8.0;
++    const CGFloat contentHeight = panelHeight - inset * 2.0;
++    const CGFloat trailingButtonsWidth = buttonWidth * 3.0 + gap * 2.0;
++    const CGFloat labelWidth = compact ? 94.0 : MIN(150.0, panelWidth * 0.23);
++    const CGFloat sliderX = inset + labelWidth + gap;
++    const CGFloat sliderWidth =
++        panelWidth - inset * 2.0 - labelWidth - gap - trailingButtonsWidth - gap;
++    self.editorLabel.numberOfLines = compact ? 1 : 2;
++    self.editorLabel.font =
++        [UIFont systemFontOfSize:(compact ? 11.0 : 14.0) weight:UIFontWeightSemibold];
++    self.editorLabel.frame = CGRectMake(inset, inset, labelWidth, contentHeight);
++    self.sizeSlider.frame = CGRectMake(sliderX, inset, MAX(80.0, sliderWidth), contentHeight);
++
++    CGFloat buttonX = panelWidth - inset - trailingButtonsWidth;
++    for (UIButton* button in @[ self.visibilityButton, self.resetButton, self.doneButton ]) {
++        button.titleLabel.font =
++            [UIFont systemFontOfSize:(compact ? 12.0 : 14.0) weight:UIFontWeightSemibold];
++        button.layer.cornerRadius = compact ? 8.0 : 10.0;
++        button.frame = CGRectMake(buttonX, inset, buttonWidth, contentHeight);
++        buttonX += buttonWidth + gap;
++    }
++}
++
++- (void)beginLayoutEditing {
++    if (self.layoutEditing) {
++        return;
++    }
++    [self cancelAllInputs];
++    self.layoutEditing = YES;
++    for (UIGestureRecognizer* gesture in self.editGestures) {
++        gesture.enabled = YES;
++    }
++    self.editorPanel.hidden = NO;
++    [self applyLayout];
++    [self selectControl:self.btnAccel];
++    NSLog(@"[F0X] touch layout editor opened");
++}
++
++- (void)endLayoutEditing {
++    if (!self.layoutEditing) {
++        return;
++    }
++    [self saveCurrentLayout];
++    self.layoutEditing = NO;
++    for (UIGestureRecognizer* gesture in self.editGestures) {
++        gesture.enabled = NO;
++    }
++    self.editorPanel.hidden = YES;
++    self.selectedControl = nil;
++    [self cancelAllInputs];
++    [self applyLayout];
++    gdx_touch_controls_haptic_feedback();
++    NSLog(@"[F0X] touch layout saved");
++}
++
++- (void)selectControl:(UIView*)control {
++    if (!self.layoutEditing || control == nil) {
++        return;
++    }
++    // The D-pad is one editable group: selecting any button selects the group.
++    self.selectedControl = control;
++    NSString* label = control.accessibilityLabel;
++    if (label.length == 0) {
++        label = control.accessibilityIdentifier;
++    }
++    const BOOL compact = [self isCompact];
++    self.editorLabel.text =
++        compact ? [NSString stringWithFormat:@"%@ • Drag • Size", label]
++                : [NSString stringWithFormat:@"%@\nDrag to move • Size", label];
++    NSString* key = control.accessibilityIdentifier;
++    self.sizeSlider.value =
++        self.layoutScales[key] == nil ? 1.0f : self.layoutScales[key].floatValue;
++    const BOOL hidden = [self.hiddenControls containsObject:key];
++    [self.visibilityButton setTitle:(hidden ? @"Show" : @"Hide") forState:UIControlStateNormal];
++    const BOOL canHide = gdx_touch_layout_can_hide(key.intValue);
++    self.visibilityButton.enabled = canHide;
++    self.visibilityButton.alpha = canHide ? 1.0 : 0.4;
++    [self highlightSelection];
++}
++
++- (void)highlightSelection {
++    for (UIView* control in self.editableControls) {
++        const BOOL selected =
++            self.layoutEditing && control == self.selectedControl &&
++            [control.accessibilityIdentifier isEqualToString:self.selectedControl.accessibilityIdentifier];
++        control.layer.shadowColor = [UIColor colorWithRed:1.0 green:0.78 blue:0.16 alpha:1.0].CGColor;
++        control.layer.shadowRadius = selected ? 8.0 : 0.0;
++        control.layer.shadowOpacity = selected ? 1.0 : 0.0;
++        control.layer.shadowOffset = CGSizeZero;
++    }
++}
++
++- (void)selectControlGesture:(UITapGestureRecognizer*)gesture {
++    [self selectControl:gesture.view];
++}
++
++- (void)moveControl:(UIPanGestureRecognizer*)gesture {
++    UIView* control = gesture.view;
++    if (!self.layoutEditing || control == nil) {
++        return;
++    }
++    if (gesture.state == UIGestureRecognizerStateBegan) {
++        [self selectControl:control];
++    }
++    const CGPoint translation = [gesture translationInView:self];
++    if ([control.accessibilityIdentifier isEqualToString:@"11"]) {
++        // The D-pad is one editable group: drag all four buttons together.
++        for (GdxTouchButton* button in @[ self.dUp, self.dDown, self.dLeft, self.dRight ]) {
++            button.center =
++                CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
++            [self clampControlToSafeBounds:button];
++        }
++        [gesture setTranslation:CGPointZero inView:self];
++        [self recordGroupCenter];
++    } else {
++        control.center =
++            CGPointMake(control.center.x + translation.x, control.center.y + translation.y);
++        [gesture setTranslation:CGPointZero inView:self];
++        [self clampControlToSafeBounds:control];
++        [self recordCenter:control];
++    }
++}
++
++- (void)recordGroupCenter {
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
++    const CGFloat cx = (self.dUp.center.x + self.dDown.center.x + self.dLeft.center.x +
++                        self.dRight.center.x) * 0.25;
++    const CGFloat cy = (self.dUp.center.y + self.dDown.center.y + self.dLeft.center.y +
++                        self.dRight.center.y) * 0.25;
++    self.layoutCenters[@"11"] = @[
++        @((cx - safeRect.origin.x) / MAX(safeRect.size.width, 1.0)),
++        @((cy - safeRect.origin.y) / MAX(safeRect.size.height, 1.0)),
++    ];
++}
++
++- (void)clampControlToSafeBounds:(UIView*)control {
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGFloat halfWidth = CGRectGetWidth(control.bounds) * 0.5;
++    const CGFloat halfHeight = CGRectGetHeight(control.bounds) * 0.5;
++    const CGFloat minX = safe.left + halfWidth + 4.0;
++    const CGFloat maxX = CGRectGetWidth(self.bounds) - safe.right - halfWidth - 4.0;
++    const CGFloat minY = safe.top + halfHeight + 4.0;
++    const CGFloat maxY = CGRectGetHeight(self.bounds) - safe.bottom - halfHeight - 4.0;
++    control.center = CGPointMake(
++        std::max(minX, std::min(control.center.x, maxX)),
++        std::max(minY, std::min(control.center.y, maxY)));
++}
++
++- (void)recordCenter:(UIView*)control {
++    NSString* key = control.accessibilityIdentifier;
++    if (key.length == 0) {
++        return;
++    }
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
++    self.layoutCenters[key] = @[
++        @((control.center.x - safeRect.origin.x) / MAX(safeRect.size.width, 1.0)),
++        @((control.center.y - safeRect.origin.y) / MAX(safeRect.size.height, 1.0)),
++    ];
++}
++
++- (void)editorSizeChanged:(UISlider*)slider {
++    UIView* control = self.selectedControl;
++    NSString* key = control.accessibilityIdentifier;
++    if (control == nil || key.length == 0) {
++        return;
++    }
++    const CGFloat scale = slider.value;
++    self.layoutScales[key] = @(scale);
++    [self applyLayout];
++    [self highlightSelection];
++    [self clampControlToSafeBounds:control];
++    [self recordCenter:control];
++}
++
++- (void)toggleSelectedVisibility {
++    NSString* key = self.selectedControl.accessibilityIdentifier;
++    if (key.length == 0 || !gdx_touch_layout_can_hide(key.intValue)) {
++        return;
++    }
++    if ([self.hiddenControls containsObject:key]) {
++        [self.hiddenControls removeObject:key];
++    } else {
++        [self.hiddenControls addObject:key];
++    }
++    [self applyLayout];
++    [self selectControl:self.selectedControl];
++}
++
++- (void)resetCurrentLayout {
++    if (self.layoutProfile.length == 0) {
++        return;
++    }
++    [self.layoutCenters removeAllObjects];
++    [self.layoutScales removeAllObjects];
++    [self.hiddenControls removeAllObjects];
++    [NSUserDefaults.standardUserDefaults removeObjectForKey:[self storageKeyForProfile:self.layoutProfile]];
++    _layoutNeedsProfileLoad = YES;
++    [self applyLayout];
++    if (self.layoutEditing) {
++        [self selectControl:self.btnAccel];
++    }
++    NSLog(@"[F0X] touch layout reset to defaults (%@)", self.layoutProfile);
++}
++
++- (void)saveCurrentLayout {
++    if (self.layoutProfile.length == 0) {
++        return;
++    }
++    const BOOL compact = [self isCompact];
++    const GdxBaseSpec* bases = compact ? kPhoneSpecs : kTabletSpecs;
++    const int baseCount = compact ? (int)(sizeof(kPhoneSpecs) / sizeof(kPhoneSpecs[0]))
++                                  : (int)(sizeof(kTabletSpecs) / sizeof(kTabletSpecs[0]));
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
++    std::vector<GdxTouchControlSpec> specs;
++    for (int i = 0; i < baseCount; i++) {
++        GdxTouchControlSpec spec;
++        spec.controlId = bases[i].controlId;
++        UIView* view = (bases[i].controlId == GDX_TOUCH_CTL_DPAD) ? self.dUp : [self viewForControlId:bases[i].controlId];
++        const CGFloat base = bases[i].baseSize;
++        const CGFloat baseH = bases[i].baseHeight > 0.0f ? bases[i].baseHeight : base;
++        const CGFloat w = CGRectGetWidth(view.bounds);
++        const CGFloat h = CGRectGetHeight(view.bounds);
++        spec.scale = (base > 0.0f) ? (float)(w / base) : 1.0f;
++        if (baseH > base && h > 0.0f) {
++            spec.scale = (float)(h / baseH);
++        }
++        NSString* key = view.accessibilityIdentifier;
++        spec.centerX = (float)((view.center.x - safeRect.origin.x) / MAX(safeRect.size.width, 1.0));
++        spec.centerY = (float)((view.center.y - safeRect.origin.y) / MAX(safeRect.size.height, 1.0));
++        spec.hidden = [self.hiddenControls containsObject:key] ? 1 : 0;
++        specs.push_back(spec);
++    }
++    char buffer[1024];
++    const int len = gdx_touch_profile_encode(specs.data(), (int)specs.size(), buffer, (int)sizeof(buffer));
++    if (len > 0) {
++        [NSUserDefaults.standardUserDefaults setObject:[NSString stringWithUTF8String:buffer]
++                                               forKey:[self storageKeyForProfile:self.layoutProfile]];
++    }
++}
++
++@end
++
++// ── Overlay + menu-button installation ─────────────────────────────────────────
++static GdxTouchOverlay* sOverlay;
++static GdxTouchButton* sMenuButton;
++
++// Target/action holder for the permanent ••• button: UIControl actions must be
++// Objective-C methods, so the C API wrapper lives on a small retained object.
++@interface GdxMenuButtonTarget : NSObject
++@end
++
++@implementation GdxMenuButtonTarget
++- (void)menuPressed {
++    gdx_touch_menu_toggle();
++}
++@end
++
++static GdxMenuButtonTarget* sMenuTarget;
++
++static UIWindow* gdx_active_ui_window(void) {
++    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
++        if (![scene isKindOfClass:UIWindowScene.class]) {
++            continue;
++        }
++        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
++            if (window.isKeyWindow) {
++                return window;
++            }
++        }
++    }
++    return UIApplication.sharedApplication.windows.firstObject;
++}
++
++// Compact attach diagnostic so Simulator evidence can verify the overlay maps
++// onto the live window. One line per attach, no per-control spam.
++static void gdx_log_overlay_geometry(GdxTouchOverlay* overlay) {
++    NSLog(@"[F0X] touch overlay frame=%@ hidden=%d alpha=%.2f userInteraction=%d",
++          NSStringFromCGRect(overlay.frame), overlay.hidden ? 1 : 0, overlay.alpha,
++          overlay.userInteractionEnabled ? 1 : 0);
++}
++
++static void gdx_install_menu_button(UIWindow* window) {
++    if (sMenuButton == nil) {
++        sMenuButton =
++            [[GdxTouchButton alloc] initWithLabel:@"•••" bit:0 key:@"menu" pill:NO];
++        sMenuButton.accessibilityLabel = @"Menu";
++        sMenuButton.label.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightSemibold];
++        [sMenuButton setIdleColor:[UIColor colorWithWhite:0.04 alpha:0.42]
++                     pressedColor:[UIColor colorWithWhite:0.72 alpha:0.62]];
++        sMenuButton.autoresizingMask =
++            UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleBottomMargin;
++        sMenuTarget = [[GdxMenuButtonTarget alloc] init];
++        [sMenuButton addTarget:sMenuTarget
++                        action:@selector(menuPressed)
++              forControlEvents:UIControlEventTouchUpInside];
++    }
++
++    const UIEdgeInsets safe = window.safeAreaInsets;
++    const CGFloat width = CGRectGetWidth(window.bounds);
++    const CGFloat height = CGRectGetHeight(window.bounds);
++    const BOOL compact = height < 560.0;
++    const CGFloat size = compact ? 44.0 : 38.0;
++    const BOOL editing = sOverlay != nil && sOverlay.layoutEditing;
++
++    if (editing) {
++        sMenuButton.hidden = YES;
++        return;
++    }
++    sMenuButton.hidden = NO;
++    if (compact) {
++        // Phone: dedicated safe slot clear of the Dynamic Island and the menu tab
++        // strip. Upper-left during gameplay; bottom-center while the menu is open.
++        const CGFloat y =
++            sMenuVisible ? height - safe.bottom - size - 8.0 : safe.top + 8.0;
++        sMenuButton.frame =
++            sMenuVisible
++                ? CGRectMake(width * 0.5 - size * 0.5, y, size, size)
++                : CGRectMake(safe.left + 8.0, y, size, size);
++        sMenuButton.autoresizingMask =
++            sMenuVisible
++                ? (UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin |
++                   UIViewAutoresizingFlexibleTopMargin)
++                : (UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleBottomMargin);
++    } else {
++        // Tablet: upper-right safe area, clear of the menu content.
++        sMenuButton.frame =
++            CGRectMake(width - safe.right - size - 8.0, safe.top + 76.0, size, size);
++    }
++    sMenuButton.alpha = sOpacity;
++    if (sMenuButton.superview != window) {
++        [sMenuButton removeFromSuperview];
++        [window addSubview:sMenuButton];
++    }
++    [window bringSubviewToFront:sMenuButton];
++}
++
++static void gdx_apply_touch_state(void) {
++    if (!sStarted) {
++        return;
++    }
++    UIWindow* window = gdx_active_ui_window();
++    if (window == nil) {
++        // Window not up yet (boot transition): retry shortly.
++        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)),
++                       dispatch_get_main_queue(), ^{
++                           if (sStarted) {
++                               gdx_apply_touch_state();
++                           }
++                       });
++        return;
++    }
++
++    gdx_install_menu_button(window);
++    const BOOL overlayHidden = !sDesiredEnabled || sMenuVisible || sControllerAutoHidden;
++
++    if (sEditorRequested) {
++        if (!sDesiredEnabled || sControllerAutoHidden) {
++            sEditorRequested = NO; // cannot edit while disabled / controller-hidden
++        } else if (sMenuVisible) {
++            // Keep the request; the editor opens once the menu finishes closing.
++        } else {
++            sEditorRequested = NO;
++            if (sOverlay == nil) {
++                sOverlay = [[GdxTouchOverlay alloc] initWithFrame:window.bounds];
++                sOverlay.autoresizingMask =
++                    UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
++            }
++            if (sOverlay.superview != window) {
++                [sOverlay removeFromSuperview];
++                sOverlay.frame = window.bounds;
++                [window addSubview:sOverlay];
++            }
++            gdx_log_overlay_geometry(sOverlay);
++            [sOverlay setTouchOpacity:sOpacity];
++            [sOverlay beginLayoutEditing];
++            [window bringSubviewToFront:sOverlay];
++            return;
++        }
++    }
++
++    if (overlayHidden) {
++        if (sOverlay != nil) {
++            if (sOverlay.layoutEditing) {
++                [sOverlay endLayoutEditing];
++            }
++            [sOverlay cancelAllInputs];
++            [sOverlay removeFromSuperview];
++            sOverlay = nil;
++        }
++        return;
++    }
++
++    if (sOverlay == nil) {
++        sOverlay = [[GdxTouchOverlay alloc] initWithFrame:window.bounds];
++        sOverlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
++    }
++    [sOverlay setTouchOpacity:sOpacity];
++    if (sOverlay.superview != window) {
++        [sOverlay removeFromSuperview];
++        sOverlay.frame = window.bounds;
++        [window addSubview:sOverlay];
++    }
++    gdx_log_overlay_geometry(sOverlay);
++    [window bringSubviewToFront:sOverlay];
++    [window bringSubviewToFront:sMenuButton];
++
++    // Live-state evidence, rate-limited: attach truth and the permanent menu
++    // button's frame (also serves as a Simulator click-mapping anchor).
++    static CFAbsoluteTime sLastLiveLog = 0.0;
++    const CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
++    if ((now - sLastLiveLog) >= 5.0) {
++        sLastLiveLog = now;
++        NSLog(@"[F0X] touch live: overlay=%@ hidden=%d menuButton=%@ safe=%@",
++              sOverlay != nil ? @"attached" : @"none", (sOverlay != nil && sOverlay.hidden) ? 1 : 0,
++              NSStringFromCGRect(sMenuButton.frame), NSStringFromUIEdgeInsets(window.safeAreaInsets));
++    }
++}
++
++// ── Lifecycle ─────────────────────────────────────────────────────────────────
++static void gdx_install_lifecycle_observers(void) {
++    if (sLifecycleObserversInstalled) {
++        return;
++    }
++    sLifecycleObserversInstalled = YES;
++    NSNotificationCenter* notifications = NSNotificationCenter.defaultCenter;
++    for (NSNotificationName name in
++         @[ UIApplicationWillResignActiveNotification, UIApplicationDidEnterBackgroundNotification,
++            UIApplicationWillTerminateNotification ]) {
++        [notifications addObserverForName:name
++                                   object:nil
++                                    queue:NSOperationQueue.mainQueue
++                               usingBlock:^(NSNotification* notification) {
++                                   (void)notification;
++                                   gdx_touch_state_cancel_all();
++                                   if (sOverlay != nil) {
++                                       [sOverlay cancelAllInputs];
++                                   }
++                               }];
++    }
++    [notifications addObserverForName:UIApplicationDidBecomeActiveNotification
++                               object:nil
++                                queue:NSOperationQueue.mainQueue
++                           usingBlock:^(NSNotification* notification) {
++                               (void)notification;
++                               gdx_apply_touch_state();
++                           }];
++}
++
++// ── Public API ────────────────────────────────────────────────────────────────
++int gdx_touch_controls_available(void) {
++    return 1;
++}
++
++void gdx_touch_controls_start(void) {
++    gdx_main_sync(^{
++        if (sStarted) {
++            return;
++        }
++        gdx_install_lifecycle_observers();
++        sStarted = YES;
++        gdx_apply_touch_state();
++    });
++}
++
++void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected,
++                             int enabled, float opacity) {
++    gdx_main_sync(^{
++        const BOOL menuVisibleNow = menuVisible != 0;
++        const BOOL controllerHiddenNow = physicalGamepadConnected != 0;
++        const BOOL enabledNow = enabled != 0;
++        const CGFloat opacityNow = std::max(0.25f, std::min(1.0f, (float)opacity));
++        const BOOL changed = (menuVisibleNow != sMenuVisible) ||
++                             (controllerHiddenNow != sControllerAutoHidden) ||
++                             (enabledNow != sDesiredEnabled) ||
++                             (fabs(opacityNow - sOpacity) >= 0.001f);
++        sMenuVisible = menuVisibleNow;
++        sControllerAutoHidden = controllerHiddenNow;
++        sDesiredEnabled = enabledNow;
++        sOpacity = opacityNow;
++        static BOOL sLoggedMenuState = NO;
++        if (sMenuVisible && !sLoggedMenuState) {
++            sLoggedMenuState = YES;
++            NSLog(@"[F0X] touch menu visible -> gameplay overlay hidden");
++        } else if (!sMenuVisible && sLoggedMenuState) {
++            sLoggedMenuState = NO;
++            NSLog(@"[F0X] touch menu closed -> overlay restored");
++        }
++        if (changed || !sStarted) {
++            gdx_apply_touch_state();
++        }
++        // Debounced input-state evidence: while any touch input is live, publish
++        // the exact N64 state the game will read this frame (buttons + stick) at
++        // most every 2s, plus one neutral line when the last active burst ends.
++        // This is the log seam that proves UIKit touches reach the pad state.
++        {
++            static CFAbsoluteTime sLastDump = 0.0;
++            static BOOL sWasActive = NO;
++            GdxTouchPadState state;
++            gdx_touch_state_read(&state);
++            const BOOL active = (state.buttons != 0) || (state.stickActive != 0);
++            const CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
++            if (active && (now - sLastDump) >= 2.0) {
++                sLastDump = now;
++                NSLog(@"[F0X] touch state buttons=0x%04X stick=(%d,%d) active=%d",
++                      state.buttons, state.stickX, state.stickY, state.stickActive);
++            } else if (!active && sWasActive) {
++                NSLog(@"[F0X] touch state neutral (input released)");
++            }
++            sWasActive = active;
++        }
++    });
++}
++
++void gdx_touch_controls_read(GdxTouchPadState* outState) {
++    gdx_touch_state_read(outState);
++}
++
++void gdx_touch_controls_cancel_all(void) {
++    gdx_touch_state_cancel_all();
++    gdx_main_sync(^{
++        if (sOverlay != nil) {
++            [sOverlay cancelAllInputs];
++        }
++    });
++}
++
++void gdx_touch_controls_begin_layout_editor(void) {
++    gdx_main_sync(^{
++        if (!sDesiredEnabled || !sStarted) {
++            NSLog(@"[F0X] touch layout editor requires Touch Controls enabled");
++            return;
++        }
++        sEditorRequested = YES;
++        if (sMenuVisible) {
++            // Close the in-game menu; gdx_apply_touch_state opens the editor on
++            // the next tick once the menu is no longer visible.
++            gdx_touch_menu_toggle();
++        } else {
++            gdx_apply_touch_state();
++        }
++    });
++}
++
++void gdx_touch_controls_reset_current_layout(void) {
++    gdx_main_sync(^{
++        if (sOverlay != nil) {
++            [sOverlay resetCurrentLayout];
++        }
++    });
++}
++
++void gdx_touch_controls_set_haptics_enabled(int enabled) {
++    gdx_main_sync(^{
++        sHapticsEnabled = enabled != 0;
++    });
++}
++
++void gdx_touch_controls_shutdown(void) {
++    gdx_main_sync(^{
++        if (sOverlay != nil) {
++            if (sOverlay.layoutEditing) {
++                [sOverlay endLayoutEditing];
++            }
++            [sOverlay cancelAllInputs];
++            [sOverlay removeFromSuperview];
++            sOverlay = nil;
++        }
++        [sMenuButton removeFromSuperview];
++        sMenuButton = nil;
++        sStarted = NO;
++    });
++    gdx_touch_state_cancel_all();
++}
++
++// Haptic confirmation, shared by buttons and the editor Done action.
++void gdx_touch_controls_haptic_feedback(void) {
++    if (!sHapticsEnabled) {
++        return;
++    }
++    UIImpactFeedbackGenerator* generator =
++        [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
++    [generator impactOccurred];
++}
+diff --git a/port/gdx_touch_controls_stub.c b/port/gdx_touch_controls_stub.c
+new file mode 100644
+index 0000000..6e8d13a
+--- /dev/null
++++ b/port/gdx_touch_controls_stub.c
+@@ -0,0 +1,51 @@
++// port/gdx_touch_controls_stub.c — neutral non-iOS touch-controls implementation.
++//
++// macOS, Linux, and Windows builds compile this file so every C/C++ call site
++// (input_bridge.c, main.cpp, the Settings registry) stays platform-neutral.
++// Available() is 0, so the Settings page hides the whole Touch Controls section
++// and the merged pad state is always the physical ControlDeck state. The shared
++// state core still zeroes on read/cancel so behavior is uniform if any port code
++// calls into it.
++
++#include "gdx_touch_controls.h"
++
++#include <stddef.h>
++
++int gdx_touch_controls_available(void) {
++    return 0;
++}
++
++void gdx_touch_controls_start(void) {}
++
++void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected,
++                             int enabled, float opacity) {
++    (void)menuVisible;
++    (void)physicalGamepadConnected;
++    (void)enabled;
++    (void)opacity;
++}
++
++void gdx_touch_controls_read(GdxTouchPadState* outState) {
++    if (outState != NULL) {
++        outState->buttons = 0;
++        outState->stickX = 0;
++        outState->stickY = 0;
++        outState->stickActive = 0;
++    }
++}
++
++void gdx_touch_controls_cancel_all(void) {
++    gdx_touch_state_cancel_all();
++}
++
++void gdx_touch_controls_begin_layout_editor(void) {}
++
++void gdx_touch_controls_reset_current_layout(void) {}
++
++void gdx_touch_controls_set_haptics_enabled(int enabled) {
++    (void)enabled;
++}
++
++void gdx_touch_controls_shutdown(void) {
++    gdx_touch_state_cancel_all();
++}
+diff --git a/port/gdx_touch_state.c b/port/gdx_touch_state.c
+new file mode 100644
+index 0000000..0473737
+--- /dev/null
++++ b/port/gdx_touch_state.c
+@@ -0,0 +1,232 @@
++// port/gdx_touch_state.c — platform-neutral touch pad state core.
++//
++// Owns the shared atomic pad state (buttons + packed analog stick), the
++// normalized-stick mapping, the port-1 merge helper, and the layout/profile
++// geometry core. The iOS bridge and the neutral stub both delegate their read /
++// cancel behavior here, and the deterministic gdx_touch_merge_tests regression
++// drives these exact functions, so merge/cancel/stick/layout behavior is tested
++// against the code the overlay actually runs.
++//
++// Threading: UIKit touch callbacks and gdx_controller_poll() both run on the
++// host main thread, but the state is published through C11 atomics so a future
++// input worker cannot race the host frame, and the contract's atomic-state
++// requirement holds on every platform.
++
++#include "gdx_touch_controls.h"
++
++#include <math.h>
++#include <stdatomic.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++// ── Shared atomic state ───────────────────────────────────────────────────────
++// Stick packing: bit 0 = stickActive, bits 8..15 = stickX (unsigned 8-bit of the
++// signed value), bits 16..23 = stickY. One 32-bit store publishes a coherent
++// snapshot.
++static _Atomic unsigned int sButtons;    // low 16 bits = N64 mask
++static _Atomic unsigned int sStickPacked;
++
++static void gdx_touch_state_publish_stick(signed char x, signed char y, int active) {
++    unsigned int packed = (active ? 1u : 0u) |
++                          ((unsigned int)(unsigned char)x << 8) |
++                          ((unsigned int)(unsigned char)y << 16);
++    atomic_store_explicit(&sStickPacked, packed, memory_order_relaxed);
++}
++
++void gdx_touch_state_set_button(int buttonBit, int pressed) {
++    const unsigned int mask = (unsigned int)buttonBit & 0xFFFFu;
++    if (mask == 0u) {
++        return;
++    }
++    if (pressed != 0) {
++        atomic_fetch_or_explicit(&sButtons, mask, memory_order_relaxed);
++    } else {
++        atomic_fetch_and_explicit(&sButtons, ~mask, memory_order_relaxed);
++    }
++}
++
++// Deadzone as a fraction of full deflection (~10/80 of stick travel).
++#define GDX_TOUCH_STICK_DEADZONE 0.12f
++#define GDX_TOUCH_STICK_MAX 80.0f
++
++void gdx_touch_state_set_stick(float x, float y) {
++    const float length = sqrtf(x * x + y * y);
++
++    if (length <= GDX_TOUCH_STICK_DEADZONE || !isfinite(length)) {
++        gdx_touch_state_publish_stick(0, 0, 0);
++        return;
++    }
++
++    // Clamp the vector to the unit circle before scaling so diagonals stay
++    // inside the N64 -80..80 square.
++    if (length > 1.0f) {
++        x /= length;
++        y /= length;
++    }
++
++    const signed char sx = (signed char)lrintf(x * GDX_TOUCH_STICK_MAX);
++    const signed char sy = (signed char)lrintf(y * GDX_TOUCH_STICK_MAX);
++    gdx_touch_state_publish_stick(sx, sy, 1);
++}
++
++void gdx_touch_state_release_stick(void) {
++    gdx_touch_state_publish_stick(0, 0, 0);
++}
++
++void gdx_touch_state_cancel_all(void) {
++    atomic_store_explicit(&sButtons, 0u, memory_order_relaxed);
++    gdx_touch_state_publish_stick(0, 0, 0);
++}
++
++void gdx_touch_state_read(GdxTouchPadState* outState) {
++    if (outState == NULL) {
++        return;
++    }
++    const unsigned int buttons = atomic_load_explicit(&sButtons, memory_order_relaxed) & 0xFFFFu;
++    const unsigned int packed = atomic_load_explicit(&sStickPacked, memory_order_relaxed);
++    outState->buttons = (unsigned short)buttons;
++    outState->stickActive = (unsigned char)(packed & 1u);
++    outState->stickX = (signed char)((packed >> 8) & 0xFFu);
++    outState->stickY = (signed char)((packed >> 16) & 0xFFu);
++}
++
++// ── Port-1 merge (input_bridge.c calls this after the ControlDeck read) ──────
++void gdx_touch_merge_pad(unsigned short* ioButtons, signed char* ioStickX,
++                         signed char* ioStickY, const GdxTouchPadState* touch) {
++    if (ioButtons != NULL && touch->buttons != 0) {
++        *ioButtons = (unsigned short)(*ioButtons | touch->buttons);
++    }
++    if (touch->stickActive != 0 && ioStickX != NULL && ioStickY != NULL) {
++        *ioStickX = touch->stickX;
++        *ioStickY = touch->stickY;
++    }
++}
++
++// ── Layout / profile core ─────────────────────────────────────────────────────
++// Protected controls can never be hidden: without the stick, accelerator, Start,
++// or the permanent menu affordance a player could strand the game or lose the
++// only way back into the settings.
++int gdx_touch_layout_can_hide(int controlId) {
++    switch (controlId) {
++        case GDX_TOUCH_CTL_STICK:
++        case GDX_TOUCH_CTL_ACCEL:
++        case GDX_TOUCH_CTL_START:
++        case GDX_TOUCH_CTL_MENU:
++            return 0;
++        default:
++            return 1;
++    }
++}
++
++static float gdx_touch_clampf(float v, float lo, float hi) {
++    if (v < lo) {
++        return lo;
++    }
++    if (v > hi) {
++        return hi;
++    }
++    return v;
++}
++
++void gdx_touch_layout_apply(const GdxTouchControlSpec* defaults, int defaultCount,
++                            const GdxTouchControlSpec* overrides, int overrideCount,
++                            float safeX0, float safeY0, float safeW, float safeH,
++                            GdxTouchControlSpec* out, int outCapacity) {
++    int i;
++    const int count = (defaultCount < outCapacity) ? defaultCount : outCapacity;
++    float x0 = safeX0;
++    float y0 = safeY0;
++    float x1 = safeX0 + safeW;
++    float y1 = safeY0 + safeH;
++
++    if (x1 <= x0) {
++        x0 = 0.0f;
++        x1 = 1.0f;
++    }
++    if (y1 <= y0) {
++        y0 = 0.0f;
++        y1 = 1.0f;
++    }
++
++    for (i = 0; i < count; i++) {
++        out[i] = defaults[i];
++    }
++    for (i = 0; i < overrideCount; i++) {
++        int j;
++        for (j = 0; j < count; j++) {
++            if (out[j].controlId == overrides[i].controlId) {
++                out[j] = overrides[i];
++                break;
++            }
++        }
++    }
++    for (i = 0; i < count; i++) {
++        out[i].scale = gdx_touch_clampf(out[i].scale, 0.70f, 1.50f);
++        if (!gdx_touch_layout_can_hide(out[i].controlId)) {
++            out[i].hidden = 0;
++        }
++        out[i].centerX = gdx_touch_clampf(out[i].centerX, x0, x1);
++        out[i].centerY = gdx_touch_clampf(out[i].centerY, y0, y1);
++    }
++}
++
++#define GDX_TOUCH_PROFILE_VERSION "v1"
++
++int gdx_touch_profile_encode(const GdxTouchControlSpec* specs, int count,
++                             char* out, int outCapacity) {
++    int written = 0;
++    int i;
++    if (out == NULL || outCapacity <= 0) {
++        return 0;
++    }
++    out[0] = '\0';
++    for (i = 0; i < count; i++) {
++        const int need = snprintf(NULL, 0, "%s %d %.6f %.6f %.3f %d\n",
++                                  GDX_TOUCH_PROFILE_VERSION, specs[i].controlId,
++                                  (double)specs[i].centerX, (double)specs[i].centerY,
++                                  (double)specs[i].scale, specs[i].hidden ? 1 : 0);
++        if (need < 0 || written + need + 1 > outCapacity) {
++            return 0; // truncation: caller keeps the previous profile
++        }
++        written += snprintf(out + written, (size_t)(outCapacity - written),
++                            "%s %d %.6f %.6f %.3f %d\n", GDX_TOUCH_PROFILE_VERSION,
++                            specs[i].controlId, (double)specs[i].centerX,
++                            (double)specs[i].centerY, (double)specs[i].scale,
++                            specs[i].hidden ? 1 : 0);
++    }
++    return written;
++}
++
++int gdx_touch_profile_decode(const char* text, GdxTouchControlSpec* out,
++                             int outCapacity) {
++    int count = 0;
++    const char* p = text;
++    char version[8];
++    if (text == NULL || out == NULL || outCapacity <= 0) {
++        return 0;
++    }
++    while (p != NULL && *p != '\0' && count < outCapacity) {
++        int id = -1;
++        int hidden = 0;
++        float x = 0.0f;
++        float y = 0.0f;
++        float scale = 1.0f;
++        int n = sscanf(p, "%7s %d %f %f %f %d", version, &id, &x, &y, &scale, &hidden);
++        if (n != 6 || strcmp(version, GDX_TOUCH_PROFILE_VERSION) != 0 ||
++            id < 0 || id >= GDX_TOUCH_CTL_COUNT || scale <= 0.0f) {
++            break; // malformed or a future version: stop, keep what we parsed
++        }
++        out[count].controlId = id;
++        out[count].centerX = x;
++        out[count].centerY = y;
++        out[count].scale = scale;
++        out[count].hidden = hidden ? 1 : 0;
++        count++;
++        p = strchr(p, '\n');
++        if (p != NULL) {
++            p++;
++        }
++    }
++    return count;
++}
 diff --git a/port/gen/LinkStubs.c b/port/gen/LinkStubs.c
 index ccb0585..eb611a7 100644
 --- a/port/gen/LinkStubs.c
@@ -1662,11 +3624,126 @@ index 927d50d..e5c1587 100644
  #define GDX_O2R_EXPECTED_ENTRY_COUNT 3610
  
  #endif /* GDX_O2R_EXPECTED_H */
+diff --git a/port/input_bridge.c b/port/input_bridge.c
+index 5900586..4b47908 100644
+--- a/port/input_bridge.c
++++ b/port/input_bridge.c
+@@ -48,6 +48,7 @@
+ #include "PR/os_pfs.h"
+ #include "controller.h"
+ #include "fzx_game.h" // GameMode values + GET_MODE (in-race safety checks)
++#include "gdx_touch_controls.h" // iOS UIKit touch overlay -> atomic N64 pad state
+ #include "gdx_input_script.h" // GDX_INPUT_SCRIPT: dev-only deterministic input playback (see file header)
+ #include "port_log.h"
+ 
+@@ -668,6 +669,20 @@ void gdx_controller_poll(void) {
+     // controller the game will accept.
+     connected[0] = 1;
+ 
++    // ── Touch controls (iOS/iPadOS overlay) merge ───────────────────────────────────────────
++    // At the rawest N64 seam: immediately after the one ControlDeck read and BEFORE the
++    // developer overrides below. Buttons OR into the live port-1 state; an active touch stick
++    // replaces only the two analog axes and an inactive one leaves the physical analog alone.
++    // The touch layer never computes edges — gdx_update_port_inputs() below remains the sole
++    // owner of pressed/released accumulation, digital-stick thresholds, repeats, and game-frame
++    // alignment. The stub implementation on non-iOS platforms reads neutral, so desktop builds
++    // are byte-for-byte unaffected.
++    {
++        GdxTouchPadState touchPad;
++        gdx_touch_controls_read(&touchPad);
++        gdx_touch_merge_pad(&buttons[0], &stick_x[0], &stick_y[0], &touchPad);
++    }
++
+     // Applied after the real controller read so analog events are not overwritten by it. Both dev
+     // harnesses drive PORT 1 only; giving them a port argument would change their file formats.
+     gdx_autoinput_apply(&buttons[0], &stick_x[0], &stick_y[0]);
 diff --git a/port/main.cpp b/port/main.cpp
-index 118ee0d..8e6c813 100644
+index 118ee0d..514ba9d 100644
 --- a/port/main.cpp
 +++ b/port/main.cpp
-@@ -498,6 +498,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
+@@ -73,6 +73,11 @@ extern "C" void gdx_disk_save_tick(void);
+ extern "C" void gdx_disk_save_flush(void);
+ extern "C" void gdx_discord_tick(void);
+ extern "C" void gdx_discord_shutdown(void);
++extern "C" void gdx_touch_controls_start(void);
++extern "C" void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected, int enabled,
++                                        float opacity);
++extern "C" void gdx_touch_controls_set_haptics_enabled(int enabled);
++extern "C" void gdx_touch_controls_shutdown(void);
+ extern "C" void gdx_pcm_capture_init(void);
+ extern "C" int  gdx_pcm_capture_finished(void);
+ extern "C" void gdx_pcm_capture_shutdown(void);
+@@ -467,6 +472,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
+     return 1;
+ }
+ 
++// ── Touch-controls host bridge ──────────────────────────────────────────────────────────────
++// The iOS UIKit overlay asks the host for two narrow facts each frame and one
++// action; everything else (settings CVars, layout profiles) lives in the touch
++// layer itself. These are deliberately extern "C" shims around the live
++// ControlDeck / GdxMenu objects.
++
++// True when at least one real SDL gamepad is plugged in. Deliberately NOT the
++// pinned logical port-1 "connected" flag: port 1 is always marked connected so
++// the game accepts input, but auto-hiding the touch overlay must key on actual
++// physical hardware. The Auto-hide CVar is folded in by the caller so the tick
++// API stays state-oriented.
++extern "C" int gdx_physical_gamepads_connected(void) {
++    auto ctx = Ship::Context::GetInstance();
++    if (ctx == nullptr) {
++        return 0;
++    }
++    auto controlDeck = ctx->GetControlDeck();
++    if (controlDeck == nullptr) {
++        return 0;
++    }
++    auto devices = controlDeck->GetConnectedPhysicalDeviceManager();
++    if (devices == nullptr) {
++        return 0;
++    }
++    const auto names = devices->GetConnectedSDLGamepadNames();
++    static bool sLoggedGamepads = false;
++    if (!sLoggedGamepads) {
++        sLoggedGamepads = true;
++        std::string joined;
++        for (const auto& [instanceId, name] : names) {
++            if (!joined.empty()) {
++                joined += ", ";
++            }
++            joined += name;
++        }
++        gdx_port_logf("[touch] physical SDL gamepads: %zu (%s)\n", names.size(),
++                      joined.empty() ? "none" : joined.c_str());
++    }
++    return names.empty() ? 0 : 1;
++}
++
++// Toggles the live full-screen menu through its GuiWindow, never a bare CVar
++// write: a constructed GuiWindow owns its in-memory visibility and a CVar write
++// alone would leave the menu state stale (see gdx_menu.cpp's GdxToggleWindow).
++extern "C" void gdx_touch_menu_toggle(void) {
++    auto ctx = Ship::Context::GetInstance();
++    if (ctx == nullptr) {
++        return;
++    }
++    auto w = ctx->GetWindow();
++    if (w == nullptr) {
++        return;
++    }
++    auto gui = w->GetGui();
++    if (gui == nullptr) {
++        return;
++    }
++    auto menu = gui->GetMenu();
++    if (menu != nullptr) {
++        menu->ToggleVisibility();
++    }
++}
++
+ // Deliberately no single-port variant: looping one over four ports would silently break the
+ // wheel buffer and input-lag deque described above.
+ 
+@@ -498,6 +566,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
          ec.clear();
      }
  
@@ -1680,7 +3757,7 @@ index 118ee0d..8e6c813 100644
      for (std::filesystem::path dir = start; !dir.empty(); dir = dir.parent_path()) {
          roots.push_back(dir);
          roots.push_back(dir / "assets" / "extracted");
-@@ -662,7 +669,7 @@ int main(int argc, char** argv) {
+@@ -662,7 +737,7 @@ int main(int argc, char** argv) {
      }
  
      logStep("CreateUninitializedInstance");
@@ -1689,7 +3766,7 @@ index 118ee0d..8e6c813 100644
                                                            "gdiffuser.cfg.json");
      if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
  
-@@ -702,7 +709,15 @@ int main(int argc, char** argv) {
+@@ -702,7 +777,15 @@ int main(int argc, char** argv) {
      logStep("ControlDeck::Init");     controlDeck->Init(&sGdxControllerBits);
  
      // ResourceManager MUST init before the window is constructed/inited.
@@ -1706,7 +3783,7 @@ index 118ee0d..8e6c813 100644
      for (const auto& archivePath : archivePaths) {
          gdx_port_logf("[G-Diffuser] archive: %s\n", archivePath.c_str());
      }
-@@ -919,6 +934,32 @@ int main(int argc, char** argv) {
+@@ -919,6 +1002,32 @@ int main(int argc, char** argv) {
          firstBoot.status = gdx::FirstBootStatus::SetupComplete;
      }
  
@@ -1739,7 +3816,50 @@ index 118ee0d..8e6c813 100644
      // Safe this early: the thread internally waits for gAudioContextInitialized (set once decomp's
      // Audio_Init runs, well after bootproc() below) before producing anything.
      logStep("gdx_audio_thread_start()");
-@@ -1232,6 +1273,23 @@ int main(int argc, char** argv) {
+@@ -1076,6 +1185,12 @@ int main(int argc, char** argv) {
+     // FrameInterpolation is on.
+     gdx_gfx_interp_set_now_fn(&gdx_host_now_seconds);
+ 
++    // Touch controls start AFTER first-time setup/Home hand off to game boot, so
++    // the overlay never covers the setup or F0X Home surfaces. The haptics CVar
++    // is applied once here; the Settings callback applies live changes.
++    gdx_touch_controls_set_haptics_enabled(CVarGetInteger("gSettings.Touch.Haptics", 1));
++    gdx_touch_controls_start();
++
+     logStep("entering frame loop");
+     auto w = ctx->GetWindow();
+     while (w != nullptr && w->IsRunning()) {
+@@ -1090,6 +1205,29 @@ int main(int argc, char** argv) {
+         // and the window manager crashes.
+         w->HandleEvents();
+         gdx::PerfPhaseEnd(gdx::PerfEvents);
++        // Touch overlay state, once per host frame and BEFORE the controller
++        // poll that merges its state: menu visibility comes from the live
++        // GdxMenu, the physical-controller policy folds the Auto-hide CVar and
++        // the real gamepad presence together, and enabled/opacity are the live
++        // settings. The iOS overlay reacts to transitions by cancelling held
++        // input and hiding/restoring the gameplay surface; the stub is a no-op.
++        {
++            bool menuVisible = false;
++            auto gui = w->GetGui();
++            if (gui != nullptr) {
++                auto menu = gui->GetMenu();
++                if (menu != nullptr) {
++                    menuVisible = menu->IsVisible();
++                }
++            }
++            const int touchEnabled = CVarGetInteger("gSettings.Touch.Enabled", 1);
++            const float touchOpacity = CVarGetFloat("gSettings.Touch.Opacity", 0.55f);
++            const int autoHide = CVarGetInteger("gSettings.Touch.AutoHideWithController", 1);
++            const int controllerConnected =
++                (autoHide != 0) ? gdx_physical_gamepads_connected() : 0;
++            gdx_touch_controls_tick(menuVisible ? 1 : 0, controllerConnected, touchEnabled,
++                                    touchOpacity);
++        }
+         gdx::PerfPhaseBegin(gdx::PerfInput);
+         gdx_controller_poll();
+         // Must publish the editor fixed-aspect state before this frame's gfx task runs below:
+@@ -1232,6 +1370,23 @@ int main(int argc, char** argv) {
          gdx_gfx_interp_tick_config(interpOn ? 1 : 0, interpTickStart, kGdxInterpTickSeconds,
                                     interpMaxSubframes);
  
@@ -1763,7 +3883,7 @@ index 118ee0d..8e6c813 100644
          // The game frame ACTUALLY runs here, not in gdx_dispatch() below. gdx_vi_tick posts the VI
          // retrace message, which wakes the Main scheduler thread and dispatches the game fiber
          // inline (osSendMesg -> osStartThread -> __osDispatchThread, because __osRunningThread is
-@@ -1250,14 +1308,6 @@ int main(int argc, char** argv) {
+@@ -1250,14 +1405,6 @@ int main(int argc, char** argv) {
          if (!interpOn) {
              // Default path: one tick, one Run, one present, paced by the frame pacer. Nothing on
              // this branch touches the interpolation machinery.
@@ -1778,6 +3898,14 @@ index 118ee0d..8e6c813 100644
              gdx::PerfPhaseBegin(gdx::PerfDispatch);
              gdx_dispatch();  // run the decomp's game threads cooperatively until they block again
              gdx::PerfPhaseEnd(gdx::PerfDispatch);
+@@ -1441,5 +1588,7 @@ int main(int argc, char** argv) {
+     // the file and folds the SHA, so it must not race a still-running audio thread calling feed().
+     gdx_audio_thread_stop();
+     gdx_pcm_capture_shutdown();
++    // Release every held touch input and detach the UIKit overlay (iOS only).
++    gdx_touch_controls_shutdown();
+     return 0;
+ }
 diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
 index 8c63a17..7eaf81f 100644
 --- a/port/n64_gfx_bridge.cpp
@@ -1975,6 +4103,337 @@ index c4598d5..6c99936 100644
  #endif
  
  // libc: BSD byte-compare not in the MSVC CRT. glibc provides both natively (with size_t
+diff --git a/port/tests/touch_merge_tests.c b/port/tests/touch_merge_tests.c
+new file mode 100644
+index 0000000..8fa28ff
+--- /dev/null
++++ b/port/tests/touch_merge_tests.c
+@@ -0,0 +1,325 @@
++/* Standalone unit-test harness for port/gdx_touch_state.c (the touch pad state
++ * core the iOS overlay and the neutral stub both run). Console exe, no game
++ * deps, no libultraship, no decomp headers: the module compiles unmodified
++ * alongside this file (see port/CMakeLists.txt's gdx_touch_merge_tests) and is
++ * driven entirely through its public API.
++ *
++ * This regression fails before the merge/cancel/stick/profile implementation
++ * exists (the symbols are absent) and covers the F0X touch contract:
++ *   - every N64 button bit OR-merges with live physical input;
++ *   - an inactive touch stick leaves the physical analog untouched;
++ *   - an active touch stick owns only the two analog axes;
++ *   - releasing/cancelling restores the physical stick on the next poll;
++ *   - simultaneous accelerator + steering + brake/boost/Z/R merge together;
++ *   - menu/editor/background transitions clear all state (cancel_all);
++ *   - the normalized stick maps continuously to -80..80 with circle clamping,
++ *     sign correctness, and a deadzone that publishes stickActive=0;
++ *   - layout overrides apply by id, clamp into the safe area, clamp scale into
++ *     70%..150%, and never hide protected controls;
++ *   - profile encode/decode round-trips deterministically.
++ */
++#include <math.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "gdx_touch_controls.h"
++
++static int gSubChecks = 0;
++static int gSubFails = 0;
++
++static void checkTrue(const char* what, int cond) {
++    gSubChecks++;
++    if (!cond) {
++        gSubFails++;
++        printf("    [x] %s\n", what);
++    }
++}
++
++static void checkEq(const char* what, long got, long expected) {
++    gSubChecks++;
++    if (got != expected) {
++        gSubFails++;
++        printf("    [x] %s: got %ld, expected %ld\n", what, got, expected);
++    }
++}
++
++static void case_button_merge_every_bit(void) {
++    static const struct {
++        const char* name;
++        unsigned short bit;
++    } kBits[] = {
++        { "CRIGHT", GDX_TOUCH_BTN_CRIGHT }, { "CLEFT", GDX_TOUCH_BTN_CLEFT },
++        { "CDOWN", GDX_TOUCH_BTN_CDOWN },   { "CUP", GDX_TOUCH_BTN_CUP },
++        { "R", GDX_TOUCH_BTN_R },           { "L", GDX_TOUCH_BTN_L },
++        { "DRIGHT", GDX_TOUCH_BTN_DRIGHT }, { "DLEFT", GDX_TOUCH_BTN_DLEFT },
++        { "DDOWN", GDX_TOUCH_BTN_DDOWN },   { "DUP", GDX_TOUCH_BTN_DUP },
++        { "START", GDX_TOUCH_BTN_START },   { "Z", GDX_TOUCH_BTN_Z },
++        { "B", GDX_TOUCH_BTN_B },           { "A", GDX_TOUCH_BTN_A },
++    };
++    size_t i;
++
++    printf("  case: every N64 button bit OR-merges into port 1\n");
++    for (i = 0; i < sizeof(kBits) / sizeof(kBits[0]); i++) {
++        GdxTouchPadState touch;
++        unsigned short buttons = GDX_TOUCH_BTN_START; /* live physical input */
++        signed char sx = 20;
++        signed char sy = -30;
++        char name[64];
++
++        gdx_touch_state_cancel_all();
++        gdx_touch_state_set_button(kBits[i].bit, 1);
++        gdx_touch_state_read(&touch);
++        buttons = GDX_TOUCH_BTN_START; /* fresh live physical input each merge */
++        gdx_touch_merge_pad(&buttons, &sx, &sy, &touch);
++        snprintf(name, sizeof(name), "%s bit set appears in merged pad", kBits[i].name);
++        checkTrue(name, (buttons & kBits[i].bit) != 0);
++        checkTrue("physical buttons still present", (buttons & GDX_TOUCH_BTN_START) != 0);
++
++        gdx_touch_state_set_button(kBits[i].bit, 0);
++        gdx_touch_state_read(&touch);
++        buttons = GDX_TOUCH_BTN_START;
++        gdx_touch_merge_pad(&buttons, &sx, &sy, &touch);
++        snprintf(name, sizeof(name), "%s release leaves exactly the physical pad", kBits[i].name);
++        checkTrue(name, buttons == GDX_TOUCH_BTN_START);
++    }
++    gdx_touch_state_cancel_all();
++}
++
++static void case_stick_mapping(void) {
++    GdxTouchPadState touch;
++
++    printf("  case: normalized stick maps continuously to -80..80\n");
++
++    gdx_touch_state_cancel_all();
++    gdx_touch_state_set_stick(1.0f, 0.0f);
++    gdx_touch_state_read(&touch);
++    checkEq("full right -> x=80", touch.stickX, 80);
++    checkEq("full right -> y=0", touch.stickY, 0);
++    checkEq("full right -> active", touch.stickActive, 1);
++
++    gdx_touch_state_set_stick(0.0f, -1.0f);
++    gdx_touch_state_read(&touch);
++    checkEq("full down -> y=-80 (sign preserved)", touch.stickY, -80);
++    checkEq("full down -> x=0", touch.stickX, 0);
++
++    gdx_touch_state_set_stick(0.5f, 0.0f);
++    gdx_touch_state_read(&touch);
++    checkEq("half right -> x=40", touch.stickX, 40);
++
++    /* A unit diagonal clamps to the circle: each axis = 0.7071*80 = 57. */
++    gdx_touch_state_set_stick(0.70710678f, 0.70710678f);
++    gdx_touch_state_read(&touch);
++    checkEq("diagonal x clamped to circle", touch.stickX, 57);
++    checkEq("diagonal y clamped to circle", touch.stickY, 57);
++
++    /* Out-of-range input clamps to the unit circle, never exceeds 80. */
++    gdx_touch_state_set_stick(3.0f, 0.0f);
++    gdx_touch_state_read(&touch);
++    checkEq("overshoot x clamps at 80", touch.stickX, 80);
++    checkEq("overshoot y stays 0", touch.stickY, 0);
++
++    gdx_touch_state_cancel_all();
++}
++
++static void case_stick_deadzone_and_release(void) {
++    GdxTouchPadState touch;
++
++    printf("  case: deadzone + release publish inactive stick\n");
++    gdx_touch_state_cancel_all();
++    gdx_touch_state_set_stick(0.05f, 0.0f); /* inside the deadzone */
++    gdx_touch_state_read(&touch);
++    checkEq("deadzone -> inactive", touch.stickActive, 0);
++    checkEq("deadzone -> x neutral", touch.stickX, 0);
++    checkEq("deadzone -> y neutral", touch.stickY, 0);
++
++    gdx_touch_state_set_stick(0.6f, 0.3f);
++    gdx_touch_state_release_stick();
++    gdx_touch_state_read(&touch);
++    checkEq("release -> inactive", touch.stickActive, 0);
++    checkEq("release -> x neutral", touch.stickX, 0);
++    checkEq("release -> y neutral", touch.stickY, 0);
++}
++
++static void case_merge_stick_semantics(void) {
++    GdxTouchPadState touch;
++
++    printf("  case: physical stick preserved, touch stick owns axes only\n");
++    gdx_touch_state_cancel_all();
++
++    /* Inactive touch stick: physical analog untouched. */
++    gdx_touch_state_read(&touch);
++    {
++        unsigned short buttons = 0;
++        signed char sx = 40;
++        signed char sy = -50;
++        gdx_touch_merge_pad(&buttons, &sx, &sy, &touch);
++        checkEq("inactive touch leaves physical x", sx, 40);
++        checkEq("inactive touch leaves physical y", sy, -50);
++        checkEq("inactive touch leaves buttons", buttons, 0);
++    }
++
++    /* Active touch stick: owns both axes, buttons still OR. */
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_A, 1);
++    gdx_touch_state_set_stick(-0.5f, 0.8f);
++    gdx_touch_state_read(&touch);
++    {
++        unsigned short buttons = GDX_TOUCH_BTN_B;
++        signed char sx = 40;
++        signed char sy = -50;
++        gdx_touch_merge_pad(&buttons, &sx, &sy, &touch);
++        checkEq("active touch overrides x", sx, -40);
++        checkEq("active touch overrides y", sy, 64);
++        checkEq("touch A merged with physical B", buttons,
++                (unsigned short)(GDX_TOUCH_BTN_A | GDX_TOUCH_BTN_B));
++    }
++
++    /* Releasing the touch restores the physical analog on the next poll. */
++    gdx_touch_state_release_stick();
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_A, 0);
++    gdx_touch_state_read(&touch);
++    {
++        unsigned short buttons = 0;
++        signed char sx = 40;
++        signed char sy = -50;
++        gdx_touch_merge_pad(&buttons, &sx, &sy, &touch);
++        checkEq("release restores physical x", sx, 40);
++        checkEq("release restores physical y", sy, -50);
++    }
++
++    gdx_touch_state_cancel_all();
++}
++
++static void case_simultaneous_inputs(void) {
++    GdxTouchPadState touch;
++
++    printf("  case: steering + accelerator + brake/boost/Z/R merge together\n");
++    gdx_touch_state_cancel_all();
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_A, 1);
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_B, 1);
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_CDOWN, 1);
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_Z, 1);
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_R, 1);
++    gdx_touch_state_set_stick(1.0f, 0.0f);
++    gdx_touch_state_read(&touch);
++    {
++        unsigned short buttons = 0;
++        signed char sx = 0;
++        signed char sy = 0;
++        gdx_touch_merge_pad(&buttons, &sx, &sy, &touch);
++        checkEq("all action buttons present", buttons,
++                (unsigned short)(GDX_TOUCH_BTN_A | GDX_TOUCH_BTN_B | GDX_TOUCH_BTN_CDOWN |
++                                 GDX_TOUCH_BTN_Z | GDX_TOUCH_BTN_R));
++        checkEq("steering x present", sx, 80);
++        checkEq("steering y neutral", sy, 0);
++    }
++    gdx_touch_state_cancel_all();
++}
++
++static void case_cancel_transitions(void) {
++    GdxTouchPadState touch;
++
++    printf("  case: menu/editor/background cancel clears buttons and stick\n");
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_A, 1);
++    gdx_touch_state_set_button(GDX_TOUCH_BTN_START, 1);
++    gdx_touch_state_set_stick(-0.9f, 0.9f);
++    gdx_touch_state_read(&touch);
++    checkEq("input latched before cancel", touch.buttons != 0, 1);
++    checkEq("stick active before cancel", touch.stickActive, 1);
++
++    gdx_touch_state_cancel_all();
++    gdx_touch_state_read(&touch);
++    checkEq("cancel clears buttons", touch.buttons, 0);
++    checkEq("cancel clears stick", touch.stickActive, 0);
++    checkEq("cancel neutral x", touch.stickX, 0);
++    checkEq("cancel neutral y", touch.stickY, 0);
++}
++
++static void case_layout_apply(void) {
++    GdxTouchControlSpec defaults[GDX_TOUCH_CTL_COUNT];
++    GdxTouchControlSpec overrides[2];
++    GdxTouchControlSpec out[GDX_TOUCH_CTL_COUNT];
++    int i;
++
++    printf("  case: layout overrides, clamp, scale clamp, hide protection\n");
++    for (i = 0; i < GDX_TOUCH_CTL_COUNT; i++) {
++        defaults[i].controlId = i;
++        defaults[i].centerX = 0.5f;
++        defaults[i].centerY = 0.5f;
++        defaults[i].scale = 1.0f;
++        defaults[i].hidden = 0;
++    }
++    /* Override the stick position (protected: cannot hide) and the D-pad scale. */
++    overrides[0] = defaults[GDX_TOUCH_CTL_STICK];
++    overrides[0].centerX = 0.05f; /* outside the safe rect, must clamp */
++    overrides[0].hidden = 1;      /* protected: must be forced back to visible */
++    overrides[1] = defaults[GDX_TOUCH_CTL_DPAD];
++    overrides[1].scale = 3.0f; /* outside 70%..150%, must clamp */
++
++    gdx_touch_layout_apply(defaults, GDX_TOUCH_CTL_COUNT, overrides, 2,
++                           0.10f, 0.10f, 0.80f, 0.80f, out, GDX_TOUCH_CTL_COUNT);
++    checkEq("stick x clamped to safe rect", out[GDX_TOUCH_CTL_STICK].centerX == 0.10f, 1);
++    checkEq("stick cannot hide", out[GDX_TOUCH_CTL_STICK].hidden, 0);
++    checkEq("dpad scale clamped to 1.50", out[GDX_TOUCH_CTL_DPAD].scale == 1.50f, 1);
++    checkEq("unoverridden control keeps default", out[GDX_TOUCH_CTL_ACCEL].centerX == 0.5f, 1);
++    checkEq("menu control cannot hide", out[GDX_TOUCH_CTL_MENU].hidden, 0);
++    checkEq("start control cannot hide", out[GDX_TOUCH_CTL_START].hidden, 0);
++    checkEq("accelerator control cannot hide", out[GDX_TOUCH_CTL_ACCEL].hidden, 0);
++
++    /* An empty safe rect falls back to the full 0..1 range. */
++    gdx_touch_layout_apply(defaults, GDX_TOUCH_CTL_COUNT, overrides, 2,
++                           0.5f, 0.5f, 0.0f, 0.0f, out, GDX_TOUCH_CTL_COUNT);
++    checkEq("degenerate safe rect x fallback", out[GDX_TOUCH_CTL_STICK].centerX >= 0.0f &&
++                                                   out[GDX_TOUCH_CTL_STICK].centerX <= 1.0f, 1);
++}
++
++static void case_profile_roundtrip(void) {
++    GdxTouchControlSpec specs[GDX_TOUCH_CTL_COUNT];
++    GdxTouchControlSpec decoded[GDX_TOUCH_CTL_COUNT];
++    char buffer[1024];
++    int len;
++    int count;
++    int i;
++    int identical = 1;
++
++    printf("  case: profile encode/decode round-trip\n");
++    for (i = 0; i < GDX_TOUCH_CTL_COUNT; i++) {
++        specs[i].controlId = i;
++        specs[i].centerX = 0.10f + 0.06f * (float)i;
++        specs[i].centerY = 0.80f - 0.05f * (float)i;
++        specs[i].scale = 0.80f + 0.05f * (float)i;
++        specs[i].hidden = (i % 3) == 0 ? 1 : 0;
++    }
++    len = gdx_touch_profile_encode(specs, GDX_TOUCH_CTL_COUNT, buffer, (int)sizeof(buffer));
++    checkTrue("encode wrote content", len > 0);
++    count = gdx_touch_profile_decode(buffer, decoded, GDX_TOUCH_CTL_COUNT);
++    checkEq("decode reads all controls", count, GDX_TOUCH_CTL_COUNT);
++    for (i = 0; i < count && i < GDX_TOUCH_CTL_COUNT; i++) {
++        if (decoded[i].controlId != specs[i].controlId ||
++            fabsf(decoded[i].centerX - specs[i].centerX) > 1e-5f ||
++            fabsf(decoded[i].centerY - specs[i].centerY) > 1e-5f ||
++            fabsf(decoded[i].scale - specs[i].scale) > 1e-3f ||
++            decoded[i].hidden != specs[i].hidden) {
++            identical = 0;
++        }
++    }
++    checkTrue("decoded values match encoded values", identical);
++
++    /* Unknown future version: decode stops without corrupting earlier entries. */
++    count = gdx_touch_profile_decode("v9 1 0.5 0.5 1.0 0\n", decoded, GDX_TOUCH_CTL_COUNT);
++    checkEq("future version rejected cleanly", count, 0);
++}
++
++int main(void) {
++    printf("gdx_touch_merge_tests: N64 touch merge/cancel/stick/layout core\n");
++    case_button_merge_every_bit();
++    case_stick_mapping();
++    case_stick_deadzone_and_release();
++    case_merge_stick_semantics();
++    case_simultaneous_inputs();
++    case_cancel_transitions();
++    case_layout_apply();
++    case_profile_roundtrip();
++
++    printf("sub-checks: %d, failures: %d\n", gSubChecks, gSubFails);
++    return gSubFails == 0 ? 0 : 1;
++}
 diff --git a/tools/o2r_harness/family_manifest.json b/tools/o2r_harness/family_manifest.json
 index f5f427a..2f4ebca 100644
 --- a/tools/o2r_harness/family_manifest.json
@@ -1987,339 +4446,3 @@ index f5f427a..2f4ebca 100644
 +  "source_sha256": "7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a",
    "total_entries": 3610
  }
-diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
-new file mode 100644
-index 0000000..f6ab8d2
---- /dev/null
-+++ b/port/F0X-Info.plist.in
-@@ -0,0 +1,26 @@
-+<?xml version="1.0" encoding="UTF-8"?>
-+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-+<plist version="1.0">
-+<dict>
-+    <key>CFBundleDevelopmentRegion</key>
-+    <string>en</string>
-+    <key>CFBundleExecutable</key>
-+    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
-+    <key>CFBundleIdentifier</key>
-+    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
-+    <key>CFBundleInfoDictionaryVersion</key>
-+    <string>6.0</string>
-+    <key>CFBundleName</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
-+    <key>CFBundlePackageType</key>
-+    <string>APPL</string>
-+    <key>CFBundleShortVersionString</key>
-+    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
-+    <key>CFBundleVersion</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
-+    <key>LSMinimumSystemVersion</key>
-+    <string>13.0</string>
-+    <key>NSHighResolutionCapable</key>
-+    <true/>
-+</dict>
-+</plist>
-diff --git a/port/F0X-iOS-Info.plist.in b/port/F0X-iOS-Info.plist.in
-new file mode 100644
-index 0000000..6c57885
---- /dev/null
-+++ b/port/F0X-iOS-Info.plist.in
-@@ -0,0 +1,38 @@
-+<?xml version="1.0" encoding="UTF-8"?>
-+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-+<plist version="1.0">
-+<dict>
-+    <key>CFBundleDevelopmentRegion</key>
-+    <string>en</string>
-+    <key>CFBundleExecutable</key>
-+    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
-+    <key>CFBundleIdentifier</key>
-+    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
-+    <key>CFBundleInfoDictionaryVersion</key>
-+    <string>6.0</string>
-+    <key>CFBundleName</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
-+    <key>CFBundlePackageType</key>
-+    <string>APPL</string>
-+    <key>CFBundleShortVersionString</key>
-+    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
-+    <key>CFBundleVersion</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
-+    <key>UIApplicationSupportsIndirectInputEvents</key>
-+    <true/>
-+    <key>UIRequiresFullScreen</key>
-+    <true/>
-+    <key>UILaunchScreen</key>
-+    <dict/>
-+    <key>UISupportedInterfaceOrientations</key>
-+    <array>
-+        <string>UIInterfaceOrientationLandscapeLeft</string>
-+        <string>UIInterfaceOrientationLandscapeRight</string>
-+    </array>
-+    <key>UISupportedInterfaceOrientations~ipad</key>
-+    <array>
-+        <string>UIInterfaceOrientationLandscapeLeft</string>
-+        <string>UIInterfaceOrientationLandscapeRight</string>
-+    </array>
-+</dict>
-+</plist>
-diff --git a/port/gdx_audio_effects_source.c b/port/gdx_audio_effects_source.c
-new file mode 100644
-index 0000000..bf857f4
---- /dev/null
-+++ b/port/gdx_audio_effects_source.c
-@@ -0,0 +1,6 @@
-+/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/effects.c. */
-+#ifdef EXPANSION_KIT
-+#include "../decomp/src/audio/disk/lib/effects.c"
-+#else
-+#include "../decomp/src/audio/rom/lib/effects.c"
-+#endif
-diff --git a/port/gdx_audio_thread_source.c b/port/gdx_audio_thread_source.c
-new file mode 100644
-index 0000000..2438a4d
---- /dev/null
-+++ b/port/gdx_audio_thread_source.c
-@@ -0,0 +1,6 @@
-+/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/thread.c. */
-+#ifdef EXPANSION_KIT
-+#include "../decomp/src/audio/disk/lib/thread.c"
-+#else
-+#include "../decomp/src/audio/rom/lib/thread.c"
-+#endif
-diff --git a/port/gdx_discord_stub.cpp b/port/gdx_discord_stub.cpp
-new file mode 100644
-index 0000000..2968a71
---- /dev/null
-+++ b/port/gdx_discord_stub.cpp
-@@ -0,0 +1,6 @@
-+/* Discord desktop IPC is unavailable on iOS. Keep main-loop call sites platform-neutral. */
-+extern "C" void gdx_discord_tick(void) {
-+}
-+
-+extern "C" void gdx_discord_shutdown(void) {
-+}
-diff --git a/port/gdx_firstboot_picker.mm b/port/gdx_firstboot_picker.mm
-new file mode 100644
-index 0000000..7ec09fa
---- /dev/null
-+++ b/port/gdx_firstboot_picker.mm
-@@ -0,0 +1,62 @@
-+// Native macOS file-picker bridge for the in-window first-launch setup.
-+
-+#import <AppKit/AppKit.h>
-+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
-+
-+#include <string>
-+
-+namespace {
-+
-+std::string pickFile(NSString* title, NSArray<UTType*>* contentTypes) {
-+    @autoreleasepool {
-+        NSOpenPanel* panel = [NSOpenPanel openPanel];
-+        panel.title = title;
-+        panel.message = @"Choose a local game-data file. F0X copies it into its Application Support folder.";
-+        panel.canChooseFiles = YES;
-+        panel.canChooseDirectories = NO;
-+        panel.allowsMultipleSelection = NO;
-+        panel.allowedContentTypes = contentTypes;
-+        if ([panel runModal] != NSModalResponseOK || panel.URL == nil) {
-+            return {};
-+        }
-+        return panel.URL.path.UTF8String;
-+    }
-+}
-+
-+} // namespace
-+
-+namespace gdx {
-+
-+std::string GdxPickRomFileMacOS() {
-+    return pickFile(@"Select your F-Zero X ROM (US rev0)", @[
-+        [UTType typeWithFilenameExtension:@"z64"],
-+        [UTType typeWithFilenameExtension:@"n64"],
-+        [UTType typeWithFilenameExtension:@"v64"],
-+    ]);
-+}
-+
-+std::string GdxPickDiskFileMacOS() {
-+    return pickFile(@"Select your F-Zero X Expansion Kit disk", @[
-+        [UTType typeWithFilenameExtension:@"ndd"],
-+    ]);
-+}
-+
-+std::string GdxPickIplFileMacOS() {
-+    return pickFile(@"Select your 64DD IPL ROM", @[
-+        [UTType typeWithFilenameExtension:@"n64"],
-+        [UTType typeWithFilenameExtension:@"z64"],
-+    ]);
-+}
-+
-+bool GdxRevealDataDirectoryMacOS(const std::string& path) {
-+    @autoreleasepool {
-+        if (path.empty()) {
-+            return false;
-+        }
-+        NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]
-+                               isDirectory:YES];
-+        return url != nil && [[NSWorkspace sharedWorkspace] openURL:url];
-+    }
-+}
-+
-+} // namespace gdx
-diff --git a/port/gdx_firstboot_picker_ios.mm b/port/gdx_firstboot_picker_ios.mm
-new file mode 100644
-index 0000000..02f1e38
---- /dev/null
-+++ b/port/gdx_firstboot_picker_ios.mm
-@@ -0,0 +1,99 @@
-+// Native iOS/iPadOS document-picker bridge for the first-launch setup.
-+
-+#import <UIKit/UIKit.h>
-+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
-+
-+#include <string>
-+
-+@interface GdxDocumentPickerDelegate : NSObject <UIDocumentPickerDelegate>
-+@property(nonatomic, copy) NSURL* selectedURL;
-+@property(nonatomic) BOOL finished;
-+@end
-+
-+@implementation GdxDocumentPickerDelegate
-+- (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
-+    self.selectedURL = urls.firstObject;
-+    self.finished = YES;
-+}
-+
-+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller {
-+    self.finished = YES;
-+}
-+@end
-+
-+namespace {
-+
-+UIViewController* presentingViewController() {
-+    UIWindow* window = nil;
-+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-+        if (scene.activationState == UISceneActivationStateForegroundActive &&
-+            [scene isKindOfClass:UIWindowScene.class]) {
-+            for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
-+                if (candidate.isKeyWindow) {
-+                    window = candidate;
-+                    break;
-+                }
-+            }
-+        }
-+        if (window != nil) {
-+            break;
-+        }
-+    }
-+    UIViewController* controller = window.rootViewController;
-+    while (controller.presentedViewController != nil) {
-+        controller = controller.presentedViewController;
-+    }
-+    return controller;
-+}
-+
-+std::string pickFile(NSArray<UTType*>* contentTypes) {
-+    @autoreleasepool {
-+        UIViewController* presenter = presentingViewController();
-+        if (presenter == nil) {
-+            return {};
-+        }
-+
-+        GdxDocumentPickerDelegate* delegate = [[GdxDocumentPickerDelegate alloc] init];
-+        UIDocumentPickerViewController* picker =
-+            [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:NO];
-+        picker.allowsMultipleSelection = NO;
-+        picker.delegate = delegate;
-+        [presenter presentViewController:picker animated:YES completion:nil];
-+
-+        while (!delegate.finished && UIApplication.sharedApplication.applicationState == UIApplicationStateActive) {
-+            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
-+                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
-+        }
-+
-+        NSURL* url = delegate.selectedURL;
-+        if (url == nil || ![url startAccessingSecurityScopedResource]) {
-+            return {};
-+        }
-+        // Browse() validates and copies this path immediately. Keep its security scope alive for
-+        // the remainder of this short setup process so the C++ copy remains authorized.
-+        return url.fileSystemRepresentation;
-+    }
-+}
-+
-+UTType* typeForExtension(NSString* extension) {
-+    UTType* type = [UTType typeWithFilenameExtension:extension];
-+    return type != nil ? type : UTTypeData;
-+}
-+
-+} // namespace
-+
-+namespace gdx {
-+
-+std::string GdxPickRomFileIOS() {
-+    return pickFile(@[ typeForExtension(@"z64"), typeForExtension(@"n64"), typeForExtension(@"v64") ]);
-+}
-+
-+std::string GdxPickDiskFileIOS() {
-+    return pickFile(@[ typeForExtension(@"ndd") ]);
-+}
-+
-+std::string GdxPickIplFileIOS() {
-+    return pickFile(@[ typeForExtension(@"n64"), typeForExtension(@"z64") ]);
-+}
-+
-+} // namespace gdx
-diff --git a/port/tests/fiber_smoketest.c b/port/tests/fiber_smoketest.c
-new file mode 100644
-index 0000000..d02c86d
---- /dev/null
-+++ b/port/tests/fiber_smoketest.c
-@@ -0,0 +1,45 @@
-+#include "gdx_fiber.h"
-+
-+#include <stdint.h>
-+#include <stdio.h>
-+#include <stdlib.h>
-+
-+enum { kFiberCount = 3, kSwitches = 10000 };
-+
-+static GdxFiber* sHost;
-+static GdxFiber* sFibers[kFiberCount];
-+static uint64_t sCanary[kFiberCount];
-+static unsigned sSteps[kFiberCount];
-+
-+static void fiber_main(void* arg) {
-+    const unsigned index = (unsigned)(uintptr_t)arg;
-+    const uint64_t expected = UINT64_C(0xA5A5000000000000) | index;
-+    sCanary[index] = expected;
-+    for (;;) {
-+        if (sCanary[index] != expected) {
-+            fprintf(stderr, "fiber %u canary corrupted\n", index);
-+            abort();
-+        }
-+        if (sSteps[index] < kSwitches) {
-+            ++sSteps[index];
-+        }
-+        gdx_fiber_switch(sHost);
-+    }
-+}
-+
-+int main(void) {
-+    sHost = gdx_fiber_convert_thread();
-+    if (sHost == NULL) return 1;
-+    for (unsigned i = 0; i < kFiberCount; ++i) {
-+        sFibers[i] = gdx_fiber_create(fiber_main, (void*)(uintptr_t)i, 0);
-+        if (sFibers[i] == NULL) return 2;
-+    }
-+    for (unsigned round = 0; round < kSwitches; ++round) {
-+        for (unsigned i = 0; i < kFiberCount; ++i) gdx_fiber_switch(sFibers[i]);
-+    }
-+    for (unsigned i = 0; i < kFiberCount; ++i) {
-+        if (sSteps[i] != kSwitches) return 3;
-+    }
-+    puts("gdx_fiber_smoketest: PASS");
-+    return 0;
-+}

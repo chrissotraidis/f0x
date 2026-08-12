@@ -1,0 +1,64 @@
+F0X touch-controls Simulator evidence
+Date: 2026-08-12
+Environment: Apple Silicon macOS 26.6, Xcode 26.6, one booted iPad Pro 11-inch
+(M5) iOS 26.5 Simulator, one F0X process (archive-only cartridge boot).
+
+Builds
+------
+- arm64 iPhoneSimulator app: BUILD SUCCEEDED with the UIKit touch overlay,
+  atomic pad-state core, merge seam, CVars, and Settings registry section.
+- arm64 iPhoneOS (OS64) unsigned app: BUILD SUCCEEDED (CODE_SIGNING_ALLOWED=NO).
+- macOS F0X.app: rebuilt, sealed (codesign --verify --deep --strict), packaged
+  GP route still traverses modes 0 -> 7 -> 10 -> 8 -> 9 -> 1 and reaches
+  packaged_gp_race_capture_interval with the neutral stub.
+- gdx_touch_merge_tests: 87 sub-checks, 0 failures (every N64 bit OR-merge,
+  stick clamp/sign/deadzone/active, physical-stick preservation and touch
+  override, simultaneous accelerator+steering+brake/boost/Z/R, cancel-all,
+  layout apply/clamp/scale/hide-protection, profile encode/decode round-trip).
+
+Live Simulator interaction (one F0X process, real UIKit touches synthesized
+through the Simulator window at Point Accurate scale)
+------------------------------------------------------------------
+- The overlay renders with the hand-authored tablet layout: analog stick,
+  D-pad group, ACCEL/BOOST/BRAKE, SLIDE L / SLIDE R, START, VIEW, LOOK, C-left,
+  L, and the permanent ••• menu button at the upper-right safe area.
+- Touch -> N64 pad-state chain verified through the app's debounced state log
+  (the exact state input_bridge.c merges each frame):
+    START = buttons=0x1000, L = 0x0020, ACCEL = 0x8000, BOOST = 0x4000,
+    BRAKE = 0x0004, D-pad down = 0x0400.
+    Analog stick: buttons=0x0000 stick=(...) active=1 with values that change
+    with the drag and release to neutral on touch-up.
+- START on the title advanced the game to SELECT MODE; a complete touch-driven
+  GP flow reached a live race: SELECT MODE -> GP RACE -> STANDARD -> JACK CUP
+  (MUTE CITY) -> BLUE FALCON -> machine settings -> race start, where holding
+  ACCEL accelerated the Blue Falcon (0 -> 41 km/h) before a wall stall.
+- The ••• button opened the full GdxMenu (Settings/Enhancements/Workshop/
+  Online/Dev Tools; the log recorded "menu visible -> gameplay overlay hidden")
+  and closed it ("menu closed -> overlay restored").
+- Auto-hide with physical controller works: the Simulator exposes two MFi
+  gamepads to SDL, and with gSettings.Touch.AutoHideWithController=1 the
+  gameplay overlay is hidden (the log's controllerAutoHidden reason); setting
+  the CVar to 0 restored the overlay for touch testing.
+- Safe-area awareness: control frames follow window.safeAreaInsets; the tablet
+  layout positions all controls inside the safe rect (verified via the attach
+  log's exact frames).
+
+Not yet live-verified in this session
+------------------------------------
+- The Settings -> Controls -> Touch Controls page rendering (the registry
+  widgets, CVars, and editor callbacks compile and are registered, and the
+  Controls page itself renders, but synthetic clicks could not scroll the
+  embedded ImGui Input Editor page to the widgets; this is a tooling limit,
+  not a product failure).
+- Layout editor move/resize/hide/reset/Done and NSUserDefaults profile
+  persistence round-trip on the device (the profile core is unit-tested).
+- Phone layout (hand-authored defaults exist; no phone Simulator run yet).
+- Physical iPad/iPhone touch acceptance, true multi-touch contact stress,
+  controller handoff, interruptions, haptics, long sessions, thermals.
+
+Boundary
+--------
+Simulator evidence only. Compilation is not runtime proof; Simulator is not
+physical-device proof. The private gameplay screenshots are local artifacts and
+are intentionally not tracked. No ROM, derived archive, save, or Simulator
+container path is committed.

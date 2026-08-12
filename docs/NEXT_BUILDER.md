@@ -70,26 +70,28 @@ the exact evidence artifact before relying on a path or process ID.
 
 ## Highest-priority actionable work
 
-Implement the touch system in
-[`TOUCH_CONTROLS_IMPLEMENTATION.md`](TOUCH_CONTROLS_IMPLEMENTATION.md). This is
-now the largest locally actionable product gap. The original desired ordering
-placed polished touch after physical-controller proof; that physical proof is
-externally blocked on this Mac. Implement and Simulator-validate touch without
-claiming physical acceptance, then replay on real hardware when available.
+The touch system is implemented and Simulator-verified at its core (see
+`docs/evidence/touch-ios/2026-08-12.txt`). The remaining touch work is
+verification and polish, not greenfield:
 
-The exact first slice is:
+1. Capture the Settings -> Controls -> Touch Controls page rendering (navigate
+   to Controls with a real input method — the seeded
+   `gSettings.Menu.Sidebar.Settings` CVar lands the menu on the page) and
+   exercise the live toggles, opacity slider, and editor callbacks on the
+   Simulator.
+2. Exercise the layout editor (select/move/resize/hide/reset/Done), verify the
+   `F0X.TouchLayout.phone-v1` / `tablet-v1` NSUserDefaults profiles persist
+   across relaunch, and run the phone defaults on a phone Simulator.
+3. Verify cancel paths live: opening the menu/editor while a button is held
+   must release it (the tick's menu-transition log is the evidence seam), and
+   background/foreground must return neutral.
+4. Re-run the touch-driven GP flow and complete a race on Simulator, then
+   replay the whole matrix on physical iPad/iPhone when a signing-capable Mac
+   with a connected device is available.
 
-1. add cross-platform touch API + iOS Objective-C++ implementation + non-iOS
-   stub and CMake selection;
-2. add a regression for neutral/cancel/merge behavior;
-3. merge touch at the existing port-1 N64 seam after the ControlDeck read and
-   before developer overrides;
-4. implement continuous analog stick, Accel/A, Boost/B, Brake/C-down, Z, R,
-   Start, and permanent menu for iPad;
-5. build macOS and Simulator before extending the surface.
-
-Do not begin by copying all three HarkinianPad patches. Adapt behavior to the
-current F0X files and pad seam.
+Do not regress the verified core: `gdx_touch_merge_tests` (87 checks), the
+macOS sealed-bundle race route, and the unsigned iPhoneOS build are the
+standing regressions.
 
 ## Remaining execution queue after touch
 
