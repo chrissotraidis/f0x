@@ -230,3 +230,33 @@ extraction golden plus all-black internal BMP readback as separate gates.
   warm reuse, and archive-only packaged gameplay. It does not yet prove the
   complete first-time visible import/progress experience or the required
   in-process iOS/iPadOS importer.
+
+## 2026-08-12 — visible first-run import and same-process hot mount
+
+- **First-run routing correction:** a cartridge-only macOS bundle with a valid
+  ROM but no archive previously returned through the raw-ROM shortcut before a
+  window existed. The bundle now defers that state to F0X First-Time Setup;
+  portable/development cartridge builds retain their existing raw-ROM shortcut.
+- **Product copy and input:** the setup surface says it will build verified local
+  game data, future launches will be faster, and the original ROM becomes
+  optional. Setup and Home now enable standard ImGui keyboard navigation with
+  default focus on Browse/Build/Play. Dear ImGui controls still appear as one
+  macOS accessibility window rather than individual native controls.
+- **Direct visual proof:** the sealed app visibly rendered the verified-ROM
+  consent screen and then `Extracting game assets...`, a determinate `0 / 3610`
+  progress bar, and live scrollback containing the Torch game/CRC/version/
+  country/hash/recipe lines. The window remained stable and responsive during
+  extraction.
+- **End-to-end regression:** when `GDX_INPUT_SCRIPT` is present, setup renders at
+  least one frame and then confirms only already-verified inputs. This narrow
+  regression seam uses the same async extraction, validation, progress state,
+  and hot-mount code as an ordinary click; normal launches still require user
+  confirmation. With the installed archive temporarily held aside, logs recorded
+  first-run setup, async US/rev0 extraction, 3,610 entries and verified SHA-256,
+  same-process hot mount, `packaged_gp_race_capture_interval`, all 28 commands,
+  and normal shutdown. A guard restored the original archive; disposable outputs
+  were moved to Trash.
+- **Package proof:** the rebuilt app and nested helper passed strict ad-hoc
+  signature verification and plist lint.
+- **Boundary:** desktop UX and child-process import are now verified. The mobile
+  gate still requires Torch/extraction to run in process, without `fork`/`exec`.

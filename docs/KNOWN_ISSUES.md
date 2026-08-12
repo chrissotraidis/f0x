@@ -31,10 +31,12 @@
   archive (`7d60d975...`) across two independent runs. The refreshed generated
   golden passes the entry-count, version-CRC, family-completeness, install,
   warm-boot, and ROM-absent race gates. Cartridge-only first boot now accepts a
-  validated installed archive even when no legacy setup marker exists. Desktop
-  extraction still uses a child process and the complete first-time progress /
-  recovery flow has not yet been re-proved through the visible app interface;
-  iOS/iPadOS must use an in-process implementation.
+  validated installed archive even when no legacy setup marker exists. The
+  first-run screen now owns consent, determinate progress, logs, retry/fallback,
+  hot-mount, and same-process game continuation; keyboard navigation supplies
+  default focus even though ImGui widgets are not individually exposed to macOS
+  accessibility. Desktop extraction still uses a child process, so iOS/iPadOS
+  must use an in-process implementation.
 - **MAC-AUDIO-01 — physical CoreAudio route remains unverified:** cartridge
   synthesis and the dedicated producer path now emit nonzero captured PCM.
   The reproducible proof uses SDL's dummy device so it does not establish

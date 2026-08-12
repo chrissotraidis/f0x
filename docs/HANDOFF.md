@@ -25,6 +25,10 @@ unchanged on warm boot, and drove the packaged GP race with the original ROM
 temporarily absent. That negative-ROM test exposed and fixed a cartridge-only
 first-boot inconsistency: archive validation now precedes the raw-ROM fallback
 and does not depend on a setup marker that older cartridge installs never wrote.
+The macOS app now defers a raw-ROM-only install to its visible first-run surface,
+runs extraction asynchronously behind a determinate 3,610-entry progress bar and
+scrolling log, hot-mounts the validated archive, and continues into the same
+process. Standard keyboard navigation/default focus is enabled on Setup and Home.
 
 ## Revised goal and execution order
 
@@ -35,8 +39,7 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 1. Metal presentation stability across title/menu/race/resize/fullscreen;
 2. completed controlled race plus save/relaunch/load round-trip;
-3. complete first-time import UX proof and replace desktop child extraction with
-   an in-process mobile-capable importer;
+3. replace desktop child extraction with an in-process mobile-capable importer;
 4. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
 5. touch, timing/high refresh, packaging, README, and final audits.
 
@@ -90,12 +93,18 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   version CRC, and all 33 complete-or-absent families. The installed archive
   was reused without rewrite on warm boot and completed the packaged GP route
   with `baserom.us.rev0.z64` absent; the test restored the ROM immediately.
+- On a fresh-import simulation, F0X visibly rendered the verified-ROM consent
+  screen, then live extraction progress and log output. The existing scripted
+  regression contract confirmed only after one setup frame, the async extractor
+  installed and hot-mounted the 3,610-entry archive, and the same process reached
+  the packaged GP race marker. Ordinary launches still require explicit user
+  confirmation; the script seam exists only when `GDX_INPUT_SCRIPT` is set.
 
 ## Next action
 
-Re-prove first-time archive creation through F0X's visible import surface, with
-progress and recoverable failure copy, then design the smallest in-process
-extractor boundary shared by macOS and iOS/iPadOS. In parallel, the owner can
+Design the smallest in-process extractor boundary shared by macOS and iOS/iPadOS,
+preserving the current identity, atomic-install, progress, retry, and failure
+contract. In parallel, the owner can
 observe the current packaged build for flashing and use a connected controller
 to close the completed-race gate; save/relaunch/load persistence is already
 independently verified.

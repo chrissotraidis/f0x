@@ -415,7 +415,7 @@ index 9f35a8b..d528885 100644
  #else
      return (unsigned long) (uintptr_t) pthread_self();
 diff --git a/port/gdx_firstboot.cpp b/port/gdx_firstboot.cpp
-index 90116a9..f922293 100644
+index 90116a9..9e842c4 100644
 --- a/port/gdx_firstboot.cpp
 +++ b/port/gdx_firstboot.cpp
 @@ -161,8 +161,19 @@ fs::path executableDir(const char* argv0) {
@@ -456,7 +456,7 @@ index 90116a9..f922293 100644
      fs::create_directories(dataDir, ec);
      ec.clear();
      result.dataDir = dataDir.string();
-@@ -774,6 +784,32 @@ FirstBootResult FirstBootRun(const char* argv0) {
+@@ -774,6 +784,36 @@ FirstBootResult FirstBootRun(const char* argv0) {
      // the managed media/ copy (disk only), else the original file. Demanding the original ROM and IPL
      // here would drag the wizard back on a fully-installed setup whose originals were deleted.
      fs::path romInData = dataDir / kRomName;
@@ -474,7 +474,10 @@ index 90116a9..f922293 100644
 +    }
 +
 +    // A verified cartridge ROM remains sufficient for the raw-ROM fallback;
-+    // never demand disk/IPL media that this binary cannot use.
++    // never demand disk/IPL media that this binary cannot use. The macOS app
++    // deliberately defers a raw-ROM-only install to its in-window setup: that
++    // is where consent, extraction progress, retry, and fallback are visible.
++#if !(defined(__APPLE__) && defined(GDX_MACOS_BUNDLE))
 +    {
 +        std::string why;
 +        if (fileExists(romInData) && validateRom(romInData, why)) {
@@ -486,10 +489,11 @@ index 90116a9..f922293 100644
 +        }
 +    }
 +#endif
++#endif
      fs::path diskInData = dataDir / kDiskName;
      if (st.complete) {
          std::string why;
-@@ -1140,6 +1176,8 @@ std::string GdxFirstBootDescribeMissing(const std::string& dataDirIn) {
+@@ -1140,6 +1180,8 @@ std::string GdxFirstBootDescribeMissing(const std::string& dataDirIn) {
  bool NativeFilePickerAvailable() {
  #ifdef _WIN32
      return true;
@@ -498,7 +502,7 @@ index 90116a9..f922293 100644
  #else
      return false;
  #endif
-@@ -1163,6 +1201,24 @@ std::string PickIplFile() {
+@@ -1163,6 +1205,24 @@ std::string PickIplFile() {
                            L"64DD IPL ROM (*.n64;*.z64)\0*.n64;*.z64\0All files\0*.*\0");
      return p.string();
  }
@@ -523,7 +527,7 @@ index 90116a9..f922293 100644
  #else
  std::string PickRomFile() {
      return {};
-@@ -1173,6 +1229,9 @@ std::string PickDiskFile() {
+@@ -1173,6 +1233,9 @@ std::string PickDiskFile() {
  std::string PickIplFile() {
      return {};
  }
@@ -558,7 +562,7 @@ index 34478c6..ad4daa9 100644
 +
  } // namespace gdx
 diff --git a/port/gdx_firstboot_gui.cpp b/port/gdx_firstboot_gui.cpp
-index 1ed3da6..4ab4bed 100644
+index 1ed3da6..934b9a4 100644
 --- a/port/gdx_firstboot_gui.cpp
 +++ b/port/gdx_firstboot_gui.cpp
 @@ -17,6 +17,7 @@
@@ -569,7 +573,15 @@ index 1ed3da6..4ab4bed 100644
  #include "ship/window/Window.h"
  #include "ship/window/MouseStateManager.h"
  #include "ship/window/FileDropMgr.h"
-@@ -41,6 +42,12 @@ namespace {
+@@ -26,6 +27,7 @@
+ 
+ #include <imgui.h>
+ 
++#include <cstdlib>
+ #include <filesystem>
+ #include <string>
+ #include <system_error>
+@@ -41,6 +43,12 @@ namespace {
  // literal rather than exported: it is the SoH/Starship game-named-archive convention and is stable.
  constexpr const char* kGameArchiveName = "fzerox.o2r";
  
@@ -582,7 +594,7 @@ index 1ed3da6..4ab4bed 100644
  enum class Phase {
      Acquire,       // Waiting for the three inputs to be provided + validated.
      Extracting,    // Async extraction is running; showing live progress.
-@@ -77,13 +84,15 @@ struct Row {
+@@ -77,13 +85,15 @@ struct Row {
  // ── Setup screen state machine ───────────────────────────────────────────────────────────────────
  class SetupScreen {
    public:
@@ -602,7 +614,51 @@ index 1ed3da6..4ab4bed 100644
          }
      }
  
-@@ -141,8 +150,9 @@ class SetupScreen {
+@@ -101,6 +111,13 @@ class SetupScreen {
+             fileDrop->RegisterDropHandler(&SetupScreen::OnFileDroppedThunk);
+         }
+ 
++        // This preboot surface has no game input to protect. Standard keyboard
++        // navigation lets Tab/arrow/Enter users complete setup even though Dear
++        // ImGui widgets are not individually exposed by macOS accessibility.
++        ImGuiIO& io = ImGui::GetIO();
++        const bool keyboardNavWasEnabled = (io.ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0;
++        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
++
+         gdx_port_logf("[setup] entering in-window first-time setup\n");
+         while (w->IsRunning()) {
+             w->HandleEvents(); // drag-and-drop events dispatch synchronously here (main thread)
+@@ -115,11 +132,29 @@ class SetupScreen {
+             w->RunGuiOnly();          // clear/bind the game FB, run no gfx task
+             w->GetGui()->EndDraw();   // composite + ImGui::Render + present floating windows
+             w->EndFrame();
++
++            // Deterministic regressions already opt into GDX_INPUT_SCRIPT and
++            // intentionally bypass Home. After rendering at least one setup
++            // frame, let that same contract confirm verified inputs so CI can
++            // exercise the real async progress/hot-mount path without a
++            // platform-specific mouse driver. Ordinary launches still require
++            // an explicit user click or keyboard activation.
++            if (!mScriptConfirmed && mPhase == Phase::Acquire && AllRowsOk()) {
++                const char* script = std::getenv("GDX_INPUT_SCRIPT");
++                if (script != nullptr && script[0] != '\0') {
++                    mScriptConfirmed = true;
++                    gdx_port_logf("[setup] input script: confirming verified first-run inputs\n");
++                    ConfirmAndStartExtraction();
++                }
++            }
+         }
+ 
+         if (fileDrop != nullptr) {
+             fileDrop->UnregisterDropHandler(&SetupScreen::OnFileDroppedThunk);
+         }
++        if (!keyboardNavWasEnabled) {
++            io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
++        }
+ 
+         const bool completed = (mPhase == Phase::Done);
+         if (completed) {
+@@ -141,8 +176,9 @@ class SetupScreen {
          }
          std::string src(path);
          std::string why;
@@ -614,7 +670,7 @@ index 1ed3da6..4ab4bed 100644
              std::string reason;
              if (r.validate(src, reason)) {
                  if (CopyInputInto(src, mDataDir, r.canonicalName)) {
-@@ -155,7 +165,11 @@ class SetupScreen {
+@@ -155,7 +191,11 @@ class SetupScreen {
                  return;
              }
          }
@@ -626,7 +682,7 @@ index 1ed3da6..4ab4bed 100644
          gdx_port_logf("[setup] rejected dropped file (matches no expected input): %s\n", src.c_str());
      }
  
-@@ -305,8 +319,8 @@ class SetupScreen {
+@@ -305,8 +345,8 @@ class SetupScreen {
      }
  
      bool AllRowsOk() const {
@@ -637,19 +693,19 @@ index 1ed3da6..4ab4bed 100644
                  return false;
              }
          }
-@@ -350,6 +364,11 @@ class SetupScreen {
+@@ -350,6 +390,11 @@ class SetupScreen {
          if (!AllRowsOk()) {
              return;
          }
 +#ifndef EXPANSION_KIT
-+        gdx_port_logf("[setup] user confirmed the cartridge ROM; continuing with raw-ROM assets\n");
-+        mPhase = Phase::Done;
++        gdx_port_logf("[setup] user confirmed the cartridge ROM; starting game-data extraction\n");
++        StartExtraction();
 +        return;
 +#else
          // A managed-copy-only re-run (original .ndd deleted after a prior setup made the backup)
          // validated against <dataDir>/media, so RowPath(1) would record a nonexistent canonical path
          // in the sidecar and make EnsureManagedDiskCopy warn about a copy that already exists.
-@@ -376,6 +395,7 @@ class SetupScreen {
+@@ -376,6 +421,7 @@ class SetupScreen {
          }
          gdx_port_logf("[setup] user confirmed all inputs; wrote completion marker; starting extraction\n");
          StartExtraction();
@@ -657,7 +713,23 @@ index 1ed3da6..4ab4bed 100644
      }
  
      void MountArchive() {
-@@ -464,7 +484,8 @@ class SetupScreen {
+@@ -442,8 +488,14 @@ class SetupScreen {
+                         GdxExtractResetAsync();
+                         mPhase = Phase::ExtractFailed;
+                     } else {
++                        const ExtractOutcome outcome = p.outcome;
+                         GdxExtractResetAsync();
+-                        MountArchive();
++                        // A newly-created archive was absent when ResourceManager built its mount
++                        // list, so add it now. UpToDate means the archive already existed and was
++                        // mounted during startup; adding it again would duplicate the same path.
++                        if (outcome == ExtractOutcome::Extracted) {
++                            MountArchive();
++                        }
+                         mPhase = Phase::Done;
+                     }
+                 }
+@@ -464,7 +516,8 @@ class SetupScreen {
          const ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                                         ImGuiWindowFlags_NoDocking;
@@ -667,7 +739,7 @@ index 1ed3da6..4ab4bed 100644
              ImGui::End();
              return;
          }
-@@ -473,15 +494,32 @@ class SetupScreen {
+@@ -473,15 +526,32 @@ class SetupScreen {
          if (large != nullptr) {
              ImGui::PushFont(large);
          }
@@ -704,7 +776,7 @@ index 1ed3da6..4ab4bed 100644
          switch (mPhase) {
              case Phase::Acquire:
              case Phase::Done:
-@@ -495,11 +533,16 @@ class SetupScreen {
+@@ -495,11 +565,16 @@ class SetupScreen {
                  break;
          }
  
@@ -722,7 +794,17 @@ index 1ed3da6..4ab4bed 100644
              Row& r = mRows[i];
              ImGui::PushID(i);
              ImGui::SeparatorText(r.label);
-@@ -552,6 +595,7 @@ class SetupScreen {
+@@ -539,6 +614,9 @@ class SetupScreen {
+                 if (ImGui::Button(r.status == RowStatus::Ok ? "Replace..." : "Browse...")) {
+                     Browse(r);
+                 }
++                if (r.status != RowStatus::Ok) {
++                    ImGui::SetItemDefaultFocus();
++                }
+                 ImGui::SameLine();
+                 ImGui::TextDisabled("...or drag & drop the file onto this window");
+             } else {
+@@ -552,6 +630,7 @@ class SetupScreen {
              ImGui::TextColored(ImVec4(0.90f, 0.45f, 0.35f, 1.0f), "%s", mDropError.c_str());
          }
          if (AllRowsOk()) {
@@ -730,19 +812,21 @@ index 1ed3da6..4ab4bed 100644
              ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.35f, 1.0f), "All three files are verified.");
              ImGui::TextWrapped("Confirm to build fzerox.o2r from your ROM and continue to the game.");
              // The deletable-files statement names each file, so the reader never has to guess which
-@@ -577,8 +621,22 @@ class SetupScreen {
+@@ -577,8 +656,24 @@ class SetupScreen {
              if (ImGui::Button("Build game data and continue", ImVec2(-1.0f, 0.0f))) {
                  ConfirmAndStartExtraction();
              }
 +#else
 +            ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.35f, 1.0f), "The cartridge ROM is verified.");
-+            ImGui::TextWrapped("This cartridge-only build reads your ROM directly. Expansion Kit media and "
-+                               "game-data extraction are unavailable in this build.");
++            ImGui::TextWrapped("Confirm to build verified local game data from your ROM. This one-time step "
++                               "keeps future launches fast and lets F0X run without the original ROM file.");
 +            ImGui::Spacing();
-+            const char* continueLabel = mManageExisting ? "Back to F0X Home" : "Continue to the game";
++            const char* continueLabel = mManageExisting ? "Verify game data and return" :
++                                                          "Build game data and continue";
 +            if (ImGui::Button(continueLabel, ImVec2(-1.0f, 0.0f))) {
 +                ConfirmAndStartExtraction();
 +            }
++            ImGui::SetItemDefaultFocus();
 +#endif
          } else {
 +#ifdef EXPANSION_KIT
@@ -753,7 +837,7 @@ index 1ed3da6..4ab4bed 100644
          }
      }
  
-@@ -673,12 +731,14 @@ class SetupScreen {
+@@ -673,12 +768,15 @@ class SetupScreen {
  
      std::string mDataDir;
      std::string mExeDir;
@@ -765,11 +849,12 @@ index 1ed3da6..4ab4bed 100644
      std::string mDropError;  // transient "unrecognized drop" message
      bool mArchiveMounted = false;
 +    bool mManageExisting = false;
++    bool mScriptConfirmed = false;
 +    int mInputGuardFrames = 2;
      std::vector<std::string> mLog; // GUI-owned copy of the extractor stdout ring buffer; see Tick()
                                      // for why it must survive GdxExtractResetAsync()
      int mEntriesSeen = 0;          // real per-entry progress counter for the current sub-stage
-@@ -696,12 +756,130 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
+@@ -696,12 +794,137 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
  
  } // namespace
  
@@ -794,6 +879,9 @@ index 1ed3da6..4ab4bed 100644
 +    F0XHomeAction action = F0XHomeAction::Quit;
 +    bool finished = false;
 +    int inputGuardFrames = 2;
++    ImGuiIO& io = ImGui::GetIO();
++    const bool keyboardNavWasEnabled = (io.ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0;
++    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 +    while (w->IsRunning() && !finished) {
 +        w->HandleEvents();
 +        w->GetMouseStateManager()->StartFrame();
@@ -840,6 +928,7 @@ index 1ed3da6..4ab4bed 100644
 +                action = F0XHomeAction::Play;
 +                finished = true;
 +            }
++            ImGui::SetItemDefaultFocus();
 +
 +            ImGui::Spacing();
 +            ImGui::SeparatorText("Game Data");
@@ -897,6 +986,9 @@ index 1ed3da6..4ab4bed 100644
 +        w->RunGuiOnly();
 +        w->GetGui()->EndDraw();
 +        w->EndFrame();
++    }
++    if (!keyboardNavWasEnabled) {
++        io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
 +    }
 +    return finished ? action : F0XHomeAction::Quit;
 +}
