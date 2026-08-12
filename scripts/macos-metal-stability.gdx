@@ -1,0 +1,31 @@
+# Metal presentation stability route. This mirrors the packaged raw-ROM GP
+# route, then holds a live race long enough for windowed, resize, and fullscreen
+# capture so intermittent black presents cannot hide in a short smoke test.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 120
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 9 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 1 5400
+LOG metal_stability_race_hold
+WAIT 18000
+QUIT

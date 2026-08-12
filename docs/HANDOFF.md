@@ -4,9 +4,12 @@
 
 Gate 4 is partially working: F0X has a reproducible, sealed arm64 `F0X.app`
 that macOS directly launches, with mutable data separated from bundle contents.
-The normal Metal path acquires the drawable before synchronous game rendering,
-which improved the original title strobe, but the user still reports severe
-flashing in the current F0X Metal window. Do not call presentation stable.
+The normal Metal path acquires the drawable before synchronous game rendering.
+The later repeating strobe was traced to transition readback permanently moving
+a live game framebuffer onto a second Metal command queue while the window
+sampled it on the main queue. The isolated current build passed 120 consecutive
+race captures, 80 resize captures, and 60 fullscreen captures with no black
+frames; owner confirmation remains the final stability check.
 Gate 3 now has direct packaged-app race visuals, but the captured raw-ROM race
 now has restored raw-ROM machine textures and a contained narrow-window HUD.
 Presentation stability, a real F0X application interface, player control through
@@ -55,11 +58,9 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 ## Next action
 
-Treat the user's observed rapid Metal flashing as the active blocker. Reproduce
-and instrument presentation across title, menu transitions, the preserved GP
-route, window resizing, and fullscreen entry/exit; require a sustained direct
-visual soak before claiming stability. Then build the missing F0X product shell:
-first-run/import, ready/library state, settings, progress/error recovery, and a
-clear launch path. The current setup window plus upstream/developer menus are a
-foundation, not the finished interface. Only after these two gates should the
-loop return to a completed controlled race and save persistence.
+Ask the owner to observe the current packaged build while retaining the direct
+soak regression. Unless flashing recurs, proceed with the missing F0X product
+shell: first-run/import, ready/library state, settings, progress/error recovery,
+and a clear launch path. The current setup window plus upstream/developer menus
+are a foundation, not the finished interface. Only after these two gates should
+the loop return to a completed controlled race and save persistence.

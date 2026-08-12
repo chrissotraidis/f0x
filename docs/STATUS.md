@@ -10,7 +10,7 @@ runtime evidence. No Apple gameplay claim is made without a dated test entry.
 | 0: reproducible baseline | Verified | G-Diffuser `719fd82` and recursive dependency pins are documented; the maintained patch series clean-applies and reverse-checks against the local source checkout. |
 | 1: macOS ARM64 compile/link | macOS verified | Cartridge-only Debug executables and the sealed `F0X.app` bundle build as native arm64 Mach-O with Metal on Apple Silicon. |
 | 2: fiber proof | macOS verified | `gdx_fiber_smoketest` passed 30,000 deterministic Apple Silicon switches across three stacks on 2026-08-11. |
-| 3: complete macOS Metal race | Partially working | The signed packaged app boots an authorized raw ROM, deterministically traverses modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, and directly renders a live GP race. Raw-ROM machine textures are restored by falling back when archive resources are absent, and narrow-window HUD is contained by a 4:3 fallback. The user still observes severe Metal flashing, so stability and a player-controlled completed race remain open. Cartridge synthesis produces nonzero PCM under SDL dummy output; audible output remains unverified. |
+| 3: complete macOS Metal race | Stability candidate verified | The signed packaged app boots an authorized raw ROM, deterministically traverses modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, and directly renders a live GP race. The repeating black strobe was reproduced at 38/60 direct window captures and reduced to 0/120 after keeping live Metal render targets off the unsynchronized readback queue. Additional current-build samples passed 0/80 across two window sizes and 0/60 in fullscreen. A race HUD portrait crash from a physical-address/module-address collision was also fixed and the rebuilt app survived the former crash point. Player-controlled race completion remains open. Cartridge synthesis produces nonzero PCM under SDL dummy output; audible output remains unverified. |
 | 4: macOS application | Foundation only | The sealed `F0X.app` passes strict ad-hoc signature validation and keeps mutable state in Application Support, but it is not yet a complete F0X interface. The current surfaces are the first-time ROM setup view, upstream game menus, and developer/settings UI; there is no cohesive product shell for import, library/launch state, settings, recovery, and lifecycle. |
 | 5: iOS/iPadOS build | Not started | No F0X iOS target exists. |
 | 6: physical iPad engine proof | Not tested | No signed device run exists. |
@@ -37,8 +37,8 @@ stale inference from the research.
 The active loop resumes at the first unproven product behavior, not at an
 already-passed compile or fiber gate:
 
-1. Eliminate Metal flashing across title, menus, race, window resize, and
-   fullscreen transitions; require a sustained direct visual soak.
+1. Obtain owner confirmation that the current packaged Metal build no longer
+   flashes; retain the automated windowed/resize/fullscreen soak as regression.
 2. Establish the actual F0X app interface: coherent first-run/import,
    ready-to-play/library state, settings, progress/error recovery, and launch.
 3. Prove player control through a completed race, then save creation, clean

@@ -2,12 +2,18 @@
 
 ## F0X-specific
 
-- **MAC-PRESENT-02 — F0X Metal still flashes severely:** the drawable-order
-  correction restored visible title/race frames, but the user reports the
-  current interface still flashes rapidly. This supersedes any earlier
-  "stable title" wording. Reproduction must cover title, menu/race transitions,
-  resize, and fullscreen; Gate 3 remains open until a sustained direct soak is
-  visually stable.
+- **MAC-PRESENT-02 — Metal strobe fix awaits owner confirmation:** transition
+  capture moved a live game framebuffer permanently to Metal's readback queue,
+  while the main queue sampled it without a cross-queue dependency. The measured
+  38/60 black-frame baseline became 0/120 in race, 0/80 across resize, and 0/60
+  in fullscreen after keeping that target on the main queue. Keep this issue
+  open until the owner confirms the originally observed flashing is gone.
+- **MAC-RACE-CRASH-01 — physical segment-base collision fixed, regression retained:**
+  a valid segment-4 RDRAM offset shared low address bits with the PIE executable;
+  the generic resolver chose read-only `__TEXT`, and HUD portrait DMA crashed in
+  `GdxSegmentSourceRead`. Segment setters now treat in-range physical bases as
+  RDRAM. The rebuilt app survived the former crash point, but the long race soak
+  remains a required regression.
 - **MAC-UI-01 — no complete F0X product interface exists:** the app currently
   exposes a first-time ROM setup view, the game's own menus, and upstream
   developer/settings surfaces. It still needs a coherent F0X shell for import,

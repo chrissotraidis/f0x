@@ -86,6 +86,37 @@ the all-black internal BMP readback as separate gates.
 - **Live validation:** direct macOS app inspection of that exact rebuilt bundle showed the complete F-Zero X title artwork and `PUSH START`, with a second inspection 2.5 seconds after a title input still showing a stable rendered title rather than the former black strobe. The app then closed cleanly.
 - **Diagnostic boundary:** a temporary persisted present-path trace showed normal startup `vifb-vi-scanout`, followed by a real task and held-frame presentation; it did not show the historical alternating task/hold signature. The trace setting was removed after this run. This is title-screen stability proof, not yet a visual GP-race or controller proof.
 
+## 2026-08-12 — Metal strobe and race-address regression
+
+- **Measured baseline:** one packaged raw-ROM process running the deterministic
+  GP route produced 38 black frames in 60 direct window captures sampled at
+  roughly 150 ms. This reproduced the owner's repeating whole-window flash.
+- **Root cause and isolation:** transition snapshot readback set a live Metal
+  game framebuffer to use a second command queue permanently. Later main-queue
+  window composites sampled that texture without an explicit cross-queue
+  dependency. Keeping the live target on the main queue changed the same dense
+  sample to 0 black frames in 120 race captures. Restoring the separately tested
+  SDL OpenGL-swap hypothesis did not regress the result, so that speculative
+  change was removed.
+- **Resize/fullscreen proof:** the current packaged build produced 0 black frames
+  in 80 captures across 720x540 and 1100x820 window sizes, plus 0 in 60 captures
+  after native macOS fullscreen entry. One all-black image during the scripted
+  menu-to-race transition was retained as a transition/fade observation, not
+  counted as a stable-race strobe.
+- **Crash report reconciliation:** incident
+  `DF817CB7-AF39-45B1-A2BB-CB49BBB60BA5` was reproduced during the longer soak as
+  `SIGBUS` in `Hud_PortRestoreCharacterPortrait -> GdxSegmentSourceRead`. A valid
+  segment-4 RDRAM physical offset collided with a PIE module low address, and the
+  generic resolver selected read-only `__TEXT`. Segment setter APIs now prefer
+  RDRAM for in-range physical bases. The rebuilt process passed the former crash
+  point and remained alive throughout the direct race/resize/fullscreen samples.
+- **Reusable route:** `scripts/macos-metal-stability.gdx` follows the packaged GP
+  route and holds a live race for 18,000 VI ticks so future intermittent-present
+  and race-lifetime regressions have a reproducible window.
+- **Boundary:** current-build direct evidence supports the fix, but owner
+  confirmation of the originally observed flashing is still required. This does
+  not close the missing product-interface or player-completed-race gates.
+
 ## 2026-08-11 — Gate 3 cartridge PCM synthesis proof
 
 - **Fixes:** the cartridge build (`GDX_EXPANSION_KIT=OFF`) now feeds the active ROM AI buffer into the PCM seam. Its permanent allocator returns its allocation on host ABIs, sequence-font offsets are decoded as big-endian bytes, and soundfont blobs are converted into persistent host-native objects instead of rewriting 32-bit N64 offsets as host pointers.
