@@ -35,9 +35,9 @@
   first-run screen now owns consent, determinate progress, logs, retry/fallback,
   hot-mount, and same-process game continuation; keyboard navigation supplies
   default focus even though ImGui widgets are not individually exposed to macOS
-  accessibility. Torch now exposes a verified static in-memory O2R API, but F0X
-  still uses the desktop child process and the static library has not yet been
-  linked or compiled for iOS/iPadOS.
+  accessibility. F0X now has a verified opt-in static/in-memory backend and the
+  default desktop child backend remains available. The combined static graph has
+  not yet been compiled or executed on iOS/iPadOS.
 - **MAC-AUDIO-01 — physical CoreAudio route remains unverified:** cartridge
   synthesis and the dedicated producer path now emit nonzero captured PCM.
   The reproducible proof uses SDL's dummy device so it does not establish

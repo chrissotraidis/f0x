@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index eed2af7..2c1a2d7 100644
+index eed2af7..5d7355b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -18,6 +18,7 @@ option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
@@ -10,7 +10,75 @@ index eed2af7..2c1a2d7 100644
  
  # Optional override for the produced executable name (e.g. "gdx-extract").
  set(GDX_OUTPUT_NAME "" CACHE STRING "Override the standalone executable output name")
-@@ -324,6 +325,11 @@ if(NOT USE_STANDALONE)
+@@ -266,13 +267,15 @@ endif()
+ set(YAML_CPP_BUILD_TOOLS OFF)
+ set(YAML_CPP_BUILD_TESTS OFF)
+ set(YAML_CPP_DISABLE_UNINSTALL ON)
+-FetchContent_Declare(
+-    yaml-cpp
+-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+-    GIT_TAG 2f86d13775d119edbb69af52e5f566fd65c6953b
+-)
+-set(YAML_CPP_BUILD_TESTS OFF)
+-FetchContent_MakeAvailable(yaml-cpp)
++if(NOT TARGET yaml-cpp)
++    FetchContent_Declare(
++        yaml-cpp
++        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
++        GIT_TAG 2f86d13775d119edbb69af52e5f566fd65c6953b
++    )
++    set(YAML_CPP_BUILD_TESTS OFF)
++    FetchContent_MakeAvailable(yaml-cpp)
++endif()
+ 
+ target_link_libraries(${PROJECT_NAME} PRIVATE yaml-cpp)
+ if(NOT USE_STANDALONE)
+@@ -285,13 +288,14 @@ if(USE_STANDALONE)
+         set(SPDLOG_USE_STD_FORMAT ON)
+     endif()
+ 
+-	FetchContent_Declare(
+-		spdlog
+-		GIT_REPOSITORY https://github.com/gabime/spdlog.git
+-		GIT_TAG 79524ddd08a4ec981b7fea76afd08ee05f83755d
+-	)
+-
+-	FetchContent_MakeAvailable(spdlog)
++	if(NOT TARGET spdlog AND NOT TARGET spdlog::spdlog)
++		FetchContent_Declare(
++			spdlog
++			GIT_REPOSITORY https://github.com/gabime/spdlog.git
++			GIT_TAG 79524ddd08a4ec981b7fea76afd08ee05f83755d
++		)
++		FetchContent_MakeAvailable(spdlog)
++	endif()
+ 	target_link_libraries(${PROJECT_NAME} PRIVATE spdlog)
+ else()
+ 	find_package(spdlog QUIET)
+@@ -309,13 +313,15 @@ endif()
+ 
+ # Link TinyXML2
+ set(tinyxml2_BUILD_TESTING OFF)
+-FetchContent_Declare(
+-    tinyxml2
+-    GIT_REPOSITORY https://github.com/leethomason/tinyxml2.git
+-    GIT_TAG 10.0.0
+-    OVERRIDE_FIND_PACKAGE
+-)
+-FetchContent_MakeAvailable(tinyxml2)
++if(NOT TARGET tinyxml2)
++    FetchContent_Declare(
++        tinyxml2
++        GIT_REPOSITORY https://github.com/leethomason/tinyxml2.git
++        GIT_TAG 10.0.0
++        OVERRIDE_FIND_PACKAGE
++    )
++    FetchContent_MakeAvailable(tinyxml2)
++endif()
+ 
+ target_link_libraries(${PROJECT_NAME} PRIVATE tinyxml2 yaml-cpp N64Graphics BinaryTools)
+ 
+@@ -324,6 +330,11 @@ if(NOT USE_STANDALONE)
      target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib)
      target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
      target_include_directories(${PROJECT_NAME} PUBLIC ${yaml-cpp_SOURCE_DIR}/include)

@@ -20,7 +20,7 @@ index 789b053..a0cc2a8 100644
      if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
          return 0;
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..aa0babc 100644
+index cab4365..735c410 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
 @@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
@@ -34,7 +34,7 @@ index cab4365..aa0babc 100644
  set(DECOMP "${CMAKE_CURRENT_SOURCE_DIR}/../decomp")
  find_package(Python3 COMPONENTS Interpreter REQUIRED)
  
-@@ -48,6 +52,11 @@ list(FILTER GAME_SOURCES EXCLUDE REGEX "/libultra/os/getmemsize\\.c$")
+@@ -48,6 +52,26 @@ list(FILTER GAME_SOURCES EXCLUDE REGEX "/libultra/os/getmemsize\\.c$")
  # EK modes are runtime-gated by disk-image presence (port/n64_leo.c).
  option(GDX_EXPANSION_KIT "Compile Expansion Kit (64DD) support into the port" ON)
  
@@ -42,11 +42,26 @@ index cab4365..aa0babc 100644
 +# resources in Contents/MacOS; bundled F0X builds keep mutable game data in
 +# Application Support rather than attempting to write inside the app bundle.
 +option(GDX_MACOS_BUNDLE "Build G-Diffuser as the F0X macOS app bundle" OFF)
++option(GDX_INPROCESS_TORCH "Link Torch and run cartridge O2R extraction in process" OFF)
++
++if(GDX_INPROCESS_TORCH)
++    set(USE_STANDALONE OFF CACHE BOOL "Build Torch as a static library" FORCE)
++    set(BUILD_STORMLIB OFF CACHE BOOL "Torch StormLib support" FORCE)
++    set(GDX_DETERMINISTIC ON CACHE BOOL "Deterministic Torch archives" FORCE)
++    set(BUILD_SM64 OFF CACHE BOOL "Torch SM64 factories" FORCE)
++    set(BUILD_MK64 OFF CACHE BOOL "Torch MK64 factories" FORCE)
++    set(BUILD_SF64 OFF CACHE BOOL "Torch SF64 factories" FORCE)
++    set(BUILD_PM64 OFF CACHE BOOL "Torch PM64 factories" FORCE)
++    set(BUILD_MARIO_ARTIST OFF CACHE BOOL "Torch Mario Artist factories" FORCE)
++    set(BUILD_FZERO ON CACHE BOOL "Torch F-Zero factories" FORCE)
++    set(BUILD_NAUDIO ON CACHE BOOL "Torch NAudio factories" FORCE)
++    add_subdirectory("${CMAKE_SOURCE_DIR}/torch" "${CMAKE_BINARY_DIR}/torch-inprocess" EXCLUDE_FROM_ALL)
++endif()
 +
  # GDX_DEV_TOOLS — master switch for the behaviour-altering (Bucket B) developer gates
  # (port/gdx_dev_gates.h, docs/menu/DEVELOPER_TAB.md). When absent, every Bucket B gate is a
  # hard-wired 0 (no getenv, no CVar read) and the Dev Tools page omits the section — safe because
-@@ -181,6 +190,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
+@@ -181,6 +205,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
      ASSET_REVISION=rev0
  )
  
@@ -60,7 +75,7 @@ index cab4365..aa0babc 100644
  # MSVC: silence IDO-era decomp noise, but keep fatal the classes that are UB on x64 and have
  # caused real crashes: C4715/C4716 (non-void falls off the end — MIPS left the value in $v0,
  # MSVC returns garbage) and C4013 (implicit decl truncates a 64-bit pointer return to EAX;
-@@ -296,6 +312,42 @@ if(GDX_EXPANSION_KIT)
+@@ -296,6 +327,42 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
  
@@ -103,7 +118,7 @@ index cab4365..aa0babc 100644
  target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
  
  if(WIN32)
-@@ -337,30 +389,36 @@ add_custom_command(
+@@ -337,30 +404,36 @@ add_custom_command(
  add_custom_target(gdiffuser_engine_o2r DEPENDS "${GDIFFUSER_ENGINE_O2R}")
  add_dependencies(G-Diffuser gdiffuser_engine_o2r)
  add_custom_command(TARGET G-Diffuser POST_BUILD
@@ -146,7 +161,7 @@ index cab4365..aa0babc 100644
      VERBATIM)
  
  # Keep the project license and every bundled/static dependency notice with binary releases.
-@@ -369,10 +427,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -369,10 +442,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
              "${CMAKE_SOURCE_DIR}/LICENSE"
              "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
@@ -159,7 +174,7 @@ index cab4365..aa0babc 100644
      VERBATIM)
  
  # gdx-extract, the standalone deterministic O2R extractor first boot spawns as a child process.
-@@ -412,9 +470,10 @@ add_custom_target(gdx-extract DEPENDS gdx_extract_ext)
+@@ -412,9 +485,10 @@ add_custom_target(gdx-extract DEPENDS gdx_extract_ext)
  add_dependencies(G-Diffuser gdx_extract_ext)
  
  add_custom_command(TARGET G-Diffuser POST_BUILD
@@ -171,7 +186,7 @@ index cab4365..aa0babc 100644
      VERBATIM)
  
  # Deploy the recipe tree as decomp-recipes/ next to the exe. The packaged layout mirrors the
-@@ -422,7 +481,7 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -422,7 +496,7 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
  # Only us/rev0 ships; other revisions' config keys are never dereferenced because recipe
  # selection is by matched ROM SHA1.
  set(GDX_RECIPES_SRC "${CMAKE_SOURCE_DIR}/decomp")
@@ -180,7 +195,7 @@ index cab4365..aa0babc 100644
  # The EK slice manifest ships beside the recipes so the runtime disk step can pass it to
  # `gdx-extract disk -m`.
  set(GDX_EK_SLICE_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/gen/ek_slice_manifest.txt")
-@@ -449,6 +508,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -449,6 +523,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
              --ek-yaml-dir "${CMAKE_SOURCE_DIR}/fzerox-expansion-kit/assets/yaml/jp"
      VERBATIM)
  
@@ -206,7 +221,18 @@ index cab4365..aa0babc 100644
  target_include_directories(G-Diffuser PRIVATE
      "${CMAKE_CURRENT_SOURCE_DIR}"   # for "resource/ResourceFactories.h"
      "${DECOMP}/include"
-@@ -467,6 +545,9 @@ else()
+@@ -458,6 +551,10 @@ target_include_directories(G-Diffuser PRIVATE
+ 
+ target_link_libraries(G-Diffuser PRIVATE cxd4_rsp)
+ target_link_libraries(G-Diffuser PRIVATE discord-rpc)
++if(GDX_INPROCESS_TORCH)
++    target_link_libraries(G-Diffuser PRIVATE torch)
++    target_compile_definitions(G-Diffuser PRIVATE GDX_INPROCESS_TORCH=1)
++endif()
+ 
+ if(WIN32)
+     # user32: MessageBox; Comdlg32: ROM picker; Comctl32: extraction progress marquee.
+@@ -467,6 +564,9 @@ else()
      # (needed on older glibc, harmless on newer).
      find_package(Threads REQUIRED)
      target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -216,7 +242,7 @@ index cab4365..aa0babc 100644
      # Release tarballs carry the dependencies no distribution can be relied on to provide in
      # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
      # which beats a wrapper script because the binary stays directly runnable. No effect on a
-@@ -483,6 +564,8 @@ endif()
+@@ -483,6 +583,8 @@ endif()
  # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
  if(NOT MSVC)
      target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
@@ -225,7 +251,7 @@ index cab4365..aa0babc 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +619,17 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +638,17 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -243,7 +269,7 @@ index cab4365..aa0babc 100644
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -764,6 +858,8 @@ if(GDX_BUILD_JP)
+@@ -764,6 +877,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -331,10 +357,29 @@ index 3a04fc0..dd762a9 100644
              env.recipesDir = recipes.string();
              fs::path manifest = recipes / kEkSliceManifestName;
 diff --git a/port/gdx_extract_launch.cpp b/port/gdx_extract_launch.cpp
-index 4630c47..df3f0a5 100644
+index 4630c47..7fd24af 100644
 --- a/port/gdx_extract_launch.cpp
 +++ b/port/gdx_extract_launch.cpp
-@@ -169,6 +169,22 @@ constexpr const char* kExtractBinaryName = "gdx-extract.exe";
+@@ -3,6 +3,9 @@
+ #include "gdx_extract_launch.h"
+ #include "gdx_firstboot.h" // GdxFindIplSourceInDir -- shared IPL-source alt-name probe
+ #include "port_log.h"
++#ifdef GDX_INPROCESS_TORCH
++#include "gdx/inprocess_extract.h"
++#endif
+ 
+ // Golden-archive expectations, emitted by the o2r harness generator. The entire code-level contract
+ // between this file and the harness is these two macro names:
+@@ -91,6 +94,8 @@
+ #include <cstring>
+ #include <deque>
+ #include <filesystem>
++#include <fstream>
++#include <iterator>
+ #include <string>
+ #include <vector>
+ #include <atomic>
+@@ -169,6 +174,22 @@ constexpr const char* kExtractBinaryName = "gdx-extract.exe";
  constexpr const char* kExtractBinaryName = "gdx-extract";
  #endif
  
@@ -357,7 +402,15 @@ index 4630c47..df3f0a5 100644
  // Fallback ROM SHA-1s (the keys decomp/config.yml uses). config.yml is authoritative at runtime --
  // recipes are the single source of truth -- and these are read only when it cannot be.
  constexpr const char* kExpectedRomSha1Fallback = "5f658e88ffa9de23cba6986a8fd3d3a90d7b4340";
-@@ -1196,8 +1212,8 @@ ExtractOutcome runExtraction(const fs::path& dataDir, const fs::path& romPath, c
+@@ -231,6 +252,7 @@ struct AsyncExtractState {
+     std::string lastError;          // last actionable error line (guarded by mtx)
+     std::deque<std::string> log;    // ring buffer of the last kAsyncLogCapacity stdout lines (guarded by mtx)
+     std::atomic<int> entriesSeen{0};  // "- [type] Processing <name>" lines seen in the current sub-stage
++    std::atomic<std::size_t> recipeNodes{0}; // in-process Torch recipe nodes (subStage 3)
+     std::atomic<int> subStage{0};     // 0 = cart, 1 = validating cart, 2 = ipl (see ExtractProgress::subStage)
+     std::atomic<int> phase{0};      // 0 = Idle, 1 = Running, 2 = Done
+     std::atomic<int> outcome{0};    // ExtractOutcome as int; valid only when phase == 2
+@@ -1196,8 +1218,9 @@ ExtractOutcome runExtraction(const fs::path& dataDir, const fs::path& romPath, c
      std::error_code ec;
      const char* archiveName = profile.archiveName; // fzerox.o2r (US) / fzerox-jp.o2r (JP)
  
@@ -365,10 +418,73 @@ index 4630c47..df3f0a5 100644
 -    const fs::path recipesDir = exeDir / kRecipesDirName;
 +    const fs::path extractBin = packagedExtractorPath(exeDir);
 +    const fs::path recipesDir = packagedResourcesDir(exeDir) / kRecipesDirName;
++#ifndef GDX_INPROCESS_TORCH
      if (!fileExists(extractBin)) {
          gdx_port_logf("[extract] extractor component missing (%s). Cannot build %s — booting from the "
                        "raw ROM. Reinstall G-Diffuser to restore the extractor.\n",
-@@ -2045,7 +2061,7 @@ std::string GdxExtractFileSha1(const char* path) {
+@@ -1205,6 +1228,7 @@ ExtractOutcome runExtraction(const fs::path& dataDir, const fs::path& romPath, c
+         gdxAsyncPublishError("The extractor component (gdx-extract) is missing. Reinstall G-Diffuser.");
+         return ExtractOutcome::FailedRawFallback;
+     }
++#endif
+     if (!fs::is_directory(recipesDir, ec)) {
+         ec.clear();
+         gdx_port_logf("[extract] recipe data missing (%s). Cannot build %s — booting from the raw ROM.\n",
+@@ -1296,6 +1320,24 @@ ExtractOutcome runExtraction(const fs::path& dataDir, const fs::path& romPath, c
+     ExtractState state;
+     int exitCode = 1;
+     bool ok = false;
++#ifdef GDX_INPROCESS_TORCH
++    {
++        gdx_port_logf("[extract] backend: in-process Torch (ROM bytes, no fork/exec)\n");
++        std::ifstream romInput(romPath, std::ios::binary);
++        std::vector<std::uint8_t> romBytes((std::istreambuf_iterator<char>(romInput)), {});
++        std::string inProcessError;
++        gdxAsyncSetSubStage(3 /* InProcessCart */, /*resetEntries=*/true);
++        asyncState().recipeNodes.store(0, std::memory_order_relaxed);
++        exitCode = GdxRunInProcessO2R(romBytes.data(), romBytes.size(), effectiveRecipes.string(),
++                                      tmpDir.string(), versionArg, &asyncState().recipeNodes,
++                                      inProcessError);
++        ok = exitCode == 0;
++        if (!ok) {
++            gdx_port_logf("[extract] in-process Torch failed: %s\n", inProcessError.c_str());
++            gdxAsyncPublishError(inProcessError);
++        }
++    }
++#else
+ #ifdef _WIN32
+     // Build a single command line; quote paths that may contain spaces.
+     auto q = [](const std::wstring& s) { return L"\"" + s + L"\""; };
+@@ -1319,6 +1361,7 @@ ExtractOutcome runExtraction(const fs::path& dataDir, const fs::path& romPath, c
+                                       "-u",
+                                       versionArg };
+     ok = runExtractorPosix(extractBin, args, tmpDir, exitCode, state);
++#endif
+ #endif
+ 
+     // The extractor may drop a stray torch.hash.yml in the output dir and in the CWD; the MAX_PATH
+@@ -1984,6 +2027,7 @@ void GdxExtractStartAsync(const char* dataDir, const char* romPath, const char*
+         s.log.clear();
+     }
+     s.entriesSeen.store(0);
++    s.recipeNodes.store(0);
+     s.subStage.store(0);
+     s.suppressDialog.store(suppressNativeDialog);
+     s.outcome.store(static_cast<int>(ExtractOutcome::FailedRawFallback));
+@@ -2006,8 +2050,11 @@ ExtractProgress GdxExtractPollStatus() {
+     const int ph = s.phase.load();
+     p.phase = (ph == 2) ? ExtractPhase::Done : (ph == 1) ? ExtractPhase::Running : ExtractPhase::Idle;
+     p.outcome = static_cast<ExtractOutcome>(s.outcome.load());
+-    p.entriesSeen = s.entriesSeen.load(std::memory_order_relaxed);
+     p.subStage = s.subStage.load(std::memory_order_relaxed);
++    p.entriesSeen = s.entriesSeen.load(std::memory_order_relaxed);
++    if (p.subStage == 3) {
++        p.entriesSeen = static_cast<int>(s.recipeNodes.load(std::memory_order_relaxed));
++    }
+     std::lock_guard<std::mutex> lk(s.mtx);
+     p.stage = s.stage;
+     p.lastError = s.lastError;
+@@ -2045,7 +2092,7 @@ std::string GdxExtractFileSha1(const char* path) {
  std::string GdxExtractExpectedRomSha1(const char* exeDir) {
      if (exeDir != nullptr && exeDir[0] != '\0') {
          std::string fromConfig =
@@ -562,7 +678,7 @@ index 34478c6..ad4daa9 100644
 +
  } // namespace gdx
 diff --git a/port/gdx_firstboot_gui.cpp b/port/gdx_firstboot_gui.cpp
-index 1ed3da6..934b9a4 100644
+index 1ed3da6..98a8a01 100644
 --- a/port/gdx_firstboot_gui.cpp
 +++ b/port/gdx_firstboot_gui.cpp
 @@ -17,6 +17,7 @@
@@ -837,7 +953,25 @@ index 1ed3da6..934b9a4 100644
          }
      }
  
-@@ -673,12 +768,15 @@ class SetupScreen {
+@@ -590,6 +685,8 @@ class SetupScreen {
+             stageLabel = "Validating extracted archive...";
+         } else if (mSubStage == 2) {
+             stageLabel = "Extracting IPL font data...";
++        } else if (mSubStage == 3) {
++            stageLabel = "Processing game-data recipes in F0X...";
+         }
+         ImGui::TextUnformatted(stageLabel);
+         ImGui::TextWrapped("This happens once and usually takes only a few seconds.");
+@@ -600,7 +697,7 @@ class SetupScreen {
+         // (gdx_extract_launch.cpp's looksLikeEntryProgressLine). The validating sub-stage is a few
+         // hash/zip checks after the child exited, with no per-entry signal, so it stays indeterminate.
+         const int total = (mSubStage == 2) ? GdxExtractExpectedIplEntryCount() : GdxExtractExpectedCartEntryCount();
+-        if (mSubStage != 1 && total > 0) {
++        if (mSubStage != 1 && mSubStage != 3 && total > 0) {
+             int done = mEntriesSeen;
+             if (done > total) {
+                 done = total; // clamp: the "Processing" heuristic can occasionally over-count
+@@ -673,12 +770,15 @@ class SetupScreen {
  
      std::string mDataDir;
      std::string mExeDir;
@@ -854,7 +988,7 @@ index 1ed3da6..934b9a4 100644
      std::vector<std::string> mLog; // GUI-owned copy of the extractor stdout ring buffer; see Tick()
                                      // for why it must survive GdxExtractResetAsync()
      int mEntriesSeen = 0;          // real per-entry progress counter for the current sub-stage
-@@ -696,12 +794,137 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
+@@ -696,12 +796,137 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
  
  } // namespace
  

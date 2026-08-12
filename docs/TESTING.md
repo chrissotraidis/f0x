@@ -285,3 +285,29 @@ extraction golden plus all-black internal BMP readback as separate gates.
 - **Boundary:** this proves the callable extraction core on macOS. The F0X
   runtime does not yet link it, the port layer still owns validation/atomic
   activation, and iOS/iPadOS compilation and device execution remain unproven.
+
+## 2026-08-12 — in-process Torch integrated into F0X
+
+- **Build graph:** `GDX_INPROCESS_TORCH=ON` adds Torch as a static subdirectory,
+  enables only F-Zero/NAudio factories, and reuses the parent build's YAML,
+  spdlog, and tinyxml targets. The combined native arm64 F0X executable linked;
+  `nm` contains `GdxRunInProcessO2R`. The sealed bundle and nested fallback
+  helper passed strict ad-hoc signature verification and plist lint.
+- **Runtime selection:** with the installed archive held aside, the app logged
+  `backend: in-process Torch (ROM bytes, no fork/exec)`. The callable API read
+  the verified ROM bytes, processed the existing recipes on the setup worker,
+  and returned `generic.o2r` into the port's unique staging directory. The UI
+  uses an indeterminate recipe-processing stage because Torch reports 31 YAML
+  recipe nodes, not the final 3,610 ZIP records; validation remains a separate
+  stage instead of presenting a false percentage.
+- **End-to-end result:** the unchanged port gates counted 3,610 entries, verified
+  SHA-256 `7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a`,
+  atomically installed and hot-mounted the archive, reached
+  `packaged_gp_race_capture_interval`, completed all 28 commands, and shut down
+  normally. The guard restored the user's prior archive and the test duplicate
+  was moved to Trash.
+- **Default regression:** the ordinary `GDX_INPROCESS_TORCH=OFF` bundle rebuilt,
+  sealed, and passed plist lint after the integration changes. Its child-process
+  backend remains the desktop default/fallback.
+- **Boundary:** macOS linkage and execution are verified. No iOS/iPadOS target,
+  Simulator compile, signing, or device run is claimed yet.

@@ -33,7 +33,16 @@ Torch now also exposes `GdxRunInProcessO2R`: it accepts ROM bytes, recipes,
 unique staging output, version, and a pollable asset counter. The static-library
 harness reproduced the exact `7d60d975...` archive twice sequentially in one
 process and refuses to overwrite a non-empty output. It is not yet linked into
-F0X or compiled for iOS.
+the default desktop backend or compiled for iOS.
+
+That API is now integrated behind `GDX_INPROCESS_TORCH`. The opt-in macOS bundle
+links Torch statically into F0X, reuses the parent build's YAML/spdlog/tinyxml
+targets, labels recipe processing as indeterminate rather than falsely mapping
+31 recipe nodes onto 3,610 archive records, and retains the port's existing
+golden validation plus atomic activation. Its first-run regression explicitly
+logged `in-process Torch (ROM bytes, no fork/exec)`, installed the exact golden,
+hot-mounted it, and reached the packaged GP race. The default child backend also
+still builds and seals.
 
 ## Revised goal and execution order
 
@@ -44,7 +53,7 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 1. Metal presentation stability across title/menu/race/resize/fullscreen;
 2. completed controlled race plus save/relaunch/load round-trip;
-3. integrate the proven in-process Torch API and compile it for iOS;
+3. compile the integrated in-process F0X/Torch graph for iOS;
 4. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
 5. touch, timing/high refresh, packaging, README, and final audits.
 
@@ -108,12 +117,17 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   point and harness. It generated the exact 3,610-entry golden twice in one
   process from the authorized ROM, passed the full archive validator, and safely
   rejected a destination already containing `generic.o2r`.
+- An opt-in F0X macOS build now links that Torch library and routes cartridge
+  extraction through it while preserving the port-layer validation/atomic
+  install. The generated archive matched `7d60d975...`, hot-mounted in the same
+  process, and completed the packaged race route. The ordinary child-backend
+  build was rebuilt afterward and still seals successfully.
 
 ## Next action
 
-Link the proven in-process extractor into F0X behind the existing importer
-contract, then compile that dependency graph for iOS/iPadOS. Keep final archive
-validation and atomic activation in the port layer. In parallel, the owner can
+Compile the integrated in-process dependency graph for iOS/iPadOS and expose the
+first concrete platform/compiler blockers. Keep final archive validation and
+atomic activation in the port layer. In parallel, the owner can
 observe the current packaged build for flashing and use a connected controller
 to close the completed-race gate; save/relaunch/load persistence is already
 independently verified.
