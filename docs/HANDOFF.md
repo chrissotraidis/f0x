@@ -2,20 +2,19 @@
 
 ## Current gate
 
-Gate 0: reproducible cartridge-only baseline.
+Gate 3: native macOS cartridge runtime, with synthesis proven but physical
+audio output and direct race visuals still open.
 
 ## Verified state
 
 - Pinned, recursive upstream source is at `ref/G-Diffuser`, commit `719fd82`.
-- Local reference files are ignored; the repository safety boundary is now
-  explicit.
-- The G-Diffuser research and HarkinianPad README benchmark were read and
-  reconciled with the current source.
+- The cartridge-only ARM64 build completes and the PCM capture harness passes
+  all 5 cases / 28 checks.
+- A bounded SDL dummy-device run with the dedicated audio thread produced
+  nonzero cartridge PCM; see `TESTING.md` for exact capture evidence.
 
 ## Next action
 
-Run the macOS Debug configure/build from [`BUILDING.md`](BUILDING.md) with
-`GDX_EXPANSION_KIT=OFF`. Preserve the full build output as evidence. If it
-fails, make the smallest reproducible fix only after identifying whether the
-failure is upstream source, a missing host dependency, or an Apple-specific
-assumption.
+Run one clean normal-CoreAudio macOS session and record route/volume evidence
+without claiming speaker output from PCM alone. Keep this separate from the
+independent direct-race-visual and iPad gates.
