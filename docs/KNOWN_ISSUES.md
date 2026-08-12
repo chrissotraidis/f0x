@@ -18,7 +18,9 @@
   synthesis and the dedicated producer path now emit nonzero captured PCM.
   The reproducible proof uses SDL's dummy device so it does not establish
   speaker/headphone delivery, volume, route changes, interruptions, or
-  latency on a physical output device.
+  latency on a physical output device. A subsequent normal-CoreAudio launch
+  stalled inside Apple audio-device creation before F0X booted; this is an
+  external host-service boundary, not a synthesis failure.
 - **MAC-RACE-TEX-01 — pre-race null-texture warnings require visual follow-up:**
   the GP route emitted one suppressed `ImportTexture` warning for tiles 5 and
   6 while leaving machine settings, before GP-race initialization. The route

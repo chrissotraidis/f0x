@@ -15,6 +15,6 @@ audio output and direct race visuals still open.
 
 ## Next action
 
-Run one clean normal-CoreAudio macOS session and record route/volume evidence
-without claiming speaker output from PCM alone. Keep this separate from the
-independent direct-race-visual and iPad gates.
+Capture the active game window during the reproducible GP route. Keep the
+black framebuffer-readback problem separate from desktop/window visual proof;
+CoreAudio route/volume validation remains an external host-service gate.
