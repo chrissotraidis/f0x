@@ -40,6 +40,11 @@
   latency on a physical output device. A subsequent normal-CoreAudio launch
   stalled inside Apple audio-device creation before F0X booted; this is an
   external host-service boundary, not a synthesis failure.
+- **MAC-RACE-CONTROL-01 — player-completed race remains unverified:** the
+  deterministic harness reaches and holds a live GP race, and the real SRAM
+  settings path survives relaunch, but no current-build proof yet shows a human
+  controlling a racer through the finish/results flow. Do not promote scripted
+  race entry or file presence into that acceptance claim.
 - **MAC-RACE-TEX-01 — residual null TMEM warnings need follow-up:** raw-ROM
   machine textures now render after filepath emission was gated on actual
   mounted-resource existence, and narrow windows fall back to centered 4:3.

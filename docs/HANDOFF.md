@@ -63,10 +63,17 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   to Home. The sealed archive resolver now uses FirstBootRun's already-resolved
   executable directory, so relative shell launches and Finder launches locate
   `Contents/Resources/gdiffuser.o2r` identically.
+- `scripts/macos-sram-toggle.gdx` uses the game's own Options menu to toggle a
+  persisted setting. The first launch loaded the existing 32 KiB SRAM and
+  changed its SHA-256 from `aaf4cc30...` to `a13e7eb3...`; the second launch
+  explicitly loaded that changed file and the identical toggle restored the
+  exact original hash. Both 18-command routes returned to main menu and exited
+  0 without a mode timeout.
 
 ## Next action
 
 Ask the owner to observe the current packaged build while retaining the direct
 soak regression. Unless flashing recurs, proceed to a player-controlled completed
-race and save/relaunch/load persistence. Keep F0X Home as the single preboot
-surface; extend it only when a concrete recovery or launch behavior is missing.
+race; save/relaunch/load persistence is now independently verified. Keep F0X Home
+as the single preboot surface; extend it only when a concrete recovery or launch
+behavior is missing.

@@ -146,6 +146,27 @@ extraction golden plus all-black internal BMP readback as separate gates.
   sign-off. Owner UX/flashing confirmation, broader accessibility review,
   Developer ID/notarization, and player-completed race/save persistence remain.
 
+## 2026-08-12 — SRAM relaunch round trip
+
+- **Route:** `scripts/macos-sram-toggle.gdx` enters F-Zero X's own Options menu
+  from the cartridge-only main-menu grid, toggles the first persisted setting,
+  exits back to main menu, and quits. This exercises `Save_SaveSettingsProfiles`
+  and the normal host SRAM write-through path rather than a test-only write.
+- **First launch:** the runtime logged `[sram] loaded 32768 bytes from
+  fzerox.sav`, reached `sram_toggle_saved_and_returned`, completed all 18
+  commands, and exited 0. The file remained exactly 32,768 bytes, its mtime
+  advanced, and SHA-256 changed from
+  `aaf4cc308fa7b257a82566ab25fe0981062e1781944381f0158279e99417ba52` to
+  `a13e7eb3e6e2dae75e9bcf1707c0449b8c5dcbb161a69d19d473ef73b732ac2a`.
+- **Second launch/load proof:** the identical route explicitly logged another
+  32,768-byte load, completed all 18 commands, and exited 0. Its second toggle
+  restored the exact original SHA-256 `aaf4cc30...`, proving the first launch's
+  changed bytes were loaded and used rather than merely written to an existing
+  file. Neither run logged a `WAITMODE` timeout.
+- **Boundary:** this closes macOS settings-SRAM save/relaunch/load persistence.
+  It does not substitute for player-controlled race completion or a new race
+  record/ghost save.
+
 ## 2026-08-11 — Gate 3 cartridge PCM synthesis proof
 
 - **Fixes:** the cartridge build (`GDX_EXPANSION_KIT=OFF`) now feeds the active ROM AI buffer into the PCM seam. Its permanent allocator returns its allocation on host ABIs, sequence-font offsets are decoded as big-endian bytes, and soundfont blobs are converted into persistent host-native objects instead of rewriting 32-bit N64 offsets as host pointers.

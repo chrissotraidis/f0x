@@ -1,0 +1,21 @@
+# Save/load regression through F-Zero X's own Options menu. From the default
+# GP Race tile, Down selects the lower-left tile (Course Edit redirects to
+# Practice in cartridge-only builds), then Right selects Options.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 180
+PRESS DOWN 3
+WAIT 30
+PRESS RIGHT 3
+WAIT 30
+PRESS A 3
+WAITMODE 20 3600
+WAIT 180
+PRESS RIGHT 3
+WAIT 120
+PRESS B 3
+WAITMODE 7 3600
+LOG sram_toggle_saved_and_returned
+WAIT 120
+QUIT
