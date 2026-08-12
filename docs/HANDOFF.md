@@ -13,8 +13,10 @@ a live landscape race. A second run temporarily removed the ROM and independentl
 reached the same race from the validated archive alone, then exited cleanly and
 restored the local ROM. Picker presentation and extraction/gameplay are therefore
 separate proofs; a single uninterrupted manual picker-selection-to-race run is
-still open. Physical signing/device execution, controller, audio, lifecycle, and
-touch gameplay also remain open.
+still open. The same graph now also compiles, links, packages, and validates as
+an unsigned arm64 iPhoneOS app. Physical signing/device execution, controller,
+audio, lifecycle, and touch gameplay remain open because this host currently has
+no connected Apple device and no valid code-signing identity.
 
 The first iOS launch originally aborted in `AddFontFromFileTTF`: Xcode had copied
 fonts to a literal variable directory and libultraship conflated Documents with
@@ -149,12 +151,21 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   race. With that ROM temporarily renamed, the next launch explicitly selected
   archive-only mode, skipped extraction, reached the same marker, completed all
   28 commands, and closed normally. The test ROM was restored afterward.
+- A separate `PLATFORM=OS64` tree built the complete F0X/Torch graph against the
+  iPhoneOS 26.5 SDK with a 16.0 deployment target. Xcode validated the resulting
+  unsigned 33 MiB app; its executable is arm64 with platform `IOS`, its plist
+  targets iPhone and iPad in landscape, and its 73-file payload contains the
+  expected engine archive, fonts, recipes, and licenses with no ROM, generated
+  gameplay archive, disk image, or save. No connected Apple device or signing
+  identity exists on this host, so this is device-SDK compile/package evidence,
+  not physical acceptance.
 
 ## Next action
 
-Inspect available Apple device/signing state, then configure the iPhoneOS build
-and move toward physical-iPad controller/lifecycle/audio proof. In parallel with
-that gate sequence, keep two honest product gaps open: one uninterrupted native
-Files-picker selection-to-race interaction, and the owner's continuing macOS
-flashing report. The latter needs a human-visible presentation signal beyond the
-existing black-frame classifier before it can be called fixed.
+The unsigned iPhoneOS build is ready for a machine with an Apple Development
+identity and a connected iPad; on this host, physical installation is externally
+blocked. Continue locally with the two honest product gaps that do not require
+that hardware: one uninterrupted native Files-picker selection-to-race
+interaction, and the owner's continuing macOS flashing report. The latter needs
+a human-visible presentation signal beyond the existing black-frame classifier
+before it can be called fixed.

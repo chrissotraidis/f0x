@@ -375,3 +375,29 @@ extraction golden plus all-black internal BMP readback as separate gates.
   one uninterrupted manual picker-selection-to-race proof. It also is not touch,
   lifecycle, audible-output, signing, or physical-iPad evidence. The owner's
   separate macOS flashing report remains open.
+
+## 2026-08-12 — unsigned iPhoneOS compile and package audit
+
+- **Device configuration:** a separate Xcode tree used the pinned iOS toolchain
+  with `PLATFORM=OS64`, arm64, iOS 16.0 deployment, cartridge-only mode, and
+  in-process Torch. It reused the already-fetched dependency sources without
+  modifying the proven Simulator build.
+- **Build result:** `xcodebuild` completed with `CODE_SIGNING_ALLOWED=NO` and
+  `** BUILD SUCCEEDED **`. The first packaging attempt exposed that the selected
+  host Python lacked PyYAML; reconfiguration selected the existing ignored
+  `build/python-build-tools` interpreter with PyYAML 6.0.3. The incremental retry
+  generated the recipe tables, linked F0X, generated its dSYM, and passed Xcode's
+  shallow bundle validation.
+- **Binary and plist:** `F0X.app/F0X` is a 64-bit arm64 Mach-O whose
+  `LC_BUILD_VERSION` is platform `IOS`, minimum 16.0, SDK 26.5. `Info.plist`
+  passed `plutil`, identifies `com.chrissotraidis.f0x`, supports device families
+  1 and 2, requires arm64, and declares only landscape orientations.
+- **Payload audit:** the unsigned app is 33 MiB with 73 files. It contains the
+  engine-only `gdiffuser.o2r`, two fonts and their licenses, US-rev0 extraction
+  recipes, controller mappings, notices, and the F0X executable. A targeted scan
+  found no `.z64`, `.n64`, `.v64`, `.ndd`, `.sav`, or generated `fzerox.o2r`.
+- **Physical boundary:** `devicectl` reported no connected devices and the
+  keychain reported zero valid code-signing identities. The app is intentionally
+  unsigned. This is device-SDK compile/package evidence only; signing,
+  installation, launch, controller gameplay, lifecycle, audible output, and
+  physical iPad acceptance remain untested.

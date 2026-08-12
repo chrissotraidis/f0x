@@ -1,0 +1,38 @@
+F0X unsigned iPhoneOS build evidence — 2026-08-12
+
+Configuration
+
+- Xcode 26.6, iPhoneOS SDK 26.5
+- PLATFORM=OS64, arm64, deployment target 16.0
+- GDX_EXPANSION_KIT=OFF
+- GDX_INPROCESS_TORCH=ON
+- CODE_SIGNING_ALLOWED=NO
+
+Build
+
+gen_dump_tables_data: wrote .../F0X.app/decomp-recipes/audio_tables_data.json
+gen_dump_tables_data: wrote .../F0X.app/decomp-recipes/ek_tlut_map.json
+Validate .../Debug-iphoneos/F0X.app
+** BUILD SUCCEEDED **
+
+Artifact audit
+
+- file: Mach-O 64-bit executable arm64
+- LC_BUILD_VERSION: platform IOS, minos 16.0, sdk 26.5
+- bundle ID: com.chrissotraidis.f0x
+- supported platforms: iPhoneOS
+- device families: iPhone and iPad
+- orientations: landscape left and landscape right
+- app size: 33 MiB
+- files: 73
+- code signing: code object is not signed at all
+- ROM-derived content scan: none
+
+Environment boundary
+
+- devicectl: No devices found.
+- security find-identity -p codesigning: 0 valid identities found.
+
+This evidence proves an unsigned device-SDK compile and package only. It does
+not prove signing, installation, launch, physical-device gameplay, controller,
+lifecycle, or audible output.
