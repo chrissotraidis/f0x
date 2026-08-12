@@ -28,13 +28,15 @@
   available yet to judge whether those missing texture addresses have visible
   impact.
 
-## Baseline risks requiring proof
+## Remaining platform risks
 
-- Apple ARM64 correctness of the current `ucontext` fiber backend is unknown.
+- The current `ucontext` fiber backend passed 30,000 deterministic switches on
+  Apple Silicon macOS, but the equivalent proof remains required on physical
+  ARM64 iPad hardware.
 - The linker reduced one oversized common-data alignment from 0x8000 to 0x4000; this is a warning until runtime pointer/address validation proves otherwise.
-- Current G-Diffuser public documentation and platform matrix are Windows/Linux
-  only; Apple link and runtime assumptions must be tested against `719fd82`.
+- Upstream G-Diffuser public documentation and its platform matrix remain
+  Windows/Linux-oriented; F0X's Apple behavior is carried by the maintained
+  patch series and must remain regression-tested against pin `719fd82`.
 - Current mobile extraction cannot retain the desktop child-process model.
-- The local development ROM is `.v64`; the pinned runtime's documented direct
-  input is `.z64`, so conversion/validation behavior needs a safe, explicit
-  implementation rather than an assumption.
+- The packaged cartridge build has validated and booted an authorized local US
+  rev0 `.z64`; byte-swapped `.v64` import is not yet a product-supported claim.

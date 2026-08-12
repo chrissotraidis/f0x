@@ -21,7 +21,7 @@
 - **Result:** passed. `build/macos-baseline-clean/port/G-Diffuser` is a Mach-O 64-bit arm64 executable; Metal, QuartzCore, CoreAudio, and AudioToolbox are linked.
 - **Smallest fixes, all source-proven:** Darwin private-libc header compatibility; `_XOPEN_SOURCE=700` for the existing ucontext backend; Darwin relative `nanosleep` implementation of the existing absolute pacer; Linux-only ELF RPATH/version script; cartridge-only stubs for dormant Expansion Kit references.
 - **Build-only Python environment:** ignored `build/python-build-tools` with PyYAML and Pillow; no host Python was modified.
-- **Not established:** process launch, Metal initialization, fiber switching, ROM loading, title screen, gameplay, input, audio, or persistence.
+- **Boundary at this historical checkpoint:** process launch, Metal initialization, fiber switching, ROM loading, title screen, gameplay, input, audio, and persistence had not yet been tested; later dated entries below supersede several of those unknowns.
 
 ## 2026-08-11 — Gate 2 Apple ARM64 fiber proof
 
@@ -42,14 +42,16 @@
 - **GP race route:** the corrected `race_exact.gdx` script crossed `GAMEMODE_MAIN_MENU` (7), `GAMEMODE_COURSE_SELECT` (10), `GAMEMODE_MACHINE_SELECT` (8), and `GAMEMODE_MACHINE_SETTINGS` (9) without a `WAITMODE` timeout, then emitted `reached_gp_race` and reached `GAMEMODE_GP_RACE` (1). The native run loaded HUD and machine-global segments, initialized course/racer/camera/effects, and repeatedly converted 148–152 display lists with roughly 3,350–3,840 output commands for venue 0 before the scripted clean exit. This establishes internal macOS race execution, not a visually verified race.
 - **Archive boundary:** the child Torch extractor consistently produced SHA-256 `7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a`, not the configured golden `1b95e89586efb9d3df87e6334586d3c072aff0dba534ed1612354bfc7fa2654a`; it was correctly discarded and the runtime used raw-ROM fallback.
 - **Fixes already evidenced during this loop:** macOS memory-region discovery now uses Mach VM queries (rather than Linux `/proc/self/maps`), preventing all display-list roots from being rejected; the Metal frame-uniform allocation and Prism template syntax no longer cause the earlier startup crashes.
-- **Not established:** visible title/menu, playable race, audible speakers, saves, controller hardware, performance, or physical-device behavior.
+- **Boundary at this historical checkpoint:** a visible title had not yet been captured in this particular run; later entries establish a stable packaged-app title. A visible/playable race, audible speakers, save round-trip, controller hardware, performance, and physical-device behavior remain open.
 
-## Next experiment
+## Current next experiment
 
-Capture the active game window directly during the now-reproducible GP race;
-desktop-wide captures are currently obscured by unrelated system UI. Keep the
-all-black BMP readback issue separate from the renderer gate, then verify it
-independently before relying on it for transition evidence.
+Run the deterministic GP input route inside the signed, packaged `F0X.app` and
+capture the app window during the race interval. The bundle is now directly
+enumerable by the macOS UI service and its drawable ordering is fixed, removing
+the two limitations that invalidated the earlier direct-window attempt. Keep
+the all-black internal BMP readback issue separate from this direct visual
+proof.
 
 ## 2026-08-12 — Gate 4 macOS F0X application-bundle foundation
 
