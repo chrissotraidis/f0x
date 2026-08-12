@@ -51,6 +51,15 @@ desktop-wide captures are currently obscured by unrelated system UI. Keep the
 all-black BMP readback issue separate from the renderer gate, then verify it
 independently before relying on it for transition evidence.
 
+## 2026-08-12 — Gate 4 macOS F0X application-bundle foundation
+
+- **Build:** `cmake -S ref/G-Diffuser -B build/macos-f0x-bundle -G Ninja -DCMAKE_BUILD_TYPE=Debug -DGDX_EXPANSION_KIT=OFF -DGDX_MACOS_BUNDLE=ON -DPython3_EXECUTABLE=build/python-build-tools/bin/python && cmake --build build/macos-f0x-bundle --target G-Diffuser --parallel 2` completed successfully.
+- **Bundle identity:** `build/macos-f0x-bundle/port/F0X.app/Contents/MacOS/F0X` is a Mach-O 64-bit arm64 executable. Its Info.plist declares `CFBundleIdentifier=com.chrissotraidis.f0x`, executable and bundle name `F0X`, version `0.1.0`, and macOS minimum version 13.0. The engine archive, extraction helper, controller database, notices, and recipe files are packaged beside the executable; immutable fonts are in `Contents/Resources`.
+- **Writable-data proof:** launching that `.app` reached `InitWindow` and recorded `[firstboot] data directory: /Users/chrissotraidis/Library/Application Support/F0X (working directory set)`. It created `gdiffuser.cfg.json`, `gdiffuser-run.log`, and `logs/G-Diffuser.log` there, while reading the bundled engine archive from `F0X.app/Contents/MacOS/gdiffuser.o2r`.
+- **Crash report and fix:** the first bundle launch produced a native ARM64 crash report showing `ImFontAtlas::AddFontFromFileTTF` aborting from `gdx_gui.cpp`: the data/bundle split made the GUI search `Application Support` for immutable fonts. The source now resolves fonts through `LocateFileAcrossAppDirs` and bundled builds install them in `F0X.app/Contents/Resources/fonts`, where macOS `NSBundle` exposes resources. A rebuild verified the packaged font bytes match their source counterpart.
+- **First-launch UI proof:** the rebuilt F0X app was launched through the local app service and exposed an accessible `G-Diffuser (Metal)` window owned by F0X. Direct screen inspection showed `G-Diffuser - First-Time Setup`, the three expected F-Zero X ROM / Expansion Kit disk / 64DD IPL rows, all marked Missing at paths under `~/Library/Application Support/F0X`, and the explicit statement that nothing is uploaded. The test window was then closed cleanly.
+- **Boundary:** this remains a Debug application foundation, not a distributable, signed macOS product. No authorized game media was dropped into the setup flow, so completed import/extraction, save round trip, and playable bundled gameplay are still unproven.
+
 ## 2026-08-11 — Gate 3 cartridge PCM synthesis proof
 
 - **Fixes:** the cartridge build (`GDX_EXPANSION_KIT=OFF`) now feeds the active ROM AI buffer into the PCM seam. Its permanent allocator returns its allocation on host ABIs, sequence-font offsets are decoded as big-endian bytes, and soundfont blobs are converted into persistent host-native objects instead of rewriting 32-bit N64 offsets as host pointers.

@@ -11,10 +11,22 @@ diff --git a/libultraship b/libultraship
 -Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71
 +Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71-dirty
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..b87f0c6 100644
+index cab4365..f7df8c2 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
-@@ -181,6 +181,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
+@@ -48,6 +48,11 @@ list(FILTER GAME_SOURCES EXCLUDE REGEX "/libultra/os/getmemsize\\.c$")
+ # EK modes are runtime-gated by disk-image presence (port/n64_leo.c).
+ option(GDX_EXPANSION_KIT "Compile Expansion Kit (64DD) support into the port" ON)
+ 
++# Opt-in while the port remains developer-layout friendly. CMake places packaged
++# resources in Contents/MacOS; bundled F0X builds keep mutable game data in
++# Application Support rather than attempting to write inside the app bundle.
++option(GDX_MACOS_BUNDLE "Build G-Diffuser as the F0X macOS app bundle" OFF)
++
+ # GDX_DEV_TOOLS — master switch for the behaviour-altering (Bucket B) developer gates
+ # (port/gdx_dev_gates.h, docs/menu/DEVELOPER_TAB.md). When absent, every Bucket B gate is a
+ # hard-wired 0 (no getenv, no CVar read) and the Dev Tools page omits the section — safe because
+@@ -181,6 +186,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
      ASSET_REVISION=rev0
  )
  
@@ -28,7 +40,48 @@ index cab4365..b87f0c6 100644
  # MSVC: silence IDO-era decomp noise, but keep fatal the classes that are UB on x64 and have
  # caused real crashes: C4715/C4716 (non-void falls off the end — MIPS left the value in $v0,
  # MSVC returns garbage) and C4013 (implicit decl truncates a 64-bit pointer return to EAX;
-@@ -467,6 +474,9 @@ else()
+@@ -296,6 +308,18 @@ if(GDX_EXPANSION_KIT)
+     target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
+ endif()
+ 
++if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND GDX_MACOS_BUNDLE)
++    set_target_properties(G-Diffuser PROPERTIES
++        MACOSX_BUNDLE TRUE
++        OUTPUT_NAME "F0X"
++        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/F0X-Info.plist.in"
++        MACOSX_BUNDLE_BUNDLE_NAME "F0X"
++        MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x"
++        MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0"
++        MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0")
++    target_compile_definitions(G-Diffuser PRIVATE GDX_MACOS_BUNDLE=1)
++endif()
++
+ target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
+ 
+ if(WIN32)
+@@ -343,14 +367,19 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+ # Fonts stay loose beside the exe so GdxFast3dGui can add them to ImGui's atlas before the
+ # renderer uploads it.
+ set(GDIFFUSER_GUI_FONT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
++if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND GDX_MACOS_BUNDLE)
++    set(GDIFFUSER_GUI_FONT_DEST "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Resources/fonts")
++else()
++    set(GDIFFUSER_GUI_FONT_DEST "$<TARGET_FILE_DIR:G-Diffuser>/fonts")
++endif()
+ add_custom_command(TARGET G-Diffuser POST_BUILD
+-    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:G-Diffuser>/fonts"
++    COMMAND "${CMAKE_COMMAND}" -E make_directory "${GDIFFUSER_GUI_FONT_DEST}"
+     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+             "${GDIFFUSER_GUI_FONT_DIR}/Montserrat-Regular.ttf"
+             "${GDIFFUSER_GUI_FONT_DIR}/Inconsolata-Regular.ttf"
+             "${GDIFFUSER_GUI_FONT_DIR}/Montserrat-OFL.txt"
+             "${GDIFFUSER_GUI_FONT_DIR}/Inconsolata-OFL.txt"
+-            "$<TARGET_FILE_DIR:G-Diffuser>/fonts"
++            "${GDIFFUSER_GUI_FONT_DEST}"
+     VERBATIM)
+ 
+ # SDL only knows the pads that existed when it was released, and the one we bundle is pinned.
+@@ -467,6 +496,9 @@ else()
      # (needed on older glibc, harmless on newer).
      find_package(Threads REQUIRED)
      target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -38,7 +91,7 @@ index cab4365..b87f0c6 100644
      # Release tarballs carry the dependencies no distribution can be relied on to provide in
      # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
      # which beats a wrapper script because the binary stays directly runnable. No effect on a
-@@ -483,6 +493,8 @@ endif()
+@@ -483,6 +515,8 @@ endif()
  # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
  if(NOT MSVC)
      target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
@@ -47,7 +100,7 @@ index cab4365..b87f0c6 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +548,17 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +570,17 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -65,7 +118,7 @@ index cab4365..b87f0c6 100644
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -764,6 +787,8 @@ if(GDX_BUILD_JP)
+@@ -764,6 +809,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -112,10 +165,48 @@ index 9f35a8b..d528885 100644
  #else
      return (unsigned long) (uintptr_t) pthread_self();
 diff --git a/port/gdx_firstboot.cpp b/port/gdx_firstboot.cpp
-index 90116a9..98d7c6e 100644
+index 90116a9..b8e79b5 100644
 --- a/port/gdx_firstboot.cpp
 +++ b/port/gdx_firstboot.cpp
-@@ -774,6 +774,21 @@ FirstBootResult FirstBootRun(const char* argv0) {
+@@ -161,8 +161,19 @@ fs::path executableDir(const char* argv0) {
+     return fs::current_path(ec);
+ }
+ 
+-// G-Diffuser is always portable: the game folder is the data directory on every platform, and
+-// AppData/XDG are never touched.
++// Development and standalone builds stay portable: their game directory is the data directory.
++// A macOS app bundle is immutable at runtime, so its mutable config, saves, imported media, and
++// extracted archives belong to the user's Application Support directory instead.
++fs::path dataDirectoryForInstall(const fs::path& exeDir) {
++#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
++    const char* home = std::getenv("HOME");
++    if (home != nullptr && home[0] != '\0') {
++        return fs::path(home) / "Library" / "Application Support" / "F0X";
++    }
++    gdx_port_logf("[firstboot] WARNING: HOME is unavailable; using bundle executable directory for data\n");
++#endif
++    return exeDir;
++}
+ 
+ bool fileExists(const fs::path& p) {
+     std::error_code ec;
+@@ -745,11 +756,10 @@ FirstBootResult FirstBootRun(const char* argv0) {
+         }
+     }
+ 
+-    // ── Wizard mode: always portable ─────────────────────────────────────────────────────────────
+-    // The port never writes to a per-user directory (AppData / XDG data). Everything it creates — the
+-    // extracted fzerox.o2r, saves/, ghosts/, config, requested diagnostics — lives beside the
+-    // executable, so the whole installation is one folder that moves, backs up, or deletes as a unit.
+-    fs::path dataDir = exeDir;
++    // ── Wizard mode ──────────────────────────────────────────────────────────────────────────────
++    // Portable/development builds retain their self-contained layout. A macOS .app cannot safely
++    // mutate Contents/MacOS, so its writable data uses Application Support/F0X.
++    fs::path dataDir = dataDirectoryForInstall(exeDir);
+     fs::create_directories(dataDir, ec);
+     ec.clear();
+     result.dataDir = dataDir.string();
+@@ -774,6 +784,21 @@ FirstBootResult FirstBootRun(const char* argv0) {
      // the managed media/ copy (disk only), else the original file. Demanding the original ROM and IPL
      // here would drag the wizard back on a fully-installed setup whose originals were deleted.
      fs::path romInData = dataDir / kRomName;
@@ -137,6 +228,21 @@ index 90116a9..98d7c6e 100644
      fs::path diskInData = dataDir / kDiskName;
      if (st.complete) {
          std::string why;
+diff --git a/port/gdx_firstboot.h b/port/gdx_firstboot.h
+index 34478c6..7e89f73 100644
+--- a/port/gdx_firstboot.h
++++ b/port/gdx_firstboot.h
+@@ -2,8 +2,8 @@
+ //
+ // Runs once at the very top of main(), before any libultraship path resolution, so that:
+ //   * a true development tree with assets/extracted/generic.o2r may boot headlessly with its ROM;
+-//   * every portable install uses the executable directory for data and runs the in-window setup on
+-//     its first launch, even when the user already placed all three canonical inputs beside the game.
++//   * portable installs use the executable directory, while the F0X macOS app bundle uses
++//     ~/Library/Application Support/F0X for writable data and runs the in-window setup on first launch.
+ //
+ // Known limits: generic.o2r generation and Windows save-path redirection are NOT handled here.
+ #pragma once
 diff --git a/port/gdx_frame_pacer.c b/port/gdx_frame_pacer.c
 index d80931c..849e312 100644
 --- a/port/gdx_frame_pacer.c
@@ -173,6 +279,29 @@ index d80931c..849e312 100644
  }
  
  void gdx_frame_pacer_tick(void) {
+diff --git a/port/gdx_gui.cpp b/port/gdx_gui.cpp
+index b4af69a..ad90c32 100644
+--- a/port/gdx_gui.cpp
++++ b/port/gdx_gui.cpp
+@@ -42,10 +42,14 @@ void GdxFast3dGui::ImGuiWMInit() {
+     // its first font-atlas upload.
+     Fast::Fast3dGui::ImGuiWMInit();
+ 
+-    const std::string fontRoot = Ship::Context::GetPathRelativeToAppDirectory("fonts/");
+-    sFontStandard = LoadFontWithIcons(fontRoot + "Montserrat-Regular.ttf", 18.0f);
+-    sFontLarge = LoadFontWithIcons(fontRoot + "Montserrat-Regular.ttf", 22.0f);
+-    sFontMono = LoadFontWithIcons(fontRoot + "Inconsolata-Regular.ttf", 17.0f);
++    // Fonts are immutable application resources. LocateFileAcrossAppDirs checks writable data,
++    // then the macOS bundle resource directory, then the developer working directory.
++    sFontStandard = LoadFontWithIcons(
++        Ship::Context::LocateFileAcrossAppDirs("fonts/Montserrat-Regular.ttf"), 18.0f);
++    sFontLarge = LoadFontWithIcons(
++        Ship::Context::LocateFileAcrossAppDirs("fonts/Montserrat-Regular.ttf"), 22.0f);
++    sFontMono = LoadFontWithIcons(
++        Ship::Context::LocateFileAcrossAppDirs("fonts/Inconsolata-Regular.ttf"), 17.0f);
+ 
+     // Missing loose assets must never block boot. ImGui's default font already includes Font
+     // Awesome through libultraship, so it is a complete fallback.
 diff --git a/port/gen/LinkStubs.c b/port/gen/LinkStubs.c
 index ccb0585..eb611a7 100644
 --- a/port/gen/LinkStubs.c
@@ -365,3 +494,36 @@ index c4598d5..6c99936 100644
  #endif
  
  // libc: BSD byte-compare not in the MSVC CRT. glibc provides both natively (with size_t
+diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
+new file mode 100644
+index 0000000..5c0fee8
+--- /dev/null
++++ b/port/F0X-Info.plist.in
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++    <key>CFBundleDevelopmentRegion</key>
++    <string>en</string>
++    <key>CFBundleExecutable</key>
++    <string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
++    <key>CFBundleIdentifier</key>
++    <string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
++    <key>CFBundleInfoDictionaryVersion</key>
++    <string>6.0</string>
++    <key>CFBundleName</key>
++    <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
++    <key>CFBundlePackageType</key>
++    <string>APPL</string>
++    <key>CFBundleShortVersionString</key>
++    <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
++    <key>CFBundleVersion</key>
++    <string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
++    <key>LSMinimumSystemVersion</key>
++    <string>13.0</string>
++    <key>NSHighResolutionCapable</key>
++    <true/>
++</dict>
++</plist>
+

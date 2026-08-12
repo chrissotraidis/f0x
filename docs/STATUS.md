@@ -1,6 +1,6 @@
 # F0X status
 
-Last audited: 2026-08-11
+Last audited: 2026-08-12
 
 This ledger deliberately distinguishes source inspection, compilation, and
 runtime evidence. No Apple gameplay claim is made without a dated test entry.
@@ -11,7 +11,7 @@ runtime evidence. No Apple gameplay claim is made without a dated test entry.
 | 1: macOS ARM64 compile/link | Compiled | Cartridge-only Debug build linked as arm64 Mach-O on 2026-08-11. |
 | 2: fiber proof | macOS verified | `gdx_fiber_smoketest` passed 30,000 deterministic Apple Silicon switches across three stacks on 2026-08-11. |
 | 3: complete macOS Metal race | Partially working | Native Metal process visibly renders the F-Zero X title screen and, with a test-only local archive, deterministically traverses title, menu, course selection, machine selection, machine settings, and GP race mode before a clean exit. Framebuffer BMP readbacks are black despite the visible title. Cartridge synthesis and the dedicated producer now generate nonzero PCM in a bounded SDL dummy-device run; audible output remains unverified. |
-| 4: macOS application | Not started | No F0X bundle/import shell exists. |
+| 4: macOS application | In progress | Opt-in `F0X.app` Debug bundle builds as an arm64 Mach-O with F0X identity, keeps mutable state in `~/Library/Application Support/F0X`, and has a directly observed first-launch Metal setup window. Import completion, saves, signing, and distribution remain unproven. |
 | 5: iOS/iPadOS build | Not started | No F0X iOS target exists. |
 | 6: physical iPad engine proof | Not tested | No signed device run exists. |
 | 7–8: product import / in-process Torch | Not started | Desktop extractor remains child-process based; current child-process extraction is rejected by its SHA-256 golden gate and falls back to the raw ROM. |
