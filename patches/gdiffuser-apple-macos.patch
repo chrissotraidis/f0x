@@ -1,15 +1,24 @@
-diff --git a/decomp b/decomp
---- a/decomp
-+++ b/decomp
-@@ -1 +1 @@
--Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809
-+Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809-dirty
-diff --git a/libultraship b/libultraship
---- a/libultraship
-+++ b/libultraship
-@@ -1 +1 @@
--Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71
-+Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71-dirty
+diff --git a/port/AssetLoader.cpp b/port/AssetLoader.cpp
+index 789b053..a0cc2a8 100644
+--- a/port/AssetLoader.cpp
++++ b/port/AssetLoader.cpp
+@@ -38,6 +38,16 @@ extern "C" void* GDiffuser_LoadAsset(const char* key) {
+     return rm->GetResourceRawPointer(key);
+ }
+ 
++extern "C" int GDiffuser_AssetExists(const char* key) {
++    if ((key == nullptr) || (key[0] == '\0')) {
++        return 0;
++    }
++    auto ctx = Ship::Context::GetInstance();
++    auto rm = (ctx != nullptr) ? ctx->GetResourceManager() : nullptr;
++    auto am = (rm != nullptr) ? rm->GetArchiveManager() : nullptr;
++    return (am != nullptr) && am->HasFile(key);
++}
++
+ extern "C" int GDiffuser_LoadAssetBytes(const char* key, void* out, size_t outSize, size_t* copiedSize) {
+     if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
+         return 0;
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
 index cab4365..aa0babc 100644
 --- a/port/CMakeLists.txt
@@ -17,18 +26,18 @@ index cab4365..aa0babc 100644
 @@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
      project(gdiffuser_port LANGUAGES C CXX)
  endif()
-
+ 
 +if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 +    enable_language(OBJCXX)
 +endif()
 +
  set(DECOMP "${CMAKE_CURRENT_SOURCE_DIR}/../decomp")
  find_package(Python3 COMPONENTS Interpreter REQUIRED)
-
+ 
 @@ -48,6 +52,11 @@ list(FILTER GAME_SOURCES EXCLUDE REGEX "/libultra/os/getmemsize\\.c$")
  # EK modes are runtime-gated by disk-image presence (port/n64_leo.c).
  option(GDX_EXPANSION_KIT "Compile Expansion Kit (64DD) support into the port" ON)
-
+ 
 +# Opt-in while the port remains developer-layout friendly. CMake places packaged
 +# resources in Contents/MacOS; bundled F0X builds keep mutable game data in
 +# Application Support rather than attempting to write inside the app bundle.
@@ -40,7 +49,7 @@ index cab4365..aa0babc 100644
 @@ -181,6 +190,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
      ASSET_REVISION=rev0
  )
-
+ 
 +# macOS keeps the deprecated-but-present ucontext API behind this opt-in. The
 +# existing POSIX fiber backend is exercised unchanged; runtime proof remains a
 +# separate gate.
@@ -54,7 +63,7 @@ index cab4365..aa0babc 100644
 @@ -296,6 +312,42 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
-
+ 
 +if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND GDX_MACOS_BUNDLE)
 +    # Make the bundle metadata an explicit staged artifact.  CMake's implicit plist placement
 +    # follows the target's original name when OUTPUT_NAME changes, which can leave a clean F0X.app
@@ -92,7 +101,7 @@ index cab4365..aa0babc 100644
 +endif()
 +
  target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
-
+ 
  if(WIN32)
 @@ -337,30 +389,36 @@ add_custom_command(
  add_custom_target(gdiffuser_engine_o2r DEPENDS "${GDIFFUSER_ENGINE_O2R}")
@@ -102,7 +111,7 @@ index cab4365..aa0babc 100644
 +    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${GDIFFUSER_ENGINE_O2R}"
 +            "${GDIFFUSER_PACKAGE_DATA_DIR}/gdiffuser.o2r"
      VERBATIM)
-
+ 
  # Fonts stay loose beside the exe so GdxFast3dGui can add them to ImGui's atlas before the
  # renderer uploads it.
  set(GDIFFUSER_GUI_FONT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
@@ -122,7 +131,7 @@ index cab4365..aa0babc 100644
 -            "$<TARGET_FILE_DIR:G-Diffuser>/fonts"
 +            "${GDIFFUSER_GUI_FONT_DEST}"
      VERBATIM)
-
+ 
  # SDL only knows the pads that existed when it was released, and the one we bundle is pinned.
  # The community database is updated continuously and SDL_GameControllerAddMappingsFromFile layers
 -# it on top, so a pad newer than the bundled SDL still works. It has to sit beside the exe under
@@ -135,7 +144,7 @@ index cab4365..aa0babc 100644
 -            "$<TARGET_FILE_DIR:G-Diffuser>/gamecontrollerdb.txt"
 +            "${GDIFFUSER_PACKAGE_DATA_DIR}/gamecontrollerdb.txt"
      VERBATIM)
-
+ 
  # Keep the project license and every bundled/static dependency notice with binary releases.
 @@ -369,10 +427,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -148,11 +157,11 @@ index cab4365..aa0babc 100644
 -            "$<TARGET_FILE_DIR:G-Diffuser>/LICENSES"
 +            "${GDIFFUSER_PACKAGE_DATA_DIR}/LICENSES"
      VERBATIM)
-
+ 
  # gdx-extract, the standalone deterministic O2R extractor first boot spawns as a child process.
 @@ -412,9 +470,10 @@ add_custom_target(gdx-extract DEPENDS gdx_extract_ext)
  add_dependencies(G-Diffuser gdx_extract_ext)
-
+ 
  add_custom_command(TARGET G-Diffuser POST_BUILD
 +    COMMAND "${CMAKE_COMMAND}" -E make_directory "${GDIFFUSER_PACKAGE_HELPER_DIR}"
      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -160,7 +169,7 @@ index cab4365..aa0babc 100644
 -            "$<TARGET_FILE_DIR:G-Diffuser>/gdx-extract${CMAKE_EXECUTABLE_SUFFIX}"
 +            "${GDIFFUSER_PACKAGE_HELPER_DIR}/gdx-extract${CMAKE_EXECUTABLE_SUFFIX}"
      VERBATIM)
-
+ 
  # Deploy the recipe tree as decomp-recipes/ next to the exe. The packaged layout mirrors the
 @@ -422,7 +481,7 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
  # Only us/rev0 ships; other revisions' config keys are never dereferenced because recipe
@@ -174,7 +183,7 @@ index cab4365..aa0babc 100644
 @@ -449,6 +508,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
              --ek-yaml-dir "${CMAKE_SOURCE_DIR}/fzerox-expansion-kit/assets/yaml/jp"
      VERBATIM)
-
+ 
 +# CMake signs a macOS bundle during link.  The post-build steps above then add the
 +# engine, extractor, recipes, fonts, and notices, which invalidates that seal and
 +# makes Finder report the app as damaged.  Re-sign only after its complete local
@@ -219,7 +228,7 @@ index cab4365..aa0babc 100644
 @@ -536,6 +619,17 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
-
+ 
 +add_executable(gdx_fiber_smoketest tests/fiber_smoketest.c)
 +target_include_directories(gdx_fiber_smoketest PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 +if(WIN32)
@@ -243,6 +252,38 @@ index cab4365..aa0babc 100644
          target_link_options(G-Diffuser-JP PRIVATE
              "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/gdx_hide_libm.map")
      endif()
+diff --git a/port/decomp_port.c b/port/decomp_port.c
+index dc07873..f7e2c0e 100644
+--- a/port/decomp_port.c
++++ b/port/decomp_port.c
+@@ -636,7 +636,15 @@ uintptr_t Segment_SetPhysicalAddress(s32 segment, uintptr_t addr) {
+     if ((unsigned)segment >= 16u) {
+         return addr;
+     }
+-    void* resolved = Gdx_ResolvePortAddress(addr);
++    /* These two setters receive N64 physical segment bases. A valid RDRAM
++       offset can have the same low 32 bits as a symbol in the PIE executable;
++       the general resolver intentionally supports those symbol tokens, but a
++       segment physical base below the RDRAM size is unambiguous here. Resolving
++       the executable first made segment 4 point into read-only __TEXT and the
++       race HUD portrait DMA crashed in memcpy. */
++    void* resolved = (gdx_rdram != NULL && addr <= 0xFFFFFFFFULL && (u32)addr < GDX_RDRAM_SIZE)
++                         ? gdx_rdram + (u32)addr
++                         : Gdx_ResolvePortAddress(addr);
+     gSegments[segment] = (unsigned long long)resolved;
+     gdx_seg_log("SetPhys", segment, addr, resolved);
+     return addr;
+@@ -648,7 +656,9 @@ uintptr_t Segment_SetAddress(s32 segment, uintptr_t addr) {
+     if ((unsigned)segment >= 16u) {
+         return addr;
+     }
+-    resolved = Gdx_ResolvePortAddress(addr);
++    resolved = (gdx_rdram != NULL && addr <= 0xFFFFFFFFULL && (u32)addr < GDX_RDRAM_SIZE)
++                   ? gdx_rdram + (u32)addr
++                   : Gdx_ResolvePortAddress(addr);
+     gSegments[segment] = (unsigned long long)resolved;
+     gdx_seg_log("SetAddr", segment, addr, resolved);
+     return addr;
 diff --git a/port/gdx_dump_launch.cpp b/port/gdx_dump_launch.cpp
 index 3a04fc0..dd762a9 100644
 --- a/port/gdx_dump_launch.cpp
@@ -250,7 +291,7 @@ index 3a04fc0..dd762a9 100644
 @@ -88,6 +88,23 @@ fs::path exeDir() {
      return fs::current_path(ec);
  }
-
+ 
 +fs::path packagedResourcesDir() {
 +    const fs::path exe = exeDir();
 +#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
@@ -279,7 +320,7 @@ index 3a04fc0..dd762a9 100644
 +    fs::path cand = packagedExtractorPath();
      return isRegularFile(cand) ? cand.string() : std::string();
  }
-
+ 
 @@ -649,7 +666,7 @@ DumpEnvironment GdxDumpDiscover() {
          env.diskArchivePath = resolveNextToExe(kDiskArchiveName);
          env.iplArchivePath = resolveNextToExe(kIplArchiveName);
@@ -296,7 +337,7 @@ index 4630c47..df3f0a5 100644
 @@ -169,6 +169,22 @@ constexpr const char* kExtractBinaryName = "gdx-extract.exe";
  constexpr const char* kExtractBinaryName = "gdx-extract";
  #endif
-
+ 
 +fs::path packagedResourcesDir(const fs::path& exeDir) {
 +#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
 +    return exeDir.parent_path() / "Resources";
@@ -319,7 +360,7 @@ index 4630c47..df3f0a5 100644
 @@ -1196,8 +1212,8 @@ ExtractOutcome runExtraction(const fs::path& dataDir, const fs::path& romPath, c
      std::error_code ec;
      const char* archiveName = profile.archiveName; // fzerox.o2r (US) / fzerox-jp.o2r (JP)
-
+ 
 -    const fs::path extractBin = exeDir / kExtractBinaryName;
 -    const fs::path recipesDir = exeDir / kRecipesDirName;
 +    const fs::path extractBin = packagedExtractorPath(exeDir);
@@ -342,7 +383,7 @@ index 9f35a8b..d528885 100644
 +++ b/port/gdx_fiber_ucontext.c
 @@ -22,6 +22,7 @@
  #include "gdx_fiber.h"
-
+ 
  #include <stdlib.h>
 +#include <stdio.h>
  #include <stdint.h>
@@ -358,7 +399,7 @@ index 9f35a8b..d528885 100644
      }
 @@ -110,6 +112,7 @@ GdxFiber* gdx_fiber_create(GdxFiberEntry entry, void* arg, size_t stackSize) {
      }
-
+ 
      if (getcontext(&f->ctx) != 0) {
 +        perror("gdx_fiber getcontext");
          munmap(mem, total);
@@ -366,7 +407,7 @@ index 9f35a8b..d528885 100644
          return NULL;
 @@ -142,7 +145,7 @@ void gdx_fiber_switch(GdxFiber* to) {
  }
-
+ 
  unsigned long gdx_fiber_current_thread_id(void) {
 -#ifdef SYS_gettid
 +#if defined(SYS_gettid) && !defined(__APPLE__)
@@ -374,13 +415,13 @@ index 9f35a8b..d528885 100644
  #else
      return (unsigned long) (uintptr_t) pthread_self();
 diff --git a/port/gdx_firstboot.cpp b/port/gdx_firstboot.cpp
-index 90116a9..473135f 100644
+index 90116a9..1c65e3a 100644
 --- a/port/gdx_firstboot.cpp
 +++ b/port/gdx_firstboot.cpp
 @@ -161,8 +161,19 @@ fs::path executableDir(const char* argv0) {
      return fs::current_path(ec);
  }
-
+ 
 -// G-Diffuser is always portable: the game folder is the data directory on every platform, and
 -// AppData/XDG are never touched.
 +// Development and standalone builds stay portable: their game directory is the data directory.
@@ -396,13 +437,13 @@ index 90116a9..473135f 100644
 +#endif
 +    return exeDir;
 +}
-
+ 
  bool fileExists(const fs::path& p) {
      std::error_code ec;
 @@ -745,11 +756,10 @@ FirstBootResult FirstBootRun(const char* argv0) {
          }
      }
-
+ 
 -    // ── Wizard mode: always portable ─────────────────────────────────────────────────────────────
 -    // The port never writes to a per-user directory (AppData / XDG data). Everything it creates — the
 -    // extracted fzerox.o2r, saves/, ghosts/, config, requested diagnostics — lives beside the
@@ -446,7 +487,7 @@ index 90116a9..473135f 100644
  #else
      return false;
  #endif
-@@ -1163,6 +1190,20 @@ std::string PickIplFile() {
+@@ -1163,6 +1190,24 @@ std::string PickIplFile() {
                            L"64DD IPL ROM (*.n64;*.z64)\0*.n64;*.z64\0All files\0*.*\0");
      return p.string();
  }
@@ -454,6 +495,7 @@ index 90116a9..473135f 100644
 +std::string GdxPickRomFileMacOS();
 +std::string GdxPickDiskFileMacOS();
 +std::string GdxPickIplFileMacOS();
++bool GdxRevealDataDirectoryMacOS(const std::string& path);
 +
 +std::string PickRomFile() {
 +    return GdxPickRomFileMacOS();
@@ -464,11 +506,24 @@ index 90116a9..473135f 100644
 +std::string PickIplFile() {
 +    return GdxPickIplFileMacOS();
 +}
++bool RevealDataDirectory(const std::string& path) {
++    return GdxRevealDataDirectoryMacOS(path);
++}
  #else
  std::string PickRomFile() {
      return {};
+@@ -1173,6 +1218,9 @@ std::string PickDiskFile() {
+ std::string PickIplFile() {
+     return {};
+ }
++bool RevealDataDirectory(const std::string&) {
++    return false;
++}
+ #endif
+ 
+ } // namespace gdx
 diff --git a/port/gdx_firstboot.h b/port/gdx_firstboot.h
-index 34478c6..7e89f73 100644
+index 34478c6..ad4daa9 100644
 --- a/port/gdx_firstboot.h
 +++ b/port/gdx_firstboot.h
 @@ -2,8 +2,8 @@
@@ -482,14 +537,31 @@ index 34478c6..7e89f73 100644
  //
  // Known limits: generic.o2r generation and Windows save-path redirection are NOT handled here.
  #pragma once
+@@ -221,4 +221,8 @@ std::string PickRomFile();
+ std::string PickDiskFile();
+ std::string PickIplFile();
+ 
++// Reveals the application data directory in the platform file browser. Returns
++// false when this build has no native implementation or the request fails.
++bool RevealDataDirectory(const std::string& path);
++
+ } // namespace gdx
 diff --git a/port/gdx_firstboot_gui.cpp b/port/gdx_firstboot_gui.cpp
-index 1ed3da6..7faccb2 100644
+index 1ed3da6..4ab4bed 100644
 --- a/port/gdx_firstboot_gui.cpp
 +++ b/port/gdx_firstboot_gui.cpp
-@@ -41,6 +41,12 @@ namespace {
+@@ -17,6 +17,7 @@
+ #include "port_log.h"
+ 
+ #include "ship/Context.h"
++#include "libultraship/bridge/consolevariablebridge.h"
+ #include "ship/window/Window.h"
+ #include "ship/window/MouseStateManager.h"
+ #include "ship/window/FileDropMgr.h"
+@@ -41,6 +42,12 @@ namespace {
  // literal rather than exported: it is the SoH/Starship game-named-archive convention and is stable.
  constexpr const char* kGameArchiveName = "fzerox.o2r";
-
+ 
 +#ifdef EXPANSION_KIT
 +constexpr int kSetupRowCount = 3;
 +#else
@@ -499,9 +571,14 @@ index 1ed3da6..7faccb2 100644
  enum class Phase {
      Acquire,       // Waiting for the three inputs to be provided + validated.
      Extracting,    // Async extraction is running; showing live progress.
-@@ -80,10 +86,12 @@ class SetupScreen {
-     SetupScreen(std::string dataDir, std::string exeDir)
-         : mDataDir(std::move(dataDir)), mExeDir(std::move(exeDir)) {
+@@ -77,13 +84,15 @@ struct Row {
+ // ── Setup screen state machine ───────────────────────────────────────────────────────────────────
+ class SetupScreen {
+   public:
+-    SetupScreen(std::string dataDir, std::string exeDir)
+-        : mDataDir(std::move(dataDir)), mExeDir(std::move(exeDir)) {
++    SetupScreen(std::string dataDir, std::string exeDir, bool manageExisting)
++        : mDataDir(std::move(dataDir)), mExeDir(std::move(exeDir)), mManageExisting(manageExisting) {
          mRows[0] = { "F-Zero X ROM (US rev0, .z64)", SetupRomFileName(), &ValidateRomFile, &PickRomFile };
 +#ifdef EXPANSION_KIT
          mRows[1] = { "Expansion Kit disk (.ndd)", SetupDiskFileName(), &ValidateDiskFile, &PickDiskFile };
@@ -513,8 +590,8 @@ index 1ed3da6..7faccb2 100644
 +            Recheck(mRows[i]); // pre-check files that already exist beside the exe (resumed setup)
          }
      }
-
-@@ -141,8 +149,9 @@ class SetupScreen {
+ 
+@@ -141,8 +150,9 @@ class SetupScreen {
          }
          std::string src(path);
          std::string why;
@@ -526,7 +603,7 @@ index 1ed3da6..7faccb2 100644
              std::string reason;
              if (r.validate(src, reason)) {
                  if (CopyInputInto(src, mDataDir, r.canonicalName)) {
-@@ -155,7 +164,11 @@ class SetupScreen {
+@@ -155,7 +165,11 @@ class SetupScreen {
                  return;
              }
          }
@@ -537,10 +614,10 @@ index 1ed3da6..7faccb2 100644
 +#endif
          gdx_port_logf("[setup] rejected dropped file (matches no expected input): %s\n", src.c_str());
      }
-
-@@ -305,8 +318,8 @@ class SetupScreen {
+ 
+@@ -305,8 +319,8 @@ class SetupScreen {
      }
-
+ 
      bool AllRowsOk() const {
 -        for (const Row& r : mRows) {
 -            if (r.status != RowStatus::Ok) {
@@ -549,7 +626,7 @@ index 1ed3da6..7faccb2 100644
                  return false;
              }
          }
-@@ -350,6 +363,11 @@ class SetupScreen {
+@@ -350,6 +364,11 @@ class SetupScreen {
          if (!AllRowsOk()) {
              return;
          }
@@ -561,54 +638,80 @@ index 1ed3da6..7faccb2 100644
          // A managed-copy-only re-run (original .ndd deleted after a prior setup made the backup)
          // validated against <dataDir>/media, so RowPath(1) would record a nonexistent canonical path
          // in the sidecar and make EnsureManagedDiskCopy warn about a copy that already exists.
-@@ -376,6 +394,7 @@ class SetupScreen {
+@@ -376,6 +395,7 @@ class SetupScreen {
          }
          gdx_port_logf("[setup] user confirmed all inputs; wrote completion marker; starting extraction\n");
          StartExtraction();
 +#endif
      }
-
+ 
      void MountArchive() {
-@@ -464,7 +483,7 @@ class SetupScreen {
+@@ -464,7 +484,8 @@ class SetupScreen {
          const ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
                                         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                                         ImGuiWindowFlags_NoDocking;
 -        if (!ImGui::Begin("G-Diffuser - First-Time Setup", nullptr, flags)) {
-+        if (!ImGui::Begin("F0X - First-Time Setup", nullptr, flags)) {
++        const char* title = mManageExisting ? "F0X - Game Data" : "F0X - First-Time Setup";
++        if (!ImGui::Begin(title, nullptr, flags)) {
              ImGui::End();
              return;
          }
-@@ -473,13 +492,19 @@ class SetupScreen {
+@@ -473,15 +494,32 @@ class SetupScreen {
          if (large != nullptr) {
              ImGui::PushFont(large);
          }
 -        ImGui::TextUnformatted("Welcome to G-Diffuser");
-+        ImGui::TextUnformatted("Welcome to F0X");
++        ImGui::TextUnformatted(mManageExisting ? "Manage Game Data" : "Welcome to F0X");
          if (large != nullptr) {
              ImGui::PopFont();
          }
+-        ImGui::TextWrapped("Review the three original files below. Files already next to the game are "
+-                           "detected automatically, but nothing is installed until you confirm. Nothing "
+-                           "is uploaded.");
++        if (mManageExisting) {
++            ImGui::TextWrapped("Review, repair, or replace the local game data used by F0X. Nothing is uploaded.");
++        } else {
 +#ifdef EXPANSION_KIT
-         ImGui::TextWrapped("Review the three original files below. Files already next to the game are "
-                            "detected automatically, but nothing is installed until you confirm. Nothing "
-                            "is uploaded.");
++            ImGui::TextWrapped("Review the three original files below. Files already next to the game are "
++                               "detected automatically, but nothing is installed until you confirm. Nothing "
++                               "is uploaded.");
 +#else
-+        ImGui::TextWrapped("Review the original F-Zero X ROM below. Files already next to the game are "
-+                           "detected automatically, but nothing is installed until you confirm. Nothing "
-+                           "is uploaded.");
++            ImGui::TextWrapped("Review the original F-Zero X ROM below. Files already next to the game are "
++                               "detected automatically, but nothing is installed until you confirm. Nothing "
++                               "is uploaded.");
 +#endif
++        }
          ImGui::Separator();
-
+ 
++        // A button release that leaves Home must not activate a same-position
++        // control on this newly-entered screen. Disable only its first frame.
++        const bool blockInput = mInputGuardFrames > 0;
++        if (blockInput) {
++            ImGui::BeginDisabled();
++        }
++
          switch (mPhase) {
-@@ -499,7 +524,7 @@ class SetupScreen {
+             case Phase::Acquire:
+             case Phase::Done:
+@@ -495,11 +533,16 @@ class SetupScreen {
+                 break;
+         }
+ 
++        if (blockInput) {
++            ImGui::EndDisabled();
++            --mInputGuardFrames;
++        }
++
+         ImGui::End();
      }
-
+ 
      void DrawAcquire() {
 -        for (int i = 0; i < 3; ++i) {
 +        for (int i = 0; i < kSetupRowCount; ++i) {
              Row& r = mRows[i];
              ImGui::PushID(i);
              ImGui::SeparatorText(r.label);
-@@ -552,6 +577,7 @@ class SetupScreen {
+@@ -552,6 +595,7 @@ class SetupScreen {
              ImGui::TextColored(ImVec4(0.90f, 0.45f, 0.35f, 1.0f), "%s", mDropError.c_str());
          }
          if (AllRowsOk()) {
@@ -616,7 +719,7 @@ index 1ed3da6..7faccb2 100644
              ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.35f, 1.0f), "All three files are verified.");
              ImGui::TextWrapped("Confirm to build fzerox.o2r from your ROM and continue to the game.");
              // The deletable-files statement names each file, so the reader never has to guess which
-@@ -577,8 +603,21 @@ class SetupScreen {
+@@ -577,8 +621,22 @@ class SetupScreen {
              if (ImGui::Button("Build game data and continue", ImVec2(-1.0f, 0.0f))) {
                  ConfirmAndStartExtraction();
              }
@@ -625,7 +728,8 @@ index 1ed3da6..7faccb2 100644
 +            ImGui::TextWrapped("This cartridge-only build reads your ROM directly. Expansion Kit media and "
 +                               "game-data extraction are unavailable in this build.");
 +            ImGui::Spacing();
-+            if (ImGui::Button("Continue to the game", ImVec2(-1.0f, 0.0f))) {
++            const char* continueLabel = mManageExisting ? "Back to F0X Home" : "Continue to the game";
++            if (ImGui::Button(continueLabel, ImVec2(-1.0f, 0.0f))) {
 +                ConfirmAndStartExtraction();
 +            }
 +#endif
@@ -637,9 +741,9 @@ index 1ed3da6..7faccb2 100644
 +#endif
          }
      }
-
-@@ -673,7 +712,7 @@ class SetupScreen {
-
+ 
+@@ -673,12 +731,14 @@ class SetupScreen {
+ 
      std::string mDataDir;
      std::string mExeDir;
 -    Row mRows[3] = {};
@@ -647,8 +751,148 @@ index 1ed3da6..7faccb2 100644
      Phase mPhase = Phase::Acquire;
      std::string mStage;      // latest extraction stage line
      std::string mError;      // extraction failure reason (surfaced in DrawExtractFailed)
+     std::string mDropError;  // transient "unrecognized drop" message
+     bool mArchiveMounted = false;
++    bool mManageExisting = false;
++    int mInputGuardFrames = 2;
+     std::vector<std::string> mLog; // GUI-owned copy of the extractor stdout ring buffer; see Tick()
+                                     // for why it must survive GdxExtractResetAsync()
+     int mEntriesSeen = 0;          // real per-entry progress counter for the current sub-stage
+@@ -696,12 +756,130 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
+ 
+ } // namespace
+ 
+-bool GdxFirstBootSetupRun(const std::string& dataDir, const std::string& exeDir, std::string& outRomPath) {
+-    SetupScreen screen(dataDir, exeDir);
++bool GdxFirstBootSetupRun(const std::string& dataDir, const std::string& exeDir, std::string& outRomPath,
++                          bool manageExisting) {
++    SetupScreen screen(dataDir, exeDir, manageExisting);
+     gActiveScreen = &screen;
+     bool completed = screen.Run(outRomPath);
+     gActiveScreen = nullptr;
+     return completed;
+ }
+ 
++F0XHomeAction GdxF0XHomeRun(const std::string& dataDir) {
++    auto ctx = Ship::Context::GetInstance();
++    auto w = (ctx != nullptr) ? ctx->GetWindow() : nullptr;
++    if (w == nullptr) {
++        return F0XHomeAction::Quit;
++    }
++
++    F0XHomeAction action = F0XHomeAction::Quit;
++    bool finished = false;
++    int inputGuardFrames = 2;
++    while (w->IsRunning() && !finished) {
++        w->HandleEvents();
++        w->GetMouseStateManager()->StartFrame();
++        w->GetGui()->StartDraw();
++
++        const ImGuiViewport* vp = ImGui::GetMainViewport();
++        ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
++        ImGui::SetNextWindowSize(ImVec2(720.0f, 0.0f), ImGuiCond_Always);
++        const ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
++                                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
++                                       ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar;
++        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(30.0f, 26.0f));
++        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
++        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
++        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
++        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 8.0f));
++        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.035f, 0.045f, 0.065f, 0.98f));
++        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.10f, 0.55f, 0.90f, 0.70f));
++        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.05f, 0.35f, 0.62f, 1.0f));
++        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.08f, 0.48f, 0.82f, 1.0f));
++        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.04f, 0.28f, 0.52f, 1.0f));
++        if (ImGui::Begin("F0X Home", nullptr, flags)) {
++            const bool blockInput = inputGuardFrames > 0;
++            if (blockInput) {
++                ImGui::BeginDisabled();
++            }
++            ImFont* large = GdxGuiFontLarge();
++            if (large != nullptr) {
++                ImGui::PushFont(large);
++            }
++            ImGui::TextUnformatted("F0X");
++            if (large != nullptr) {
++                ImGui::PopFont();
++            }
++            ImGui::TextDisabled("NATIVE F-ZERO X FOR macOS  /  METAL");
++            ImGui::Spacing();
++            ImGui::Separator();
++            ImGui::Spacing();
++
++            ImGui::TextColored(ImVec4(0.35f, 0.88f, 0.48f, 1.0f), "READY TO PLAY");
++            ImGui::TextWrapped("Your verified F-Zero X game data is installed locally. Nothing is uploaded.");
++            ImGui::Spacing();
++            if (ImGui::Button("PLAY F-ZERO X", ImVec2(-1.0f, 52.0f))) {
++                action = F0XHomeAction::Play;
++                finished = true;
++            }
++
++            ImGui::Spacing();
++            ImGui::SeparatorText("Game Data");
++            ImGui::TextDisabled("%s", dataDir.c_str());
++            if (ImGui::Button("Manage Game Data...")) {
++                action = F0XHomeAction::ManageGameData;
++                finished = true;
++            }
++            ImGui::SameLine();
++            if (ImGui::Button("Open Data Folder")) {
++                if (!RevealDataDirectory(dataDir)) {
++                    gdx_port_logf("[home] could not reveal data directory: %s\n", dataDir.c_str());
++                }
++            }
++
++            ImGui::Spacing();
++            ImGui::SeparatorText("Startup Settings");
++            bool vsync = CVarGetInteger("gVsyncEnabled", 1) != 0;
++            if (ImGui::Checkbox("VSync", &vsync)) {
++                CVarSetInteger("gVsyncEnabled", vsync ? 1 : 0);
++                CVarSave();
++            }
++            ImGui::SameLine();
++            bool widescreen = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
++            if (ImGui::Checkbox("Widescreen", &widescreen)) {
++                CVarSetInteger("gEnhancements.Graphics.Widescreen", widescreen ? 1 : 0);
++                CVarSave();
++            }
++            ImGui::SameLine();
++            bool fullscreen = w->IsFullscreen();
++            if (ImGui::Checkbox("Fullscreen", &fullscreen)) {
++                w->SetFullscreen(fullscreen);
++            }
++
++            ImGui::Spacing();
++            ImGui::TextDisabled("More graphics, audio, controls, and accessibility settings are available in-game.");
++            ImGui::TextDisabled("If game data becomes invalid, choose Manage Game Data to repair or replace it.");
++            ImGui::Spacing();
++            ImGui::Separator();
++            ImGui::Spacing();
++            if (ImGui::Button("Quit F0X")) {
++                action = F0XHomeAction::Quit;
++                finished = true;
++            }
++            if (blockInput) {
++                ImGui::EndDisabled();
++                --inputGuardFrames;
++            }
++        }
++        ImGui::End();
++        ImGui::PopStyleColor(5);
++        ImGui::PopStyleVar(5);
++
++        w->StartFrame();
++        w->RunGuiOnly();
++        w->GetGui()->EndDraw();
++        w->EndFrame();
++    }
++    return finished ? action : F0XHomeAction::Quit;
++}
++
+ } // namespace gdx
 diff --git a/port/gdx_firstboot_gui.h b/port/gdx_firstboot_gui.h
-index 7255291..9af4bce 100644
+index 7255291..8c5aeb4 100644
 --- a/port/gdx_firstboot_gui.h
 +++ b/port/gdx_firstboot_gui.h
 @@ -1,9 +1,9 @@
@@ -665,7 +909,7 @@ index 7255291..9af4bce 100644
  //
  // main() invokes it only when FirstBootRun() returns FirstBootStatus::NeedsSetup, AFTER the window /
  // Gui / FileDropMgr exist and BEFORE the game boots — between InitFileDropMgr and
-@@ -21,10 +21,10 @@ namespace gdx {
+@@ -21,10 +21,22 @@ namespace gdx {
  //   exeDir       Absolute executable directory (where gdx-extract + decomp-recipes ship).
  //   outRomPath   On success, receives the absolute path of the installed ROM (for gdx_init_rom).
  //
@@ -673,99 +917,33 @@ index 7255291..9af4bce 100644
 -// extraction succeeded — fzerox.o2r hot-mounted. False means the user closed the window and the
 -// caller should exit cleanly; files already copied beside the exe persist, so the next launch resumes
 -// with those rows pre-filled.
+-bool GdxFirstBootSetupRun(const std::string& dataDir, const std::string& exeDir, std::string& outRomPath);
 +// True means boot should continue. Expansion-Kit builds have installed ROM/disk/IPL media and,
 +// when extraction succeeds, hot-mounted fzerox.o2r. Cartridge-only builds have installed a verified
 +// ROM for the existing raw-ROM path. False means the user closed the window and the caller exits
 +// cleanly; installed files persist, so the next launch resumes with pre-filled rows.
- bool GdxFirstBootSetupRun(const std::string& dataDir, const std::string& exeDir, std::string& outRomPath);
-
- } // namespace gdx
-diff --git a/port/AssetLoader.cpp b/port/AssetLoader.cpp
-index 789b053..a0cc2a8 100644
---- a/port/AssetLoader.cpp
-+++ b/port/AssetLoader.cpp
-@@ -38,6 +38,16 @@ extern "C" void* GDiffuser_LoadAsset(const char* key) {
-     return rm->GetResourceRawPointer(key);
- }
-
-+extern "C" int GDiffuser_AssetExists(const char* key) {
-+    if ((key == nullptr) || (key[0] == '\0')) {
-+        return 0;
-+    }
-+    auto ctx = Ship::Context::GetInstance();
-+    auto rm = (ctx != nullptr) ? ctx->GetResourceManager() : nullptr;
-+    auto am = (rm != nullptr) ? rm->GetArchiveManager() : nullptr;
-+    return (am != nullptr) && am->HasFile(key);
-+}
++bool GdxFirstBootSetupRun(const std::string& dataDir, const std::string& exeDir, std::string& outRomPath,
++                          bool manageExisting = false);
 +
- extern "C" int GDiffuser_LoadAssetBytes(const char* key, void* out, size_t outSize, size_t* copiedSize) {
-     if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
-         return 0;
-diff --git a/port/decomp_port.c b/port/decomp_port.c
-index dc07873..f7e2c0e 100644
---- a/port/decomp_port.c
-+++ b/port/decomp_port.c
-@@ -636,7 +636,15 @@ uintptr_t Segment_SetPhysicalAddress(s32 segment, uintptr_t addr) {
-     if ((unsigned)segment >= 16u) {
-         return addr;
-     }
--    void* resolved = Gdx_ResolvePortAddress(addr);
-+    /* These two setters receive N64 physical segment bases. A valid RDRAM
-+       offset can have the same low 32 bits as a symbol in the PIE executable;
-+       the general resolver intentionally supports those symbol tokens, but a
-+       segment physical base below the RDRAM size is unambiguous here. Resolving
-+       the executable first made segment 4 point into read-only __TEXT and the
-+       race HUD portrait DMA crashed in memcpy. */
-+    void* resolved = (gdx_rdram != NULL && addr <= 0xFFFFFFFFULL && (u32)addr < GDX_RDRAM_SIZE)
-+                         ? gdx_rdram + (u32)addr
-+                         : Gdx_ResolvePortAddress(addr);
-     gSegments[segment] = (unsigned long long)resolved;
-     gdx_seg_log("SetPhys", segment, addr, resolved);
-     return addr;
-@@ -648,7 +656,9 @@ uintptr_t Segment_SetAddress(s32 segment, uintptr_t addr) {
-     if ((unsigned)segment >= 16u) {
-         return addr;
-     }
--    resolved = Gdx_ResolvePortAddress(addr);
-+    resolved = (gdx_rdram != NULL && addr <= 0xFFFFFFFFULL && (u32)addr < GDX_RDRAM_SIZE)
-+                   ? gdx_rdram + (u32)addr
-+                   : Gdx_ResolvePortAddress(addr);
-     gSegments[segment] = (unsigned long long)resolved;
-     gdx_seg_log("SetAddr", segment, addr, resolved);
-     return addr;
-diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
-index 9ef930b..b96de75 100644
---- a/port/n64_gfx_bridge.cpp
-+++ b/port/n64_gfx_bridge.cpp
-@@ -225,6 +225,7 @@ extern "C" int gdx_mode_owns_segment(unsigned int seg);
- extern "C" int gdx_mode_segment_content_matches(unsigned int seg, unsigned int rom_base);
- extern "C" const char* GDiffuser_LookupLoadedAssetKey(const void* buffer, size_t minSize, int requireUnmodified);
- extern "C" const char* gdx_lookup_asset_segment_o2r_key(unsigned int sym_low32);
-+extern "C" int GDiffuser_AssetExists(const char* key);
- // Workshop texture packs (port/gdx_workshop.cpp).
- extern "C" int gdx_workshop_texture_packs_enabled(void);
- extern "C" const char* GdxWorkshopLookupOverridePath(const char* key);
-@@ -5682,6 +5683,13 @@ class N64DisplayListAdapter {
-                                               !IsVenueBuildingTextureRange(translated))
-                                                  ? gdx_lookup_asset_segment_o2r_key(in.w1)
-                                                  : nullptr;
-+                        // The generated binding table names every extractable resource even when
-+                        // the game archive is absent or was rejected. Only emit the filepath
-+                        // opcode when that resource is actually mounted; otherwise the handler's
-+                        // failed lookup drops the texture instead of taking the raw-ROM copy path.
-+                        if (o2rKey != nullptr && !GDiffuser_AssetExists(o2rKey)) {
-+                            o2rKey = nullptr;
-+                        }
-                         const char* texCensusPath = "rawcopy"; /* [tex-census] delivery classification */
-                         /* Texture-pack override. `translated` is the unified source pointer for
-                            BOTH delivery paths, so one lookup here covers common assets (fonts,
++enum class F0XHomeAction {
++    Play,
++    ManageGameData,
++    Quit,
++};
++
++// Packaged-app home screen shown after setup and before the game boots. It uses
++// the same GUI-only frame pump as setup, so normal launches have one coherent
++// F0X surface for play, data recovery, and safe startup settings.
++F0XHomeAction GdxF0XHomeRun(const std::string& dataDir);
+ 
+ } // namespace gdx
 diff --git a/port/gdx_frame_pacer.c b/port/gdx_frame_pacer.c
 index d80931c..849e312 100644
 --- a/port/gdx_frame_pacer.c
 +++ b/port/gdx_frame_pacer.c
 @@ -256,6 +256,23 @@ static void gdx_frame_pacer_init_posix(void) {
  }
-
+ 
  static void gdx_sleep_until_ns(int64_t deadlineNs) {
 +#if defined(__APPLE__)
 +    // Darwin does not expose clock_nanosleep/TIMER_ABSTIME. Recompute the
@@ -793,7 +971,7 @@ index d80931c..849e312 100644
      }
 +#endif
  }
-
+ 
  void gdx_frame_pacer_tick(void) {
 diff --git a/port/gdx_gui.cpp b/port/gdx_gui.cpp
 index b4af69a..ad90c32 100644
@@ -802,7 +980,7 @@ index b4af69a..ad90c32 100644
 @@ -42,10 +42,14 @@ void GdxFast3dGui::ImGuiWMInit() {
      // its first font-atlas upload.
      Fast::Fast3dGui::ImGuiWMInit();
-
+ 
 -    const std::string fontRoot = Ship::Context::GetPathRelativeToAppDirectory("fonts/");
 -    sFontStandard = LoadFontWithIcons(fontRoot + "Montserrat-Regular.ttf", 18.0f);
 -    sFontLarge = LoadFontWithIcons(fontRoot + "Montserrat-Regular.ttf", 22.0f);
@@ -815,7 +993,7 @@ index b4af69a..ad90c32 100644
 +        Ship::Context::LocateFileAcrossAppDirs("fonts/Montserrat-Regular.ttf"), 22.0f);
 +    sFontMono = LoadFontWithIcons(
 +        Ship::Context::LocateFileAcrossAppDirs("fonts/Inconsolata-Regular.ttf"), 17.0f);
-
+ 
      // Missing loose assets must never block boot. ImGui's default font already includes Font
      // Awesome through libultraship, so it is a complete fallback.
 diff --git a/port/gdx_input_script.c b/port/gdx_input_script.c
@@ -842,7 +1020,7 @@ index cef7cfb..1b79c48 100644
 +extern short gGameModeChangeState;
 +extern signed char gTitleDemoState;
 +extern int D_i4_8011D790;
-
+ 
  // main.cpp: closes the LUS window via the same path SDL_QUIT/WM_CLOSE take.
  extern void gdx_request_quit(void);
 @@ -108,6 +117,7 @@ extern void gdx_request_frame_dump(const char* label);
@@ -907,7 +1085,7 @@ index ccb0585..eb611a7 100644
 --- a/port/gen/LinkStubs.c
 +++ b/port/gen/LinkStubs.c
 @@ -199,6 +199,12 @@ unsigned char unk_gfx_segment_VRAM_END[1];
-
+ 
  #ifndef EXPANSION_KIT /* real definition in leo/mfs (mfs_data.c) under EK */
  long D_i1_80428618() { return 0; }
 +/* The cartridge-only source set still retains a few dormant 64DD references.
@@ -920,13 +1098,13 @@ index ccb0585..eb611a7 100644
  /* D_i2_8010ADE0 (save file "F-ZERO X" signature) is real now: save.c (save-system slice). */
  /* ending_effects.c is excluded from the build (static GBI lists need
 diff --git a/port/main.cpp b/port/main.cpp
-index 118ee0d..6b828a3 100644
+index 118ee0d..8e6c813 100644
 --- a/port/main.cpp
 +++ b/port/main.cpp
 @@ -498,6 +498,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
          ec.clear();
      }
-
+ 
 +#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
 +    // F0X keeps immutable archives in Contents/Resources, never in the executable directory.
 +    if (start.filename() == "MacOS" && start.parent_path().filename() == "Contents") {
@@ -939,17 +1117,67 @@ index 118ee0d..6b828a3 100644
          roots.push_back(dir / "assets" / "extracted");
 @@ -662,7 +669,7 @@ int main(int argc, char** argv) {
      }
-
+ 
      logStep("CreateUninitializedInstance");
 -    auto ctx = Ship::Context::CreateUninitializedInstance("G-Diffuser", "gdiffuser",
 +    auto ctx = Ship::Context::CreateUninitializedInstance("F0X", "gdiffuser",
                                                            "gdiffuser.cfg.json");
      if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
-
-@@ -1232,6 +1239,23 @@ int main(int argc, char** argv) {
+ 
+@@ -702,7 +709,15 @@ int main(int argc, char** argv) {
+     logStep("ControlDeck::Init");     controlDeck->Init(&sGdxControllerBits);
+ 
+     // ResourceManager MUST init before the window is constructed/inited.
+-    auto archivePaths = findArchivePaths((argc > 0) ? argv[0] : nullptr);
++    // FirstBootRun resolves argv[0] before switching cwd to Application Support.
++    // Reuse that stable absolute directory: a relative shell argv[0] would
++    // otherwise be interpreted from the new cwd and miss Contents/Resources.
++    const std::string resolvedExeProbe =
++        (std::filesystem::path(firstBoot.exeDir) /
++         (((argc > 0) && argv[0] != nullptr) ? std::filesystem::path(argv[0]).filename()
++                                             : std::filesystem::path("F0X")))
++            .string();
++    auto archivePaths = findArchivePaths(resolvedExeProbe.c_str());
+     for (const auto& archivePath : archivePaths) {
+         gdx_port_logf("[G-Diffuser] archive: %s\n", archivePath.c_str());
+     }
+@@ -919,6 +934,32 @@ int main(int argc, char** argv) {
+         firstBoot.status = gdx::FirstBootStatus::SetupComplete;
+     }
+ 
++#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
++    // Normal app launches begin at a small product home screen. Automated input
++    // scripts bypass it so deterministic title/race regressions keep their
++    // existing boot contract.
++    const char* inputScript = std::getenv("GDX_INPUT_SCRIPT");
++    if (inputScript == nullptr || inputScript[0] == '\0') {
++        for (;;) {
++            const gdx::F0XHomeAction action = gdx::GdxF0XHomeRun(firstBoot.dataDir);
++            if (action == gdx::F0XHomeAction::Quit) {
++                return 0;
++            }
++            if (action == gdx::F0XHomeAction::Play) {
++                break;
++            }
++
++            std::string setupRomPath;
++            if (!gdx::GdxFirstBootSetupRun(firstBoot.dataDir, firstBoot.exeDir, setupRomPath, true)) {
++                return 0;
++            }
++            if (!setupRomPath.empty()) {
++                firstBoot.romPath = setupRomPath;
++            }
++        }
++    }
++#endif
++
+     // Safe this early: the thread internally waits for gAudioContextInitialized (set once decomp's
+     // Audio_Init runs, well after bootproc() below) before producing anything.
+     logStep("gdx_audio_thread_start()");
+@@ -1232,6 +1273,23 @@ int main(int argc, char** argv) {
          gdx_gfx_interp_tick_config(interpOn ? 1 : 0, interpTickStart, kGdxInterpTickSeconds,
                                     interpMaxSubframes);
-
+ 
 +        // The default path's game fiber submits its graphics task synchronously from
 +        // gdx_vi_tick() below.  Metal's task renderer needs the current drawable and
 +        // command buffer before that submission; acquiring them afterwards renders
@@ -970,7 +1198,7 @@ index 118ee0d..6b828a3 100644
          // The game frame ACTUALLY runs here, not in gdx_dispatch() below. gdx_vi_tick posts the VI
          // retrace message, which wakes the Main scheduler thread and dispatches the game fiber
          // inline (osSendMesg -> osStartThread -> __osDispatchThread, because __osRunningThread is
-@@ -1250,14 +1274,6 @@ int main(int argc, char** argv) {
+@@ -1250,14 +1308,6 @@ int main(int argc, char** argv) {
          if (!interpOn) {
              // Default path: one tick, one Run, one present, paced by the frame pacer. Nothing on
              // this branch touches the interpolation machinery.
@@ -986,7 +1214,7 @@ index 118ee0d..6b828a3 100644
              gdx_dispatch();  // run the decomp's game threads cooperatively until they block again
              gdx::PerfPhaseEnd(gdx::PerfDispatch);
 diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
-index 8c63a17..9ef930b 100644
+index 8c63a17..b96de75 100644
 --- a/port/n64_gfx_bridge.cpp
 +++ b/port/n64_gfx_bridge.cpp
 @@ -11,6 +11,12 @@
@@ -1002,7 +1230,15 @@ index 8c63a17..9ef930b 100644
  #else
  /* POSIX memory-probe backend: /proc/self/maps snapshot helpers plus the #else branches of
   * GetMainModuleRange / ReadableByteLimit / ReadableCommandLimit / IsReadableAddress. */
-@@ -1798,6 +1804,38 @@ static void ResetWindowsMemoryRegionCache() {
+@@ -225,6 +231,7 @@ extern "C" int gdx_mode_owns_segment(unsigned int seg);
+ extern "C" int gdx_mode_segment_content_matches(unsigned int seg, unsigned int rom_base);
+ extern "C" const char* GDiffuser_LookupLoadedAssetKey(const void* buffer, size_t minSize, int requireUnmodified);
+ extern "C" const char* gdx_lookup_asset_segment_o2r_key(unsigned int sym_low32);
++extern "C" int GDiffuser_AssetExists(const char* key);
+ // Workshop texture packs (port/gdx_workshop.cpp).
+ extern "C" int gdx_workshop_texture_packs_enabled(void);
+ extern "C" const char* GdxWorkshopLookupOverridePath(const char* key);
+@@ -1798,6 +1805,38 @@ static void ResetWindowsMemoryRegionCache() {
          sWindowsMemoryRegions.reserve(64);
      }
  }
@@ -1041,8 +1277,8 @@ index 8c63a17..9ef930b 100644
  #else
  // ---------------------------------------------------------------------------------------------
  // POSIX memory-probe backend: a snapshot of /proc/self/maps with miss-triggered refresh.
-@@ -1914,6 +1952,65 @@ void GetMainModuleRange(uintptr_t& moduleBegin, uintptr_t& moduleEnd) {
-
+@@ -1914,6 +1953,65 @@ void GetMainModuleRange(uintptr_t& moduleBegin, uintptr_t& moduleEnd) {
+ 
      moduleBegin = reinterpret_cast<uintptr_t>(module);
      moduleEnd = moduleBegin + ntHeaders->OptionalHeader.SizeOfImage;
 +#elif defined(__APPLE__)
@@ -1107,10 +1343,10 @@ index 8c63a17..9ef930b 100644
  #else
      // Mirror "module base + SizeOfImage": take the contiguous run of /proc/self/maps entries whose
      // pathname is the main executable, using begin-of-first .. end-of-last. dladdr on a local
-@@ -2005,6 +2102,13 @@ size_t ReadableCommandLimit(const void* source, size_t stride = kN64GfxStride) {
+@@ -2005,6 +2103,13 @@ size_t ReadableCommandLimit(const void* source, size_t stride = kN64GfxStride) {
          return 0;
      }
-
+ 
 +    return static_cast<size_t>((region.end - address) / stride);
 +#elif defined(__APPLE__)
 +    const uintptr_t address = reinterpret_cast<uintptr_t>(source);
@@ -1121,10 +1357,10 @@ index 8c63a17..9ef930b 100644
      return static_cast<size_t>((region.end - address) / stride);
  #else
      const uintptr_t addr = reinterpret_cast<uintptr_t>(source);
-@@ -2030,6 +2134,12 @@ size_t ReadableByteLimit(uintptr_t address) {
+@@ -2030,6 +2135,12 @@ size_t ReadableByteLimit(uintptr_t address) {
          return 0;
      }
-
+ 
 +    return static_cast<size_t>(region.end - address);
 +#elif defined(__APPLE__)
 +    DarwinMemoryRegion region;
@@ -1134,7 +1370,7 @@ index 8c63a17..9ef930b 100644
      return static_cast<size_t>(region.end - address);
  #else
      MapsRegion r;
-@@ -2050,6 +2160,9 @@ bool IsReadableAddress(uintptr_t address) {
+@@ -2050,6 +2161,9 @@ bool IsReadableAddress(uintptr_t address) {
          return false;
      }
      return region.readable;
@@ -1144,6 +1380,20 @@ index 8c63a17..9ef930b 100644
  #else
      MapsRegion r;
      if (!PosixRegionFor(address, r)) {
+@@ -5682,6 +5796,13 @@ class N64DisplayListAdapter {
+                                               !IsVenueBuildingTextureRange(translated))
+                                                  ? gdx_lookup_asset_segment_o2r_key(in.w1)
+                                                  : nullptr;
++                        // The generated binding table names every extractable resource even when
++                        // the game archive is absent or was rejected. Only emit the filepath
++                        // opcode when that resource is actually mounted; otherwise the handler's
++                        // failed lookup drops the texture instead of taking the raw-ROM copy path.
++                        if (o2rKey != nullptr && !GDiffuser_AssetExists(o2rKey)) {
++                            o2rKey = nullptr;
++                        }
+                         const char* texCensusPath = "rawcopy"; /* [tex-census] delivery classification */
+                         /* Texture-pack override. `translated` is the unified source pointer for
+                            BOTH delivery paths, so one lookup here covers common assets (fonts,
 diff --git a/port/shims.c b/port/shims.c
 index c4598d5..6c99936 100644
 --- a/port/shims.c
@@ -1158,7 +1408,7 @@ index c4598d5..6c99936 100644
 +// eligible.
 +int gdx_disk_archive_verified(void) { return 0; }
  #endif
-
+ 
  // libc: BSD byte-compare not in the MSVC CRT. glibc provides both natively (with size_t
 diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
 new file mode 100644
@@ -1194,10 +1444,10 @@ index 0000000..f6ab8d2
 +</plist>
 diff --git a/port/gdx_firstboot_picker.mm b/port/gdx_firstboot_picker.mm
 new file mode 100644
-index 0000000..29c553a
+index 0000000..7ec09fa
 --- /dev/null
 +++ b/port/gdx_firstboot_picker.mm
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,62 @@
 +// Native macOS file-picker bridge for the in-window first-launch setup.
 +
 +#import <AppKit/AppKit.h>
@@ -1248,4 +1498,66 @@ index 0000000..29c553a
 +    ]);
 +}
 +
++bool GdxRevealDataDirectoryMacOS(const std::string& path) {
++    @autoreleasepool {
++        if (path.empty()) {
++            return false;
++        }
++        NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]
++                               isDirectory:YES];
++        return url != nil && [[NSWorkspace sharedWorkspace] openURL:url];
++    }
++}
++
 +} // namespace gdx
+diff --git a/port/tests/fiber_smoketest.c b/port/tests/fiber_smoketest.c
+new file mode 100644
+index 0000000..d02c86d
+--- /dev/null
++++ b/port/tests/fiber_smoketest.c
+@@ -0,0 +1,45 @@
++#include "gdx_fiber.h"
++
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++enum { kFiberCount = 3, kSwitches = 10000 };
++
++static GdxFiber* sHost;
++static GdxFiber* sFibers[kFiberCount];
++static uint64_t sCanary[kFiberCount];
++static unsigned sSteps[kFiberCount];
++
++static void fiber_main(void* arg) {
++    const unsigned index = (unsigned)(uintptr_t)arg;
++    const uint64_t expected = UINT64_C(0xA5A5000000000000) | index;
++    sCanary[index] = expected;
++    for (;;) {
++        if (sCanary[index] != expected) {
++            fprintf(stderr, "fiber %u canary corrupted\n", index);
++            abort();
++        }
++        if (sSteps[index] < kSwitches) {
++            ++sSteps[index];
++        }
++        gdx_fiber_switch(sHost);
++    }
++}
++
++int main(void) {
++    sHost = gdx_fiber_convert_thread();
++    if (sHost == NULL) return 1;
++    for (unsigned i = 0; i < kFiberCount; ++i) {
++        sFibers[i] = gdx_fiber_create(fiber_main, (void*)(uintptr_t)i, 0);
++        if (sFibers[i] == NULL) return 2;
++    }
++    for (unsigned round = 0; round < kSwitches; ++round) {
++        for (unsigned i = 0; i < kFiberCount; ++i) gdx_fiber_switch(sFibers[i]);
++    }
++    for (unsigned i = 0; i < kFiberCount; ++i) {
++        if (sSteps[i] != kSwitches) return 3;
++    }
++    puts("gdx_fiber_smoketest: PASS");
++    return 0;
++}

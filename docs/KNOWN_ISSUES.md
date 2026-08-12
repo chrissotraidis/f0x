@@ -14,10 +14,12 @@
   `GdxSegmentSourceRead`. Segment setters now treat in-range physical bases as
   RDRAM. The rebuilt app survived the former crash point, but the long race soak
   remains a required regression.
-- **MAC-UI-01 — no complete F0X product interface exists:** the app currently
-  exposes a first-time ROM setup view, the game's own menus, and upstream
-  developer/settings surfaces. It still needs a coherent F0X shell for import,
-  ready/library state, launch, settings, progress/error recovery, and lifecycle.
+- **MAC-UI-01 — F0X Home foundation exists; release polish remains:** normal
+  packaged launches now open on a branded F0X Home surface with verified-data
+  state, Play, Manage Game Data, Open Data Folder, VSync/widescreen/fullscreen,
+  recovery guidance, and Quit. Management returns through the validated import
+  state machine without launching a second app. Broader settings, release-grade
+  accessibility, signing/notarization, and owner UX review remain open.
 
 - **MAC-CAPTURE-01 — framebuffer BMP readback is black while the title is visible:**
   on Apple Silicon macOS, deterministic 320×240 BMP captures are identical

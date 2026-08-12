@@ -46,11 +46,10 @@
 
 ## Current next experiment
 
-Use `scripts/macos-packaged-race.gdx` as the regression while fixing raw-ROM
-fallback texture resolution. Repeat the direct app-window inspection at its
-named race interval and require an intact HUD and textured machines before
-moving to a player-controlled completed race. Keep the extraction golden and
-the all-black internal BMP readback as separate gates.
+Use the current F0X Home build for owner flashing confirmation, then run a
+player-controlled completed race and save/relaunch/load round trip. Keep
+`scripts/macos-packaged-race.gdx` as the boot/race regression and keep the
+extraction golden plus all-black internal BMP readback as separate gates.
 
 ## 2026-08-12 — Signed packaged raw-ROM GP race proof
 
@@ -116,6 +115,36 @@ the all-black internal BMP readback as separate gates.
 - **Boundary:** current-build direct evidence supports the fix, but owner
   confirmation of the originally observed flashing is still required. This does
   not close the missing product-interface or player-completed-race gates.
+
+## 2026-08-12 — F0X Home and packaged-launch regression
+
+- **Visible product surface:** the exact sealed bundle opened on a centered,
+  borderless F0X Home panel. Direct macOS inspection showed `READY TO PLAY`, the
+  verified local-data statement, `PLAY F-ZERO X`, Manage Game Data, Open Data
+  Folder, VSync/widescreen/fullscreen, recovery guidance, and Quit.
+- **Recovery flow:** Manage Game Data reuses the existing validator/import state
+  machine in-process with management-specific title and copy. An observed
+  click-through into `Replace...` was fixed with a two-frame input guard. The
+  management-specific surface was directly observed; the final styled-build
+  click transition remains automation-limited because ImGui controls are absent
+  from macOS accessibility and synthetic one-frame clicks are intermittently
+  missed by the GUI-only frame pump.
+- **Launch-path fix:** a relative shell launch changed cwd to Application Support
+  before archive discovery and consequently missed sealed
+  `Contents/Resources/gdiffuser.o2r`, producing `OTR file not found`. Discovery
+  now reuses FirstBootRun's already-resolved executable directory. The same
+  relative command then mounted the engine archive and booted normally.
+- **Automation compatibility:** `GDX_INPUT_SCRIPT` deliberately bypasses Home.
+  The rebuilt signed bundle ran `scripts/macos-packaged-race.gdx`, emitted
+  `packaged_gp_race_capture_interval`, completed all 28 commands, closed the
+  window normally, and returned status 0. No `WAITMODE` timeout occurred.
+- **Package and patch proof:** the rebuilt app passed
+  `codesign --verify --deep --strict` and plist lint. The G-Diffuser, decomp, and
+  libultraship maintained patches all passed reverse-apply checks against the
+  live nested checkouts.
+- **Boundary:** this is a functional macOS interface foundation, not a release
+  sign-off. Owner UX/flashing confirmation, broader accessibility review,
+  Developer ID/notarization, and player-completed race/save persistence remain.
 
 ## 2026-08-11 — Gate 3 cartridge PCM synthesis proof
 

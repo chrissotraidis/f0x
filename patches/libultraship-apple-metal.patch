@@ -50,14 +50,28 @@ index 6d890e90..de909556 100644
 + #if SDL_HAS_PER_MONITOR_DPI
 +         // FIXME-VIEWPORT: On MacOS SDL reports actual monitor DPI scale, ignoring OS configuration. We may want to set
 +         //  DpiScale to cocoa_window.backingScaleFactor here.
+diff --git a/src/fast/Fast3dGui.cpp b/src/fast/Fast3dGui.cpp
+index ac65f1ac..9762206f 100644
+--- a/src/fast/Fast3dGui.cpp
++++ b/src/fast/Fast3dGui.cpp
+@@ -407,7 +407,8 @@ void Fast3dGui::DrawGame() {
+         size = ImVec2(sw, size.y);
+     } else if (Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger("gEnhancements.Graphics.Widescreen",
+                                                                                1) == 0 ||
+-               gdx_get_force_fixed_aspect() != 0) {
++               gdx_get_force_fixed_aspect() != 0 ||
++               (size.y > 0.0f && size.x / size.y <= 4.0f / 3.0f)) {
+         // 4:3 pillarbox, either from the Widescreen setting or from the runtime flag the game
+         // publishes for modes that must render stock 4:3 (the Expansion Kit editors). The flag
+         // is read live because it can flip mid-dispatch and this decision has to track it within
 diff --git a/src/fast/backends/gfx_metal.cpp b/src/fast/backends/gfx_metal.cpp
-index a32a12e7..0a6a3303 100644
+index a32a12e7..8879109d 100644
 --- a/src/fast/backends/gfx_metal.cpp
 +++ b/src/fast/backends/gfx_metal.cpp
 @@ -936,6 +936,12 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale)
          mFrameUniforms.noiseScale = 1.0f / noise_scale;
      }
-
+ 
 +    // The taskless VI presentation path can bind the window framebuffer before
 +    // the interpreter's normal StartFrame call. Keep this entry point valid for
 +    // that first boot frame as well as the usual renderer-driven path.
@@ -66,7 +80,52 @@ index a32a12e7..0a6a3303 100644
 +    }
      memcpy(mFrameUniformBuffer->contents(), &mFrameUniforms, sizeof(FrameUniforms));
  }
-
+ 
+@@ -1274,7 +1280,12 @@ void GfxRenderingAPIMetal::ReadFramebufferToCPU(int fb_id, uint32_t width, uint3
+             // First frame on main queue — can't block without deadlock.
+             // Return zeros so the caller gets black instead of garbage.
+             memset(rgba16_buf, 0, sizeof(uint16_t) * width * height);
+-            framebuffer.mUseReadbackQueue = true;
++            // Keep a live render target on the main queue. Moving it permanently
++            // to mReadbackQueue makes the window's main-queue compositor sample
++            // that texture without a cross-queue dependency, so transition
++            // captures turn subsequent presents into an intermittent black strobe.
++            // A missed synchronous snapshot is preferable to corrupting every
++            // following frame; asynchronous offscreen readback is a separate path.
+         }
+ 
+         output_buffer->release();
+diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
+index f619b462..e885815f 100644
+--- a/src/fast/backends/gfx_sdl2.cpp
++++ b/src/fast/backends/gfx_sdl2.cpp
+@@ -379,7 +379,6 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
+ #else
+     constexpr bool use_opengl = true;
+ #endif
+-
+     if (use_opengl) {
+         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
+index e7501b7e..8985d3fe 100644
+--- a/src/fast/interpreter.cpp
++++ b/src/fast/interpreter.cpp
+@@ -7106,7 +7106,13 @@ void Interpreter::StartFrame() {
+     // members instead of doing CVar lookups on the hot path. Run() re-latches the fixed-aspect
+     // flag per task. Widescreen == 0 pillarboxes via Fast3dGui::DrawGame, which needs the frame in
+     // an offscreen texture -- hence the forced offscreen target below even at 1x with no MSAA.
+-    mWidescreenEnabledCache = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
++    // Hor+ is meaningful only beyond the native 4:3 aspect. Applying its X scale to a
++    // portrait or otherwise narrow window produces a factor greater than one and pushes
++    // HUD anchors off-screen. Treat those windows as fixed 4:3 for this frame; Fast3dGui
++    // composites the offscreen target into a centered letterbox below.
++    const bool widescreenRequested = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
++    mWidescreenEnabledCache = widescreenRequested &&
++                              mCurDimensions.aspect_ratio > (4.0f / 3.0f);
+     mForceFixedAspectCache = sGdxForceFixedAspect != 0;
+     mWidescreenUiCache = CVarGetInteger("gEnhancements.Graphics.WidescreenUI", 0) != 0;
+     mUltrawideCache = CVarGetInteger("gEnhancements.Graphics.UltrawideMode", 0) != 0;
 diff --git a/src/fast/shaders/metal/default.shader.metal b/src/fast/shaders/metal/default.shader.metal
 index cee31eff..ac5261ee 100644
 --- a/src/fast/shaders/metal/default.shader.metal
@@ -74,7 +133,7 @@ index cee31eff..ac5261ee 100644
 @@ -9,7 +9,7 @@ struct FrameUniforms {
      float noiseScale;
  };
-
+ 
 -// Do not gate these fields behind @if. setFragmentBytes() copies sizeof(DrawUniforms) from the
 +// Do not gate these fields behind a conditional directive. setFragmentBytes() copies sizeof(DrawUniforms) from the
  // one fixed C++ layout in gfx_metal.h for every variant, so a shorter struct here reads the
@@ -105,7 +164,7 @@ index cee31eff..ac5261ee 100644
              @{update_floats(4)}
 @@ -64,10 +64,10 @@ struct Vertex {
  };
-
+ 
  struct ProjectedVertex {
 -    @for(i in 0..2)
 +    @for(i in 0 .. 2)
@@ -126,7 +185,7 @@ index cee31eff..ac5261ee 100644
              float4 input@{i + 1};
          @else
 @@ -96,10 +96,10 @@ struct ProjectedVertex {
-
+ 
  vertex ProjectedVertex vertexShader(Vertex in [[stage_in]]) {
      ProjectedVertex out;
 -    @for(i in 0..2)
@@ -159,7 +218,7 @@ index cee31eff..ac5261ee 100644
 @@ -230,7 +230,7 @@ fragment FragOut fragmentShader(
          @{f_range = 1}
      @end
-
+ 
 -    @for(c in 0..f_range)
 +    @for(c in 0 .. f_range)
          @if(c == 1)
@@ -172,54 +231,3 @@ index cee31eff..ac5261ee 100644
 -}
 \ No newline at end of file
 +}
-diff --git a/src/fast/backends/gfx_metal.cpp b/src/fast/backends/gfx_metal.cpp
-index 0a6a3303..8879109d 100644
---- a/src/fast/backends/gfx_metal.cpp
-+++ b/src/fast/backends/gfx_metal.cpp
-@@ -1274,7 +1274,12 @@ void GfxRenderingAPIMetal::ReadFramebufferToCPU(int fb_id, uint32_t width, uint3
-             // First frame on main queue — can't block without deadlock.
-             // Return zeros so the caller gets black instead of garbage.
-             memset(rgba16_buf, 0, sizeof(uint16_t) * width * height);
--            framebuffer.mUseReadbackQueue = true;
-+            // Keep a live render target on the main queue. Moving it permanently
-+            // to mReadbackQueue makes the window's main-queue compositor sample
-+            // that texture without a cross-queue dependency, so transition
-+            // captures turn subsequent presents into an intermittent black strobe.
-+            // A missed synchronous snapshot is preferable to corrupting every
-+            // following frame; asynchronous offscreen readback is a separate path.
-         }
-
-         output_buffer->release();
-diff --git a/src/fast/Fast3dGui.cpp b/src/fast/Fast3dGui.cpp
-index ac65f1ac..9762206f 100644
---- a/src/fast/Fast3dGui.cpp
-+++ b/src/fast/Fast3dGui.cpp
-@@ -407,7 +407,8 @@ void Fast3dGui::DrawGame() {
-         size = ImVec2(sw, size.y);
-     } else if (Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger("gEnhancements.Graphics.Widescreen",
-                                                                                1) == 0 ||
--               gdx_get_force_fixed_aspect() != 0) {
-+               gdx_get_force_fixed_aspect() != 0 ||
-+               (size.y > 0.0f && size.x / size.y <= 4.0f / 3.0f)) {
-         // 4:3 pillarbox, either from the Widescreen setting or from the runtime flag the game
-         // publishes for modes that must render stock 4:3 (the Expansion Kit editors). The flag
-         // is read live because it can flip mid-dispatch and this decision has to track it within
-diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
-index e7501b7e..8985d3fe 100644
---- a/src/fast/interpreter.cpp
-+++ b/src/fast/interpreter.cpp
-@@ -7106,7 +7106,13 @@ void Interpreter::StartFrame() {
-     // members instead of doing CVar lookups on the hot path. Run() re-latches the fixed-aspect
-     // flag per task. Widescreen == 0 pillarboxes via Fast3dGui::DrawGame, which needs the frame in
-     // an offscreen texture -- hence the forced offscreen target below even at 1x with no MSAA.
--    mWidescreenEnabledCache = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
-+    // Hor+ is meaningful only beyond the native 4:3 aspect. Applying its X scale to a
-+    // portrait or otherwise narrow window produces a factor greater than one and pushes
-+    // HUD anchors off-screen. Treat those windows as fixed 4:3 for this frame; Fast3dGui
-+    // composites the offscreen target into a centered letterbox below.
-+    const bool widescreenRequested = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
-+    mWidescreenEnabledCache = widescreenRequested &&
-+                              mCurDimensions.aspect_ratio > (4.0f / 3.0f);
-     mForceFixedAspectCache = sGdxForceFixedAspect != 0;
-     mWidescreenUiCache = CVarGetInteger("gEnhancements.Graphics.WidescreenUI", 0) != 0;
-     mUltrawideCache = CVarGetInteger("gEnhancements.Graphics.UltrawideMode", 0) != 0;

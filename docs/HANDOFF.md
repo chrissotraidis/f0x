@@ -2,8 +2,11 @@
 
 ## Current gate
 
-Gate 4 is partially working: F0X has a reproducible, sealed arm64 `F0X.app`
-that macOS directly launches, with mutable data separated from bundle contents.
+Gate 4 now has a verified interface foundation: F0X has a reproducible, sealed
+arm64 `F0X.app` that macOS directly launches, with mutable data separated from
+bundle contents. Normal launches open on F0X Home with ready/data state, Play,
+data management, startup display settings, recovery guidance, and Quit; scripted
+regressions bypass Home deliberately and retain their existing boot contract.
 The normal Metal path acquires the drawable before synchronous game rendering.
 The later repeating strobe was traced to transition readback permanently moving
 a live game framebuffer onto a second Metal command queue while the window
@@ -12,8 +15,8 @@ race captures, 80 resize captures, and 60 fullscreen captures with no black
 frames; owner confirmation remains the final stability check.
 Gate 3 now has direct packaged-app race visuals, but the captured raw-ROM race
 now has restored raw-ROM machine textures and a contained narrow-window HUD.
-Presentation stability, a real F0X application interface, player control through
-a completed race, and physical audio remain open.
+Owner confirmation of presentation stability, player control through a completed
+race, and physical audio remain open.
 
 ## Revised goal and execution order
 
@@ -23,11 +26,10 @@ evidence. Preserve the G-Diffuser → libultraship/Fast3D → Metal architecture
 the ROM-free public boundary. Work one falsifiable gate at a time:
 
 1. Metal presentation stability across title/menu/race/resize/fullscreen;
-2. coherent F0X app shell for import, ready/library state, settings, recovery, and launch;
-3. completed controlled race plus save/relaunch/load round-trip;
-4. desktop extraction-golden correction plus safe import through the app shell;
-5. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
-6. touch, timing/high refresh, packaging, README, and final audits.
+2. completed controlled race plus save/relaunch/load round-trip;
+3. desktop extraction-golden correction plus safe import through the app shell;
+4. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
+5. touch, timing/high refresh, packaging, README, and final audits.
 
 ## Verified state
 
@@ -55,12 +57,16 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   key is not actually mounted, restoring the Blue Falcon and scene detail.
 - Narrower-than-4:3 windows now select the centered 4:3 composite instead of
   applying hor+ expansion that pushed the HUD outside the viewport.
+- Normal packaged launches now show a styled, borderless F0X Home panel. Its
+  management path reuses the verified first-boot/import state machine with
+  management-specific copy, a two-frame click-through guard, and a clear return
+  to Home. The sealed archive resolver now uses FirstBootRun's already-resolved
+  executable directory, so relative shell launches and Finder launches locate
+  `Contents/Resources/gdiffuser.o2r` identically.
 
 ## Next action
 
 Ask the owner to observe the current packaged build while retaining the direct
-soak regression. Unless flashing recurs, proceed with the missing F0X product
-shell: first-run/import, ready/library state, settings, progress/error recovery,
-and a clear launch path. The current setup window plus upstream/developer menus
-are a foundation, not the finished interface. Only after these two gates should
-the loop return to a completed controlled race and save persistence.
+soak regression. Unless flashing recurs, proceed to a player-controlled completed
+race and save/relaunch/load persistence. Keep F0X Home as the single preboot
+surface; extend it only when a concrete recovery or launch behavior is missing.
