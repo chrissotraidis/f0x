@@ -14,7 +14,7 @@ runtime evidence. No Apple gameplay claim is made without a dated test entry.
 | 4: macOS application | macOS interface foundation verified | The sealed `F0X.app` passes strict ad-hoc signature validation, keeps mutable state in Application Support, and now opens on a branded F0X Home surface with verified-data state, Play, Manage Game Data, Open Data Folder, startup display settings, recovery guidance, and Quit. Management reuses the validated import screen in-process and guards against click-through. Release signing/notarization and broader settings remain open. |
 | 5: iOS/iPadOS build | Not started | No F0X iOS target exists. |
 | 6: physical iPad engine proof | Not tested | No signed device run exists. |
-| 7–8: product import / in-process Torch | macOS import flow verified; mobile importer open | The bundled desktop extractor now produces a byte-deterministic, fully validated 3,610-entry archive whose refreshed golden is `7d60d975...`. F0X visibly presents consent and live progress, installs and hot-mounts the archive in the same process, reuses it unchanged on warm boot, and reaches a GP race with the original ROM absent. The desktop extractor remains a child process; an in-process mobile importer remains open. |
+| 7–8: product import / in-process Torch | macOS import verified; in-process core proven | The bundled desktop extractor produces a byte-deterministic, fully validated 3,610-entry archive whose refreshed golden is `7d60d975...`. F0X visibly presents consent/progress, installs and hot-mounts it in the same process, reuses it unchanged, and reaches a GP race without the ROM. A new static Torch API consumes ROM bytes in memory and reproduced that exact archive twice sequentially in one process. F0X/iOS linkage and on-device import remain open. |
 | Touch / lifecycle / 60 Hz / high refresh | Not started | Deferred until controller-first engine proof. |
 | 64DD Expansion Kit | Deferred | Cartridge-only build is the first Apple target. |
 
@@ -41,8 +41,8 @@ already-passed compile or fiber gate:
    flashes; retain the automated windowed/resize/fullscreen soak as regression.
 2. Prove player control through a completed race, then save creation, clean
    relaunch, and load persistence.
-3. Replace the now-verified desktop child-process extractor with an in-process
-   mobile-capable importer while preserving its validation/progress contract.
+3. Integrate the proven in-process Torch API into F0X and compile it for iOS,
+   preserving the current validation/progress/atomic-install contract.
 4. Establish iOS/iPadOS build closure, then a physical-iPad controller race,
    lifecycle, and audio.
 5. Only after physical engine proof: touch UX, timing/high refresh, release

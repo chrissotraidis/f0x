@@ -260,3 +260,28 @@ extraction golden plus all-black internal BMP readback as separate gates.
   signature verification and plist lint.
 - **Boundary:** desktop UX and child-process import are now verified. The mobile
   gate still requires Torch/extraction to run in process, without `fork`/`exec`.
+
+## 2026-08-12 — in-process Torch extraction core
+
+- **API:** Torch static-library mode now exposes `GdxRunInProcessO2R`. It accepts
+  a ROM byte buffer, recipe directory, unique destination, version stamp, and an
+  optional atomic progress counter. It calls the same `Companion` F-Zero factory
+  registration, recipe walk, and O2R writer as the CLI; no extractor logic was
+  duplicated. Invalid inputs and exceptions return an actionable error, and an
+  existing `generic.o2r` is never overwritten.
+- **Build:** a focused Release harness built with `USE_STANDALONE=OFF`,
+  `GDX_DETERMINISTIC=ON`, F-Zero plus NAudio enabled, and unrelated game
+  factories disabled.
+- **Golden proof:** the harness read the authorized ROM into memory and wrote a
+  3,610-record archive at SHA-256
+  `7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a`.
+  `validate_archive.py` passed record count, unique paths, golden SHA, US-rev0
+  version CRC, and all 33 complete-or-absent families.
+- **Same-process proof:** two sequential calls in one harness process both
+  completed, processed 31 recipe nodes, produced byte-identical golden archives,
+  and demonstrated that Torch's singleton/cache cleanup survives reimport.
+  A separate call against a destination containing `generic.o2r` returned 1
+  with `destination already contains generic.o2r` and left it untouched.
+- **Boundary:** this proves the callable extraction core on macOS. The F0X
+  runtime does not yet link it, the port layer still owns validation/atomic
+  activation, and iOS/iPadOS compilation and device execution remain unproven.

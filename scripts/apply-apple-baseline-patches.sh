@@ -17,3 +17,4 @@ apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-apple-m
 apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-fiber-smoketest.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser/decomp" "$root_dir/patches/fzerox-decomp-apple.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser/libultraship" "$root_dir/patches/libultraship-apple-metal.patch"
+apply_patch_file "$root_dir/ref/G-Diffuser/torch" "$root_dir/patches/torch-inprocess-apple.patch"

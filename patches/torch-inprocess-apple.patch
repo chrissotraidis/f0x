@@ -1,0 +1,174 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index eed2af7..2c1a2d7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -18,6 +18,7 @@ option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+ #  - Also switches the standalone Windows CRT to static (/MT) so the extractor ships
+ #    self-contained (matches the G-Diffuser executable, no VC++ redist dependency).
+ option(GDX_DETERMINISTIC "Deterministic, reproducible O2R output for G-Diffuser" OFF)
++option(GDX_BUILD_INPROCESS_TEST "Build the in-process O2R extraction harness" OFF)
+ 
+ # Optional override for the produced executable name (e.g. "gdx-extract").
+ set(GDX_OUTPUT_NAME "" CACHE STRING "Override the standalone executable output name")
+@@ -324,6 +325,11 @@ if(NOT USE_STANDALONE)
+     target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+     target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+     target_include_directories(${PROJECT_NAME} PUBLIC ${yaml-cpp_SOURCE_DIR}/include)
++
++    if(GDX_BUILD_INPROCESS_TEST)
++        add_executable(gdx-inprocess-extract-test tests/inprocess_extract_test.cpp)
++        target_link_libraries(gdx-inprocess-extract-test PRIVATE ${PROJECT_NAME})
++    endif()
+ endif()
+ 
+ # Install the standalone executable to <prefix>/bin so an outer superbuild can copy
+diff --git a/src/gdx/inprocess_extract.cpp b/src/gdx/inprocess_extract.cpp
+new file mode 100644
+index 0000000..a4f9708
+--- /dev/null
++++ b/src/gdx/inprocess_extract.cpp
+@@ -0,0 +1,69 @@
++#include "gdx/inprocess_extract.h"
++
++#include "Companion.h"
++
++#include <filesystem>
++#include <memory>
++#include <stdexcept>
++#include <vector>
++
++namespace fs = std::filesystem;
++
++int GdxRunInProcessO2R(const std::uint8_t* romData, std::size_t romSize,
++                       const std::string& recipesDir, const std::string& destDir,
++                       const std::string& version, std::atomic<std::size_t>* assetsProcessed,
++                       std::string& error) {
++    error.clear();
++    if (romData == nullptr || romSize == 0) {
++        error = "ROM data is empty";
++        return 1;
++    }
++    if (recipesDir.empty() || !fs::is_directory(recipesDir)) {
++        error = "recipe directory is missing: " + recipesDir;
++        return 1;
++    }
++    if (destDir.empty()) {
++        error = "destination directory is empty";
++        return 1;
++    }
++
++    const fs::path output = fs::path(destDir) / "generic.o2r";
++    std::error_code ec;
++    fs::create_directories(destDir, ec);
++    if (ec) {
++        error = "could not create destination directory: " + ec.message();
++        return 1;
++    }
++    if (fs::exists(output, ec)) {
++        error = "destination already contains generic.o2r";
++        return 1;
++    }
++
++    std::atomic<std::size_t> localProgress{ 0 };
++    std::atomic<std::size_t>& progress = assetsProcessed != nullptr ? *assetsProcessed : localProgress;
++    progress.store(0);
++
++    try {
++        std::vector<std::uint8_t> rom(romData, romData + romSize);
++        auto companion = std::make_unique<Companion>(std::move(rom), ArchiveType::O2R, false,
++                                                     recipesDir, destDir);
++        Companion::Instance = companion.get();
++        companion->SetVersion(version);
++        companion->Init(ExportType::Binary, progress);
++        Companion::Instance = nullptr;
++    } catch (const std::exception& ex) {
++        Companion::Instance = nullptr;
++        error = ex.what();
++        return 1;
++    } catch (...) {
++        Companion::Instance = nullptr;
++        error = "Torch extraction failed with an unknown exception";
++        return 1;
++    }
++
++    if (!fs::is_regular_file(output, ec)) {
++        error = "Torch returned without producing generic.o2r";
++        return 1;
++    }
++    return 0;
++}
+diff --git a/src/gdx/inprocess_extract.h b/src/gdx/inprocess_extract.h
+new file mode 100644
+index 0000000..dd5fc15
+--- /dev/null
++++ b/src/gdx/inprocess_extract.h
+@@ -0,0 +1,17 @@
++#pragma once
++
++#include <atomic>
++#include <cstddef>
++#include <cstdint>
++#include <string>
++
++// Run Torch's existing F-Zero O2R path without spawning a process. The ROM is
++// supplied as memory so mobile callers do not need to expose a filesystem path.
++// `destDir` must be a unique staging directory; Torch writes generic.o2r there.
++// Returns 0 on success and stores an actionable message in `error` on failure.
++// `assetsProcessed`, when non-null, is updated by the same recipe walk used by
++// the CLI and can be polled by a UI thread.
++int GdxRunInProcessO2R(const std::uint8_t* romData, std::size_t romSize,
++                       const std::string& recipesDir, const std::string& destDir,
++                       const std::string& version, std::atomic<std::size_t>* assetsProcessed,
++                       std::string& error);
+diff --git a/tests/inprocess_extract_test.cpp b/tests/inprocess_extract_test.cpp
+new file mode 100644
+index 0000000..8923930
+--- /dev/null
++++ b/tests/inprocess_extract_test.cpp
+@@ -0,0 +1,46 @@
++#include "gdx/inprocess_extract.h"
++
++#include <atomic>
++#include <cstdint>
++#include <fstream>
++#include <iostream>
++#include <iterator>
++#include <string>
++#include <vector>
++
++int main(int argc, char** argv) {
++    if (argc != 5 && argc != 6) {
++        std::cerr << "usage: gdx-inprocess-extract-test ROM RECIPES DEST VERSION [SECOND_DEST]\n";
++        return 2;
++    }
++
++    std::ifstream input(argv[1], std::ios::binary);
++    std::vector<std::uint8_t> rom((std::istreambuf_iterator<char>(input)), {});
++    if (rom.empty()) {
++        std::cerr << "could not read ROM\n";
++        return 2;
++    }
++
++    std::atomic<std::size_t> progress{ 0 };
++    std::string error;
++    const int rc = GdxRunInProcessO2R(rom.data(), rom.size(), argv[2], argv[3], argv[4], &progress, error);
++    if (rc != 0) {
++        std::cerr << "in-process extraction failed: " << error << "\n";
++        return rc;
++    }
++    std::cout << "in-process extraction complete; recipe nodes processed=" << progress.load() << "\n";
++
++    if (argc == 6) {
++        progress.store(0);
++        error.clear();
++        const int secondRc = GdxRunInProcessO2R(rom.data(), rom.size(), argv[2], argv[5], argv[4],
++                                                &progress, error);
++        if (secondRc != 0) {
++            std::cerr << "second in-process extraction failed: " << error << "\n";
++            return secondRc;
++        }
++        std::cout << "second in-process extraction complete; recipe nodes processed="
++                  << progress.load() << "\n";
++    }
++    return 0;
++}

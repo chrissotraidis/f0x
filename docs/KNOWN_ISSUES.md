@@ -35,8 +35,9 @@
   first-run screen now owns consent, determinate progress, logs, retry/fallback,
   hot-mount, and same-process game continuation; keyboard navigation supplies
   default focus even though ImGui widgets are not individually exposed to macOS
-  accessibility. Desktop extraction still uses a child process, so iOS/iPadOS
-  must use an in-process implementation.
+  accessibility. Torch now exposes a verified static in-memory O2R API, but F0X
+  still uses the desktop child process and the static library has not yet been
+  linked or compiled for iOS/iPadOS.
 - **MAC-AUDIO-01 — physical CoreAudio route remains unverified:** cartridge
   synthesis and the dedicated producer path now emit nonzero captured PCM.
   The reproducible proof uses SDL's dummy device so it does not establish

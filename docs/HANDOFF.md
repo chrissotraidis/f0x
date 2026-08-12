@@ -29,6 +29,11 @@ The macOS app now defers a raw-ROM-only install to its visible first-run surface
 runs extraction asynchronously behind a determinate 3,610-entry progress bar and
 scrolling log, hot-mounts the validated archive, and continues into the same
 process. Standard keyboard navigation/default focus is enabled on Setup and Home.
+Torch now also exposes `GdxRunInProcessO2R`: it accepts ROM bytes, recipes,
+unique staging output, version, and a pollable asset counter. The static-library
+harness reproduced the exact `7d60d975...` archive twice sequentially in one
+process and refuses to overwrite a non-empty output. It is not yet linked into
+F0X or compiled for iOS.
 
 ## Revised goal and execution order
 
@@ -39,7 +44,7 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
 
 1. Metal presentation stability across title/menu/race/resize/fullscreen;
 2. completed controlled race plus save/relaunch/load round-trip;
-3. replace desktop child extraction with an in-process mobile-capable importer;
+3. integrate the proven in-process Torch API and compile it for iOS;
 4. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
 5. touch, timing/high refresh, packaging, README, and final audits.
 
@@ -99,12 +104,16 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   installed and hot-mounted the 3,610-entry archive, and the same process reached
   the packaged GP race marker. Ordinary launches still require explicit user
   confirmation; the script seam exists only when `GDX_INPUT_SCRIPT` is set.
+- Torch static-library mode now has a small exception-safe in-memory O2R entry
+  point and harness. It generated the exact 3,610-entry golden twice in one
+  process from the authorized ROM, passed the full archive validator, and safely
+  rejected a destination already containing `generic.o2r`.
 
 ## Next action
 
-Design the smallest in-process extractor boundary shared by macOS and iOS/iPadOS,
-preserving the current identity, atomic-install, progress, retry, and failure
-contract. In parallel, the owner can
+Link the proven in-process extractor into F0X behind the existing importer
+contract, then compile that dependency graph for iOS/iPadOS. Keep final archive
+validation and atomic activation in the port layer. In parallel, the owner can
 observe the current packaged build for flashing and use a connected controller
 to close the completed-race gate; save/relaunch/load persistence is already
 independently verified.
