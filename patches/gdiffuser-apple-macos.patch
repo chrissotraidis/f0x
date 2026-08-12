@@ -11,10 +11,21 @@ diff --git a/libultraship b/libultraship
 -Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71
 +Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71-dirty
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..f7df8c2 100644
+index cab4365..aa0babc 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
-@@ -48,6 +48,11 @@ list(FILTER GAME_SOURCES EXCLUDE REGEX "/libultra/os/getmemsize\\.c$")
+@@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
+     project(gdiffuser_port LANGUAGES C CXX)
+ endif()
+ 
++if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
++    enable_language(OBJCXX)
++endif()
++
+ set(DECOMP "${CMAKE_CURRENT_SOURCE_DIR}/../decomp")
+ find_package(Python3 COMPONENTS Interpreter REQUIRED)
+ 
+@@ -48,6 +52,11 @@ list(FILTER GAME_SOURCES EXCLUDE REGEX "/libultra/os/getmemsize\\.c$")
  # EK modes are runtime-gated by disk-image presence (port/n64_leo.c).
  option(GDX_EXPANSION_KIT "Compile Expansion Kit (64DD) support into the port" ON)
  
@@ -26,7 +37,7 @@ index cab4365..f7df8c2 100644
  # GDX_DEV_TOOLS — master switch for the behaviour-altering (Bucket B) developer gates
  # (port/gdx_dev_gates.h, docs/menu/DEVELOPER_TAB.md). When absent, every Bucket B gate is a
  # hard-wired 0 (no getenv, no CVar read) and the Dev Tools page omits the section — safe because
-@@ -181,6 +186,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
+@@ -181,6 +190,13 @@ target_compile_definitions(gdiffuser_game PRIVATE
      ASSET_REVISION=rev0
  )
  
@@ -40,26 +51,58 @@ index cab4365..f7df8c2 100644
  # MSVC: silence IDO-era decomp noise, but keep fatal the classes that are UB on x64 and have
  # caused real crashes: C4715/C4716 (non-void falls off the end — MIPS left the value in $v0,
  # MSVC returns garbage) and C4013 (implicit decl truncates a 64-bit pointer return to EAX;
-@@ -296,6 +308,18 @@ if(GDX_EXPANSION_KIT)
+@@ -296,6 +312,42 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
  
 +if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND GDX_MACOS_BUNDLE)
++    # Make the bundle metadata an explicit staged artifact.  CMake's implicit plist placement
++    # follows the target's original name when OUTPUT_NAME changes, which can leave a clean F0X.app
++    # without Contents/Info.plist.
++    set(MACOSX_BUNDLE_EXECUTABLE_NAME "F0X")
++    set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x")
++    set(MACOSX_BUNDLE_BUNDLE_NAME "F0X")
++    set(MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0")
++    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0")
++    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/F0X-Info.plist.in"
++                   "${CMAKE_CURRENT_BINARY_DIR}/F0X-Info.plist" @ONLY)
 +    set_target_properties(G-Diffuser PROPERTIES
 +        MACOSX_BUNDLE TRUE
 +        OUTPUT_NAME "F0X"
-+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/F0X-Info.plist.in"
++        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/F0X-Info.plist"
 +        MACOSX_BUNDLE_BUNDLE_NAME "F0X"
 +        MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x"
 +        MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0"
 +        MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0")
 +    target_compile_definitions(G-Diffuser PRIVATE GDX_MACOS_BUNDLE=1)
++    set(GDIFFUSER_PACKAGE_DATA_DIR "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Resources")
++    set(GDIFFUSER_PACKAGE_HELPER_DIR "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Helpers")
++else()
++    set(GDIFFUSER_PACKAGE_DATA_DIR "$<TARGET_FILE_DIR:G-Diffuser>")
++    set(GDIFFUSER_PACKAGE_HELPER_DIR "$<TARGET_FILE_DIR:G-Diffuser>")
++endif()
++
++if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
++    target_sources(G-Diffuser PRIVATE gdx_firstboot_picker.mm)
++    find_library(GDX_APPKIT_FRAMEWORK AppKit REQUIRED)
++    find_library(GDX_UNIFORM_TYPE_IDENTIFIERS_FRAMEWORK UniformTypeIdentifiers REQUIRED)
++    target_link_libraries(G-Diffuser PRIVATE
++        "${GDX_APPKIT_FRAMEWORK}"
++        "${GDX_UNIFORM_TYPE_IDENTIFIERS_FRAMEWORK}")
 +endif()
 +
  target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
  
  if(WIN32)
-@@ -343,14 +367,19 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -337,30 +389,36 @@ add_custom_command(
+ add_custom_target(gdiffuser_engine_o2r DEPENDS "${GDIFFUSER_ENGINE_O2R}")
+ add_dependencies(G-Diffuser gdiffuser_engine_o2r)
+ add_custom_command(TARGET G-Diffuser POST_BUILD
+-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${GDIFFUSER_ENGINE_O2R}" "$<TARGET_FILE_DIR:G-Diffuser>/gdiffuser.o2r"
++    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${GDIFFUSER_ENGINE_O2R}"
++            "${GDIFFUSER_PACKAGE_DATA_DIR}/gdiffuser.o2r"
+     VERBATIM)
+ 
  # Fonts stay loose beside the exe so GdxFast3dGui can add them to ImGui's atlas before the
  # renderer uploads it.
  set(GDIFFUSER_GUI_FONT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
@@ -81,7 +124,80 @@ index cab4365..f7df8c2 100644
      VERBATIM)
  
  # SDL only knows the pads that existed when it was released, and the one we bundle is pinned.
-@@ -467,6 +496,9 @@ else()
+ # The community database is updated continuously and SDL_GameControllerAddMappingsFromFile layers
+-# it on top, so a pad newer than the bundled SDL still works. It has to sit beside the exe under
+-# this exact name: LocateFileAcrossAppDirs resolves it from the bare string in os.cpp.
++# it on top, so a pad newer than the bundled SDL still works. LocateFileAcrossAppDirs resolves it
++# from the app resources on macOS, or beside the executable in portable layouts.
+ add_custom_command(TARGET G-Diffuser POST_BUILD
+     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+             "${CMAKE_CURRENT_SOURCE_DIR}/assets/gamecontrollerdb.txt"
+-            "$<TARGET_FILE_DIR:G-Diffuser>/gamecontrollerdb.txt"
++            "${GDIFFUSER_PACKAGE_DATA_DIR}/gamecontrollerdb.txt"
+     VERBATIM)
+ 
+ # Keep the project license and every bundled/static dependency notice with binary releases.
+@@ -369,10 +427,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+             "${CMAKE_SOURCE_DIR}/LICENSE"
+             "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
+-            "$<TARGET_FILE_DIR:G-Diffuser>"
++            "${GDIFFUSER_PACKAGE_DATA_DIR}"
+     COMMAND "${CMAKE_COMMAND}" -E copy_directory
+             "${GDIFFUSER_LICENSE_DIR}"
+-            "$<TARGET_FILE_DIR:G-Diffuser>/LICENSES"
++            "${GDIFFUSER_PACKAGE_DATA_DIR}/LICENSES"
+     VERBATIM)
+ 
+ # gdx-extract, the standalone deterministic O2R extractor first boot spawns as a child process.
+@@ -412,9 +470,10 @@ add_custom_target(gdx-extract DEPENDS gdx_extract_ext)
+ add_dependencies(G-Diffuser gdx_extract_ext)
+ 
+ add_custom_command(TARGET G-Diffuser POST_BUILD
++    COMMAND "${CMAKE_COMMAND}" -E make_directory "${GDIFFUSER_PACKAGE_HELPER_DIR}"
+     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+             "${GDX_EXTRACT_EXE}"
+-            "$<TARGET_FILE_DIR:G-Diffuser>/gdx-extract${CMAKE_EXECUTABLE_SUFFIX}"
++            "${GDIFFUSER_PACKAGE_HELPER_DIR}/gdx-extract${CMAKE_EXECUTABLE_SUFFIX}"
+     VERBATIM)
+ 
+ # Deploy the recipe tree as decomp-recipes/ next to the exe. The packaged layout mirrors the
+@@ -422,7 +481,7 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+ # Only us/rev0 ships; other revisions' config keys are never dereferenced because recipe
+ # selection is by matched ROM SHA1.
+ set(GDX_RECIPES_SRC "${CMAKE_SOURCE_DIR}/decomp")
+-set(GDX_RECIPES_DST "$<TARGET_FILE_DIR:G-Diffuser>/decomp-recipes")
++set(GDX_RECIPES_DST "${GDIFFUSER_PACKAGE_DATA_DIR}/decomp-recipes")
+ # The EK slice manifest ships beside the recipes so the runtime disk step can pass it to
+ # `gdx-extract disk -m`.
+ set(GDX_EK_SLICE_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/gen/ek_slice_manifest.txt")
+@@ -449,6 +508,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+             --ek-yaml-dir "${CMAKE_SOURCE_DIR}/fzerox-expansion-kit/assets/yaml/jp"
+     VERBATIM)
+ 
++# CMake signs a macOS bundle during link.  The post-build steps above then add the
++# engine, extractor, recipes, fonts, and notices, which invalidates that seal and
++# makes Finder report the app as damaged.  Re-sign only after its complete local
++# layout has been staged.  This is intentionally ad-hoc signing: distribution
++# notarization remains a separate release responsibility.
++if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND GDX_MACOS_BUNDLE)
++    find_program(GDX_CODESIGN_EXECUTABLE codesign REQUIRED)
++    add_custom_command(TARGET G-Diffuser POST_BUILD
++        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
++                "${CMAKE_CURRENT_BINARY_DIR}/F0X-Info.plist"
++                "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Info.plist"
++        COMMAND "${GDX_CODESIGN_EXECUTABLE}" --force --sign - --timestamp=none
++                "${GDIFFUSER_PACKAGE_HELPER_DIR}/gdx-extract${CMAKE_EXECUTABLE_SUFFIX}"
++        COMMAND "${GDX_CODESIGN_EXECUTABLE}" --force --sign - --timestamp=none
++                "$<TARGET_BUNDLE_DIR:G-Diffuser>"
++        COMMENT "Ad-hoc signing the staged F0X bundle"
++        VERBATIM)
++endif()
++
+ target_include_directories(G-Diffuser PRIVATE
+     "${CMAKE_CURRENT_SOURCE_DIR}"   # for "resource/ResourceFactories.h"
+     "${DECOMP}/include"
+@@ -467,6 +545,9 @@ else()
      # (needed on older glibc, harmless on newer).
      find_package(Threads REQUIRED)
      target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -91,7 +207,7 @@ index cab4365..f7df8c2 100644
      # Release tarballs carry the dependencies no distribution can be relied on to provide in
      # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
      # which beats a wrapper script because the binary stays directly runnable. No effect on a
-@@ -483,6 +515,8 @@ endif()
+@@ -483,6 +564,8 @@ endif()
  # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
  if(NOT MSVC)
      target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
@@ -100,7 +216,7 @@ index cab4365..f7df8c2 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +570,17 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +619,17 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -118,7 +234,7 @@ index cab4365..f7df8c2 100644
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -764,6 +809,8 @@ if(GDX_BUILD_JP)
+@@ -764,6 +858,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -127,6 +243,99 @@ index cab4365..f7df8c2 100644
          target_link_options(G-Diffuser-JP PRIVATE
              "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/gdx_hide_libm.map")
      endif()
+diff --git a/port/gdx_dump_launch.cpp b/port/gdx_dump_launch.cpp
+index 3a04fc0..dd762a9 100644
+--- a/port/gdx_dump_launch.cpp
++++ b/port/gdx_dump_launch.cpp
+@@ -88,6 +88,23 @@ fs::path exeDir() {
+     return fs::current_path(ec);
+ }
+ 
++fs::path packagedResourcesDir() {
++    const fs::path exe = exeDir();
++#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
++    return exe.parent_path() / "Resources";
++#else
++    return exe;
++#endif
++}
++
++fs::path packagedExtractorPath() {
++#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
++    return exeDir().parent_path() / "Helpers" / kExtractBinaryName;
++#else
++    return exeDir() / kExtractBinaryName;
++#endif
++}
++
+ std::string truncateLine(std::string s) {
+     while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' ' || s.back() == '\t')) {
+         s.pop_back();
+@@ -231,7 +248,7 @@ bool isDir(const fs::path& p) {
+ // gdx-extract.exe next to the game exe — same convention as port/gdx_extract_launch.cpp (exeDir /
+ // kExtractBinaryName). Returns "" when absent (the Python fallback then takes over).
+ std::string findExtractBinary() {
+-    fs::path cand = exeDir() / kExtractBinaryName;
++    fs::path cand = packagedExtractorPath();
+     return isRegularFile(cand) ? cand.string() : std::string();
+ }
+ 
+@@ -649,7 +666,7 @@ DumpEnvironment GdxDumpDiscover() {
+         env.diskArchivePath = resolveNextToExe(kDiskArchiveName);
+         env.iplArchivePath = resolveNextToExe(kIplArchiveName);
+         env.romPath = resolveNextToExe(kRomName);    // optional: the tool is archive-only capable
+-        fs::path recipes = exeDir() / kRecipesDirName;
++        fs::path recipes = packagedResourcesDir() / kRecipesDirName;
+         if (isDir(recipes)) {
+             env.recipesDir = recipes.string();
+             fs::path manifest = recipes / kEkSliceManifestName;
+diff --git a/port/gdx_extract_launch.cpp b/port/gdx_extract_launch.cpp
+index 4630c47..df3f0a5 100644
+--- a/port/gdx_extract_launch.cpp
++++ b/port/gdx_extract_launch.cpp
+@@ -169,6 +169,22 @@ constexpr const char* kExtractBinaryName = "gdx-extract.exe";
+ constexpr const char* kExtractBinaryName = "gdx-extract";
+ #endif
+ 
++fs::path packagedResourcesDir(const fs::path& exeDir) {
++#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
++    return exeDir.parent_path() / "Resources";
++#else
++    return exeDir;
++#endif
++}
++
++fs::path packagedExtractorPath(const fs::path& exeDir) {
++#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
++    return exeDir.parent_path() / "Helpers" / kExtractBinaryName;
++#else
++    return exeDir / kExtractBinaryName;
++#endif
++}
++
+ // Fallback ROM SHA-1s (the keys decomp/config.yml uses). config.yml is authoritative at runtime --
+ // recipes are the single source of truth -- and these are read only when it cannot be.
+ constexpr const char* kExpectedRomSha1Fallback = "5f658e88ffa9de23cba6986a8fd3d3a90d7b4340";
+@@ -1196,8 +1212,8 @@ ExtractOutcome runExtraction(const fs::path& dataDir, const fs::path& romPath, c
+     std::error_code ec;
+     const char* archiveName = profile.archiveName; // fzerox.o2r (US) / fzerox-jp.o2r (JP)
+ 
+-    const fs::path extractBin = exeDir / kExtractBinaryName;
+-    const fs::path recipesDir = exeDir / kRecipesDirName;
++    const fs::path extractBin = packagedExtractorPath(exeDir);
++    const fs::path recipesDir = packagedResourcesDir(exeDir) / kRecipesDirName;
+     if (!fileExists(extractBin)) {
+         gdx_port_logf("[extract] extractor component missing (%s). Cannot build %s — booting from the "
+                       "raw ROM. Reinstall G-Diffuser to restore the extractor.\n",
+@@ -2045,7 +2061,7 @@ std::string GdxExtractFileSha1(const char* path) {
+ std::string GdxExtractExpectedRomSha1(const char* exeDir) {
+     if (exeDir != nullptr && exeDir[0] != '\0') {
+         std::string fromConfig =
+-            expectedRomSha1FromConfig(fs::path(exeDir) / kRecipesDirName / kConfigYmlName);
++            expectedRomSha1FromConfig(packagedResourcesDir(fs::path(exeDir)) / kRecipesDirName / kConfigYmlName);
+         if (!fromConfig.empty()) {
+             return toLowerHex(fromConfig);
+         }
 diff --git a/port/gdx_fiber_ucontext.c b/port/gdx_fiber_ucontext.c
 index 9f35a8b..d528885 100644
 --- a/port/gdx_fiber_ucontext.c
@@ -165,7 +374,7 @@ index 9f35a8b..d528885 100644
  #else
      return (unsigned long) (uintptr_t) pthread_self();
 diff --git a/port/gdx_firstboot.cpp b/port/gdx_firstboot.cpp
-index 90116a9..b8e79b5 100644
+index 90116a9..473135f 100644
 --- a/port/gdx_firstboot.cpp
 +++ b/port/gdx_firstboot.cpp
 @@ -161,8 +161,19 @@ fs::path executableDir(const char* argv0) {
@@ -228,6 +437,36 @@ index 90116a9..b8e79b5 100644
      fs::path diskInData = dataDir / kDiskName;
      if (st.complete) {
          std::string why;
+@@ -1140,6 +1165,8 @@ std::string GdxFirstBootDescribeMissing(const std::string& dataDirIn) {
+ bool NativeFilePickerAvailable() {
+ #ifdef _WIN32
+     return true;
++#elif defined(__APPLE__)
++    return true;
+ #else
+     return false;
+ #endif
+@@ -1163,6 +1190,20 @@ std::string PickIplFile() {
+                           L"64DD IPL ROM (*.n64;*.z64)\0*.n64;*.z64\0All files\0*.*\0");
+     return p.string();
+ }
++#elif defined(__APPLE__)
++std::string GdxPickRomFileMacOS();
++std::string GdxPickDiskFileMacOS();
++std::string GdxPickIplFileMacOS();
++
++std::string PickRomFile() {
++    return GdxPickRomFileMacOS();
++}
++std::string PickDiskFile() {
++    return GdxPickDiskFileMacOS();
++}
++std::string PickIplFile() {
++    return GdxPickIplFileMacOS();
++}
+ #else
+ std::string PickRomFile() {
+     return {};
 diff --git a/port/gdx_firstboot.h b/port/gdx_firstboot.h
 index 34478c6..7e89f73 100644
 --- a/port/gdx_firstboot.h
@@ -243,6 +482,204 @@ index 34478c6..7e89f73 100644
  //
  // Known limits: generic.o2r generation and Windows save-path redirection are NOT handled here.
  #pragma once
+diff --git a/port/gdx_firstboot_gui.cpp b/port/gdx_firstboot_gui.cpp
+index 1ed3da6..7faccb2 100644
+--- a/port/gdx_firstboot_gui.cpp
++++ b/port/gdx_firstboot_gui.cpp
+@@ -41,6 +41,12 @@ namespace {
+ // literal rather than exported: it is the SoH/Starship game-named-archive convention and is stable.
+ constexpr const char* kGameArchiveName = "fzerox.o2r";
+ 
++#ifdef EXPANSION_KIT
++constexpr int kSetupRowCount = 3;
++#else
++constexpr int kSetupRowCount = 1;
++#endif
++
+ enum class Phase {
+     Acquire,       // Waiting for the three inputs to be provided + validated.
+     Extracting,    // Async extraction is running; showing live progress.
+@@ -80,10 +86,12 @@ class SetupScreen {
+     SetupScreen(std::string dataDir, std::string exeDir)
+         : mDataDir(std::move(dataDir)), mExeDir(std::move(exeDir)) {
+         mRows[0] = { "F-Zero X ROM (US rev0, .z64)", SetupRomFileName(), &ValidateRomFile, &PickRomFile };
++#ifdef EXPANSION_KIT
+         mRows[1] = { "Expansion Kit disk (.ndd)", SetupDiskFileName(), &ValidateDiskFile, &PickDiskFile };
+         mRows[2] = { "64DD IPL ROM (N64DDIPLROM.n64)", SetupIplFileName(), &ValidateIplFile, &PickIplFile };
+-        for (Row& r : mRows) {
+-            Recheck(r); // pre-check files that already exist beside the exe (resumed setup)
++#endif
++        for (int i = 0; i < kSetupRowCount; ++i) {
++            Recheck(mRows[i]); // pre-check files that already exist beside the exe (resumed setup)
+         }
+     }
+ 
+@@ -141,8 +149,9 @@ class SetupScreen {
+         }
+         std::string src(path);
+         std::string why;
+-        // Classify by validator: try ROM, then disk, then IPL. First match wins.
+-        for (Row& r : mRows) {
++        // Classify only the media this binary can consume. First match wins.
++        for (int i = 0; i < kSetupRowCount; ++i) {
++            Row& r = mRows[i];
+             std::string reason;
+             if (r.validate(src, reason)) {
+                 if (CopyInputInto(src, mDataDir, r.canonicalName)) {
+@@ -155,7 +164,11 @@ class SetupScreen {
+                 return;
+             }
+         }
++#ifdef EXPANSION_KIT
+         mDropError = "That file is not a recognized F-Zero X ROM, Expansion Kit disk, or 64DD IPL ROM.";
++#else
++        mDropError = "That file is not a recognized F-Zero X ROM.";
++#endif
+         gdx_port_logf("[setup] rejected dropped file (matches no expected input): %s\n", src.c_str());
+     }
+ 
+@@ -305,8 +318,8 @@ class SetupScreen {
+     }
+ 
+     bool AllRowsOk() const {
+-        for (const Row& r : mRows) {
+-            if (r.status != RowStatus::Ok) {
++        for (int i = 0; i < kSetupRowCount; ++i) {
++            if (mRows[i].status != RowStatus::Ok) {
+                 return false;
+             }
+         }
+@@ -350,6 +363,11 @@ class SetupScreen {
+         if (!AllRowsOk()) {
+             return;
+         }
++#ifndef EXPANSION_KIT
++        gdx_port_logf("[setup] user confirmed the cartridge ROM; continuing with raw-ROM assets\n");
++        mPhase = Phase::Done;
++        return;
++#else
+         // A managed-copy-only re-run (original .ndd deleted after a prior setup made the backup)
+         // validated against <dataDir>/media, so RowPath(1) would record a nonexistent canonical path
+         // in the sidecar and make EnsureManagedDiskCopy warn about a copy that already exists.
+@@ -376,6 +394,7 @@ class SetupScreen {
+         }
+         gdx_port_logf("[setup] user confirmed all inputs; wrote completion marker; starting extraction\n");
+         StartExtraction();
++#endif
+     }
+ 
+     void MountArchive() {
+@@ -464,7 +483,7 @@ class SetupScreen {
+         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                                        ImGuiWindowFlags_NoDocking;
+-        if (!ImGui::Begin("G-Diffuser - First-Time Setup", nullptr, flags)) {
++        if (!ImGui::Begin("F0X - First-Time Setup", nullptr, flags)) {
+             ImGui::End();
+             return;
+         }
+@@ -473,13 +492,19 @@ class SetupScreen {
+         if (large != nullptr) {
+             ImGui::PushFont(large);
+         }
+-        ImGui::TextUnformatted("Welcome to G-Diffuser");
++        ImGui::TextUnformatted("Welcome to F0X");
+         if (large != nullptr) {
+             ImGui::PopFont();
+         }
++#ifdef EXPANSION_KIT
+         ImGui::TextWrapped("Review the three original files below. Files already next to the game are "
+                            "detected automatically, but nothing is installed until you confirm. Nothing "
+                            "is uploaded.");
++#else
++        ImGui::TextWrapped("Review the original F-Zero X ROM below. Files already next to the game are "
++                           "detected automatically, but nothing is installed until you confirm. Nothing "
++                           "is uploaded.");
++#endif
+         ImGui::Separator();
+ 
+         switch (mPhase) {
+@@ -499,7 +524,7 @@ class SetupScreen {
+     }
+ 
+     void DrawAcquire() {
+-        for (int i = 0; i < 3; ++i) {
++        for (int i = 0; i < kSetupRowCount; ++i) {
+             Row& r = mRows[i];
+             ImGui::PushID(i);
+             ImGui::SeparatorText(r.label);
+@@ -552,6 +577,7 @@ class SetupScreen {
+             ImGui::TextColored(ImVec4(0.90f, 0.45f, 0.35f, 1.0f), "%s", mDropError.c_str());
+         }
+         if (AllRowsOk()) {
++#ifdef EXPANSION_KIT
+             ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.35f, 1.0f), "All three files are verified.");
+             ImGui::TextWrapped("Confirm to build fzerox.o2r from your ROM and continue to the game.");
+             // The deletable-files statement names each file, so the reader never has to guess which
+@@ -577,8 +603,21 @@ class SetupScreen {
+             if (ImGui::Button("Build game data and continue", ImVec2(-1.0f, 0.0f))) {
+                 ConfirmAndStartExtraction();
+             }
++#else
++            ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.35f, 1.0f), "The cartridge ROM is verified.");
++            ImGui::TextWrapped("This cartridge-only build reads your ROM directly. Expansion Kit media and "
++                               "game-data extraction are unavailable in this build.");
++            ImGui::Spacing();
++            if (ImGui::Button("Continue to the game", ImVec2(-1.0f, 0.0f))) {
++                ConfirmAndStartExtraction();
++            }
++#endif
+         } else {
++#ifdef EXPANSION_KIT
+             ImGui::TextDisabled("Waiting for all three files.");
++#else
++            ImGui::TextDisabled("Waiting for the F-Zero X ROM.");
++#endif
+         }
+     }
+ 
+@@ -673,7 +712,7 @@ class SetupScreen {
+ 
+     std::string mDataDir;
+     std::string mExeDir;
+-    Row mRows[3] = {};
++    Row mRows[kSetupRowCount] = {};
+     Phase mPhase = Phase::Acquire;
+     std::string mStage;      // latest extraction stage line
+     std::string mError;      // extraction failure reason (surfaced in DrawExtractFailed)
+diff --git a/port/gdx_firstboot_gui.h b/port/gdx_firstboot_gui.h
+index 7255291..9af4bce 100644
+--- a/port/gdx_firstboot_gui.h
++++ b/port/gdx_firstboot_gui.h
+@@ -1,9 +1,9 @@
+ // G-Diffuser — in-window first-time setup flow (ImGui).
+ //
+-// A setup screen drawn INSIDE the game window, SoH/BattleShip style: it asks for the three original
+-// inputs (F-Zero X US rev0 ROM .z64, Expansion Kit disk .ndd, 64DD IPL ROM), validates and copies them
+-// beside the executable, runs the O2R extraction with live progress, hot-mounts the produced
+-// fzerox.o2r, and lets boot continue IN-PROCESS (no relaunch).
++// A setup screen drawn INSIDE the game window, SoH/BattleShip style. Expansion-Kit builds ask for
++// the ROM, Expansion Kit disk, and IPL, then run O2R extraction. Cartridge-only builds ask only for
++// the ROM and continue through the existing raw-ROM path. Both validate and copy selected inputs
++// into the application data directory before boot continues in-process.
+ //
+ // main() invokes it only when FirstBootRun() returns FirstBootStatus::NeedsSetup, AFTER the window /
+ // Gui / FileDropMgr exist and BEFORE the game boots — between InitFileDropMgr and
+@@ -21,10 +21,10 @@ namespace gdx {
+ //   exeDir       Absolute executable directory (where gdx-extract + decomp-recipes ship).
+ //   outRomPath   On success, receives the absolute path of the installed ROM (for gdx_init_rom).
+ //
+-// True means boot should continue: ROM/disk/IPL installed, completion marker written, and — if
+-// extraction succeeded — fzerox.o2r hot-mounted. False means the user closed the window and the
+-// caller should exit cleanly; files already copied beside the exe persist, so the next launch resumes
+-// with those rows pre-filled.
++// True means boot should continue. Expansion-Kit builds have installed ROM/disk/IPL media and,
++// when extraction succeeds, hot-mounted fzerox.o2r. Cartridge-only builds have installed a verified
++// ROM for the existing raw-ROM path. False means the user closed the window and the caller exits
++// cleanly; installed files persist, so the next launch resumes with pre-filled rows.
+ bool GdxFirstBootSetupRun(const std::string& dataDir, const std::string& exeDir, std::string& outRomPath);
+ 
+ } // namespace gdx
 diff --git a/port/gdx_frame_pacer.c b/port/gdx_frame_pacer.c
 index d80931c..849e312 100644
 --- a/port/gdx_frame_pacer.c
@@ -319,6 +756,33 @@ index ccb0585..eb611a7 100644
  #endif
  /* D_i2_8010ADE0 (save file "F-ZERO X" signature) is real now: save.c (save-system slice). */
  /* ending_effects.c is excluded from the build (static GBI lists need
+diff --git a/port/main.cpp b/port/main.cpp
+index 118ee0d..af14c8e 100644
+--- a/port/main.cpp
++++ b/port/main.cpp
+@@ -498,6 +498,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
+         ec.clear();
+     }
+ 
++#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
++    // F0X keeps immutable archives in Contents/Resources, never in the executable directory.
++    if (start.filename() == "MacOS" && start.parent_path().filename() == "Contents") {
++        roots.push_back(start.parent_path() / "Resources");
++    }
++#endif
++
+     for (std::filesystem::path dir = start; !dir.empty(); dir = dir.parent_path()) {
+         roots.push_back(dir);
+         roots.push_back(dir / "assets" / "extracted");
+@@ -662,7 +669,7 @@ int main(int argc, char** argv) {
+     }
+ 
+     logStep("CreateUninitializedInstance");
+-    auto ctx = Ship::Context::CreateUninitializedInstance("G-Diffuser", "gdiffuser",
++    auto ctx = Ship::Context::CreateUninitializedInstance("F0X", "gdiffuser",
+                                                           "gdiffuser.cfg.json");
+     if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
+ 
 diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
 index 8c63a17..9ef930b 100644
 --- a/port/n64_gfx_bridge.cpp
@@ -496,7 +960,7 @@ index c4598d5..6c99936 100644
  // libc: BSD byte-compare not in the MSVC CRT. glibc provides both natively (with size_t
 diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
 new file mode 100644
-index 0000000..5c0fee8
+index 0000000..f6ab8d2
 --- /dev/null
 +++ b/port/F0X-Info.plist.in
 @@ -0,0 +1,26 @@
@@ -507,23 +971,80 @@ index 0000000..5c0fee8
 +    <key>CFBundleDevelopmentRegion</key>
 +    <string>en</string>
 +    <key>CFBundleExecutable</key>
-+    <string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
++    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
 +    <key>CFBundleIdentifier</key>
-+    <string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
++    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
 +    <key>CFBundleInfoDictionaryVersion</key>
 +    <string>6.0</string>
 +    <key>CFBundleName</key>
-+    <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
++    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
 +    <key>CFBundlePackageType</key>
 +    <string>APPL</string>
 +    <key>CFBundleShortVersionString</key>
-+    <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
++    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
 +    <key>CFBundleVersion</key>
-+    <string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
++    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>13.0</string>
 +    <key>NSHighResolutionCapable</key>
 +    <true/>
 +</dict>
 +</plist>
+diff --git a/port/gdx_firstboot_picker.mm b/port/gdx_firstboot_picker.mm
+new file mode 100644
+index 0000000..29c553a
+--- /dev/null
++++ b/port/gdx_firstboot_picker.mm
+@@ -0,0 +1,51 @@
++// Native macOS file-picker bridge for the in-window first-launch setup.
++
++#import <AppKit/AppKit.h>
++#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
++
++#include <string>
++
++namespace {
++
++std::string pickFile(NSString* title, NSArray<UTType*>* contentTypes) {
++    @autoreleasepool {
++        NSOpenPanel* panel = [NSOpenPanel openPanel];
++        panel.title = title;
++        panel.message = @"Choose a local game-data file. F0X copies it into its Application Support folder.";
++        panel.canChooseFiles = YES;
++        panel.canChooseDirectories = NO;
++        panel.allowsMultipleSelection = NO;
++        panel.allowedContentTypes = contentTypes;
++        if ([panel runModal] != NSModalResponseOK || panel.URL == nil) {
++            return {};
++        }
++        return panel.URL.path.UTF8String;
++    }
++}
++
++} // namespace
++
++namespace gdx {
++
++std::string GdxPickRomFileMacOS() {
++    return pickFile(@"Select your F-Zero X ROM (US rev0)", @[
++        [UTType typeWithFilenameExtension:@"z64"],
++        [UTType typeWithFilenameExtension:@"n64"],
++        [UTType typeWithFilenameExtension:@"v64"],
++    ]);
++}
++
++std::string GdxPickDiskFileMacOS() {
++    return pickFile(@"Select your F-Zero X Expansion Kit disk", @[
++        [UTType typeWithFilenameExtension:@"ndd"],
++    ]);
++}
++
++std::string GdxPickIplFileMacOS() {
++    return pickFile(@"Select your 64DD IPL ROM", @[
++        [UTType typeWithFilenameExtension:@"n64"],
++        [UTType typeWithFilenameExtension:@"z64"],
++    ]);
++}
++
++} // namespace gdx
 
