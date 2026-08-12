@@ -2,6 +2,17 @@
 
 ## F0X-specific
 
+- **MAC-PRESENT-02 — F0X Metal still flashes severely:** the drawable-order
+  correction restored visible title/race frames, but the user reports the
+  current interface still flashes rapidly. This supersedes any earlier
+  "stable title" wording. Reproduction must cover title, menu/race transitions,
+  resize, and fullscreen; Gate 3 remains open until a sustained direct soak is
+  visually stable.
+- **MAC-UI-01 — no complete F0X product interface exists:** the app currently
+  exposes a first-time ROM setup view, the game's own menus, and upstream
+  developer/settings surfaces. It still needs a coherent F0X shell for import,
+  ready/library state, launch, settings, progress/error recovery, and lifecycle.
+
 - **MAC-CAPTURE-01 — framebuffer BMP readback is black while the title is visible:**
   on Apple Silicon macOS, deterministic 320×240 BMP captures are identical
   black frames even though a fresh desktop capture visibly shows the rendered
@@ -21,13 +32,11 @@
   latency on a physical output device. A subsequent normal-CoreAudio launch
   stalled inside Apple audio-device creation before F0X booted; this is an
   external host-service boundary, not a synthesis failure.
-- **MAC-RACE-TEX-01 — packaged raw-ROM race has visible texture/HUD defects:**
-  a direct packaged-app image now proves the GP race is live, but portions of
-  the right/bottom HUD are black or clipped and machine surfaces lack expected
-  detail. The same run reports absent `machine_custom_gfx` filepath resources
-  during machine selection and null texture addresses for TMEM tiles 5, 6, 3,
-  4, and 2. The deterministic route is preserved as a regression; Gate 3 stays
-  open until the direct image is visually intact.
+- **MAC-RACE-TEX-01 — residual null TMEM warnings need follow-up:** raw-ROM
+  machine textures now render after filepath emission was gated on actual
+  mounted-resource existence, and narrow windows fall back to centered 4:3.
+  The route still logs null texture addresses for TMEM tiles 5 and 6 during
+  pre-race settings; retain this as a visual regression while fixing flashing.
 
 ## Remaining platform risks
 

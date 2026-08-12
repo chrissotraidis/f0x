@@ -4,11 +4,13 @@
 
 Gate 4 is partially working: F0X has a reproducible, sealed arm64 `F0X.app`
 that macOS directly launches, with mutable data separated from bundle contents.
-The normal Metal path now acquires the drawable before synchronous game rendering,
-which removed the observed black-window flash and visibly restores the title.
+The normal Metal path acquires the drawable before synchronous game rendering,
+which improved the original title strobe, but the user still reports severe
+flashing in the current F0X Metal window. Do not call presentation stable.
 Gate 3 now has direct packaged-app race visuals, but the captured raw-ROM race
-shows missing/cropped HUD and machine-texture regions. Visual correctness,
-player control through a completed race, and physical audio remain open.
+now has restored raw-ROM machine textures and a contained narrow-window HUD.
+Presentation stability, a real F0X application interface, player control through
+a completed race, and physical audio remain open.
 
 ## Revised goal and execution order
 
@@ -17,11 +19,12 @@ PCM-synthesis, bundle-sealing, or title-stability gates without contradictory
 evidence. Preserve the G-Diffuser → libultraship/Fast3D → Metal architecture and
 the ROM-free public boundary. Work one falsifiable gate at a time:
 
-1. packaged raw-ROM race texture/HUD correctness and a completed controlled race;
-2. save/relaunch/load round-trip;
-3. desktop extraction-golden correction plus safe UI import;
-4. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
-5. touch, timing/high refresh, packaging, README, and final audits.
+1. Metal presentation stability across title/menu/race/resize/fullscreen;
+2. coherent F0X app shell for import, ready/library state, settings, recovery, and launch;
+3. completed controlled race plus save/relaunch/load round-trip;
+4. desktop extraction-golden correction plus safe import through the app shell;
+5. iOS/iPadOS build and physical-iPad controller/lifecycle/audio proof;
+6. touch, timing/high refresh, packaging, README, and final audits.
 
 ## Verified state
 
@@ -37,7 +40,7 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   `~/Library/Application Support/F0X` for configuration and logs, preserves
   immutable fonts in `Contents/Resources`, and directly reached the branded
   one-ROM Metal first-time setup screen.
-- The rebuilt sealed bundle visibly rendered a stable F-Zero X title after the
+- The rebuilt sealed bundle rendered a complete F-Zero X title after the
   normal frame setup moved ahead of `gdx_vi_tick()`. Keep that order: the game
   fiber submits its Metal work synchronously inside the tick, so moving setup
   back afterward reintroduces the drawable mismatch and black strobe.
@@ -45,15 +48,18 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   readiness state instead of a boot-time delay. In the signed packaged app it
   traversed modes `0 -> 7 -> 10 -> 8 -> 9 -> 1` without a timeout and emitted
   `packaged_gp_race_capture_interval`. Direct inspection showed a live GP race.
+- Raw-ROM texture pointers now use direct copies when their generated archive
+  key is not actually mounted, restoring the Blue Falcon and scene detail.
+- Narrower-than-4:3 windows now select the centered 4:3 composite instead of
+  applying hor+ expansion that pushed the HUD outside the viewport.
 
 ## Next action
 
-Use the preserved packaged route as the regression while correcting the visible
-race defects. The direct image has a working track, racers, player craft, lap /
-position / energy UI, but portions of the HUD are clipped or black and machine
-textures are missing. The run also logged missing `machine_custom_gfx` resources
-and null TMEM texture addresses, so start at the raw-ROM fallback's texture
-resolution boundary. Do not claim Gate 3 complete until the direct race image is
-visually intact and a player-controlled race completes. Then exercise
-save/relaunch/load persistence. The extraction golden, internal BMP readback,
-and CoreAudio route remain separate gaps.
+Treat the user's observed rapid Metal flashing as the active blocker. Reproduce
+and instrument presentation across title, menu transitions, the preserved GP
+route, window resizing, and fullscreen entry/exit; require a sustained direct
+visual soak before claiming stability. Then build the missing F0X product shell:
+first-run/import, ready/library state, settings, progress/error recovery, and a
+clear launch path. The current setup window plus upstream/developer menus are a
+foundation, not the finished interface. Only after these two gates should the
+loop return to a completed controlled race and save persistence.
