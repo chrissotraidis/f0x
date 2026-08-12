@@ -69,6 +69,14 @@ independently before relying on it for transition evidence.
 - **Observed launch:** macOS launched that exact sealed `.app` into the `F0X (Metal)` window. Its visible panel is titled `F0X - First-Time Setup`, says `Welcome to F0X`, requests only `F-Zero X ROM (US rev0, .z64)`, and points at the Application Support data directory. The native AppKit picker bridge is compiled and linked against AppKit plus UniformTypeIdentifiers; it uses `NSOpenPanel` with modern `allowedContentTypes` filters rather than deprecated file-type filtering.
 - **Boundary:** this is local ad-hoc signing, sufficient to prevent the incomplete-bundle error during local launch. It is not Developer ID signing, notarization, a release package, a completed import, or evidence that a physical Mac other than this host will accept the app.
 
+## 2026-08-12 — F0X Metal drawable-order stability regression
+
+- **Symptom and root cause:** the sealed F0X bundle intermittently flashed black. In the normal host loop, `gdx_vi_tick()` synchronously wakes the game fiber and submits its Metal graphics task before `StartDraw()`/`StartFrame()` acquired the current CAMetalLayer drawable. Metal therefore encoded game work against the prior (or absent) screen target, then the later frame setup acquired and presented a different drawable.
+- **Fix:** the non-interpolated path now opens the GUI/Metal frame and drains deferred wakes immediately before `gdx_vi_tick()`. The existing interpolation path remains unchanged because it owns complete frame brackets per subframe.
+- **Build and package validation:** `cmake --build build/macos-f0x-bundle --target G-Diffuser -j 6` completed successfully. The rebuilt `F0X.app` and its `gdx-extract` helper passed `codesign --verify --deep --strict --verbose=2`.
+- **Live validation:** direct macOS app inspection of that exact rebuilt bundle showed the complete F-Zero X title artwork and `PUSH START`, with a second inspection 2.5 seconds after a title input still showing a stable rendered title rather than the former black strobe. The app then closed cleanly.
+- **Diagnostic boundary:** a temporary persisted present-path trace showed normal startup `vifb-vi-scanout`, followed by a real task and held-frame presentation; it did not show the historical alternating task/hold signature. The trace setting was removed after this run. This is title-screen stability proof, not yet a visual GP-race or controller proof.
+
 ## 2026-08-11 — Gate 3 cartridge PCM synthesis proof
 
 - **Fixes:** the cartridge build (`GDX_EXPANSION_KIT=OFF`) now feeds the active ROM AI buffer into the PCM seam. Its permanent allocator returns its allocation on host ABIs, sequence-font offsets are decoded as big-endian bytes, and soundfont blobs are converted into persistent host-native objects instead of rewriting 32-bit N64 offsets as host pointers.

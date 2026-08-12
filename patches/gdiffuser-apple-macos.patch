@@ -757,7 +757,7 @@ index ccb0585..eb611a7 100644
  /* D_i2_8010ADE0 (save file "F-ZERO X" signature) is real now: save.c (save-system slice). */
  /* ending_effects.c is excluded from the build (static GBI lists need
 diff --git a/port/main.cpp b/port/main.cpp
-index 118ee0d..af14c8e 100644
+index 118ee0d..6b828a3 100644
 --- a/port/main.cpp
 +++ b/port/main.cpp
 @@ -498,6 +498,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
@@ -783,6 +783,45 @@ index 118ee0d..af14c8e 100644
                                                            "gdiffuser.cfg.json");
      if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
  
+@@ -1232,6 +1239,23 @@ int main(int argc, char** argv) {
+         gdx_gfx_interp_tick_config(interpOn ? 1 : 0, interpTickStart, kGdxInterpTickSeconds,
+                                    interpMaxSubframes);
+ 
++        // The default path's game fiber submits its graphics task synchronously from
++        // gdx_vi_tick() below.  Metal's task renderer needs the current drawable and
++        // command buffer before that submission; acquiring them afterwards renders
++        // into the previous (or null) drawable and then presents the new one, which
++        // appears as a black strobe.  The interpolation path owns its own complete
++        // per-subframe StartDraw/StartFrame/EndFrame brackets, so it must stay out.
++        if (!interpOn) {
++            gdx::PerfPhaseBegin(gdx::PerfGuiStart);
++            w->GetGui()->StartDraw();
++            w->StartFrame();
++            // Cross-thread message wakes recorded by the dedicated audio thread
++            // become runnable on the host immediately before the synchronous game
++            // dispatch in gdx_vi_tick().
++            gdx_sched_drain_deferred_wakes();
++            gdx::PerfPhaseEnd(gdx::PerfGuiStart);
++        }
++
+         // The game frame ACTUALLY runs here, not in gdx_dispatch() below. gdx_vi_tick posts the VI
+         // retrace message, which wakes the Main scheduler thread and dispatches the game fiber
+         // inline (osSendMesg -> osStartThread -> __osDispatchThread, because __osRunningThread is
+@@ -1250,14 +1274,6 @@ int main(int argc, char** argv) {
+         if (!interpOn) {
+             // Default path: one tick, one Run, one present, paced by the frame pacer. Nothing on
+             // this branch touches the interpolation machinery.
+-            gdx::PerfPhaseBegin(gdx::PerfGuiStart);
+-            w->GetGui()->StartDraw();
+-            w->StartFrame(); // must precede gdx_dispatch: Run() needs an initialized frame
+-            // Cross-thread message wakes recorded by the dedicated audio thread (sendmesg.c PORT
+-            // path) become runnable here, on the host thread, right before the threads dispatch.
+-            // See the guard block in n64_sched.c.
+-            gdx_sched_drain_deferred_wakes();
+-            gdx::PerfPhaseEnd(gdx::PerfGuiStart);
+             gdx::PerfPhaseBegin(gdx::PerfDispatch);
+             gdx_dispatch();  // run the decomp's game threads cooperatively until they block again
+             gdx::PerfPhaseEnd(gdx::PerfDispatch);
 diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
 index 8c63a17..9ef930b 100644
 --- a/port/n64_gfx_bridge.cpp
@@ -1047,4 +1086,3 @@ index 0000000..29c553a
 +}
 +
 +} // namespace gdx
-

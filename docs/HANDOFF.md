@@ -4,6 +4,8 @@
 
 Gate 4 is partially working: F0X has a reproducible, sealed arm64 `F0X.app`
 that macOS directly launches, with mutable data separated from bundle contents.
+The normal Metal path now acquires the drawable before synchronous game rendering,
+which removed the observed black-window flash and visibly restores the title.
 Gate 3 direct race visuals and physical audio remain open.
 
 ## Verified state
@@ -20,6 +22,10 @@ Gate 3 direct race visuals and physical audio remain open.
   `~/Library/Application Support/F0X` for configuration and logs, preserves
   immutable fonts in `Contents/Resources`, and directly reached the branded
   one-ROM Metal first-time setup screen.
+- The rebuilt sealed bundle visibly rendered a stable F-Zero X title after the
+  normal frame setup moved ahead of `gdx_vi_tick()`. Keep that order: the game
+  fiber submits its Metal work synchronously inside the tick, so moving setup
+  back afterward reintroduces the drawable mismatch and black strobe.
 
 ## Next action
 
