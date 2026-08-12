@@ -1,0 +1,28 @@
+# Deterministic menu setup only. Input playback ends at the live GP race so
+# keyboard/controller mappings take over for the player-controlled acceptance.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 120
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 9 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 1 5400
+LOG player_control_handoff

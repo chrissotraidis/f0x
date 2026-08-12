@@ -167,6 +167,28 @@ extraction golden plus all-black internal BMP readback as separate gates.
   It does not substitute for player-controlled race completion or a new race
   record/ghost save.
 
+## 2026-08-12 — physical-input race attempt (not completed)
+
+- **Handoff:** `scripts/macos-race-handoff.gdx` performed menu setup only, then
+  ended at `player_control_handoff` in live GP race mode. The runtime logged
+  `script complete (26 commands)`, after which its normal keyboard/controller
+  mappings exclusively owned input.
+- **Real mapped input:** macOS Computer Use sent ordinary keyboard events to the
+  focused F0X window. The default X-to-N64-A mapping accelerated the Blue Falcon
+  from 0 to 211 km/h and later 438 km/h; A/D analog-stick mappings visibly
+  steered and recovered the craft from a stopped rail contact. Energy, position,
+  speed, world view, and minimap all changed in the live Metal frame.
+- **Failed attempts retained:** attempt 1 accumulated rail damage and exploded
+  before completing lap 1. Attempt 2 progressed farther with shorter visual
+  sampling, then left the suspended crossover and remained off-course at 0
+  km/h. The process was closed normally. These are input-path and gameplay
+  diagnostics, not completed-race evidence.
+- **External boundary:** this host currently reports Bluetooth off and no USB
+  gamepad/controller. The available UI driver emits discrete key taps rather
+  than sustained key-down/analog state, which is inadequate for honest
+  three-lap acceptance. A connected physical controller or direct owner play is
+  still required to close `MAC-RACE-CONTROL-01`.
+
 ## 2026-08-11 — Gate 3 cartridge PCM synthesis proof
 
 - **Fixes:** the cartridge build (`GDX_EXPANSION_KIT=OFF`) now feeds the active ROM AI buffer into the PCM seam. Its permanent allocator returns its allocation on host ABIs, sequence-font offsets are decoded as big-endian bytes, and soundfont blobs are converted into persistent host-native objects instead of rewriting 32-bit N64 offsets as host pointers.

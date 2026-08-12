@@ -69,6 +69,12 @@ the ROM-free public boundary. Work one falsifiable gate at a time:
   explicitly loaded that changed file and the identical toggle restored the
   exact original hash. Both 18-command routes returned to main menu and exited
   0 without a mode timeout.
+- `scripts/macos-race-handoff.gdx` ends deterministic playback at a live GP
+  starting grid. Normal X/A/D keyboard mappings then accelerated and steered the
+  Blue Falcon in two hands-on attempts, including a recovery from 0 to 438
+  km/h. Neither attempt finished: one exploded and one became stuck off the
+  crossover. No controller is attached (Bluetooth is off; USB has no gamepad),
+  so player-completed race acceptance remains honestly open.
 
 ## Next action
 
