@@ -101,7 +101,8 @@ the exact evidence artifact before relying on a path or process ID.
 
 ## Environment boundary at handoff
 
-- One iPhone 17 Pro Simulator is booted.
+- No Simulator is booted. The final Simulator validation was a headless generic
+  arm64 build; rediscover and boot exactly one device before any future UI run.
 - No physical Apple device is connected (`devicectl: No devices found`).
 - No valid code-signing identity exists (`0 valid identities found`).
 - The installed Simulator container contains authorized private inputs/derived

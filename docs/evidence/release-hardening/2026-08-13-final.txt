@@ -1,0 +1,15 @@
+F0X final local Apple build/package audit — 2026-08-13
+
+- macOS F0X.app: clean rebuild succeeded; codesign deep/strict and plist lint passed.
+- iPhone Simulator: generic arm64 Debug Xcode build succeeded headlessly.
+- iPhoneOS/iPadOS: generic arm64 Debug build succeeded with signing disabled.
+- Unsigned package runs: 2, byte-identical.
+- IPA SHA-256: a04560d6a4ada0755b8b4426cc2ea9b8d993e70827bd95bba45a4c8aee32a483
+- unzip -t: no errors.
+- Repository safety check: passed.
+- Maintained G-Diffuser and libultraship patches: reverse-check against tested
+  trees and clean apply on fresh pinned clones passed.
+- No booted Simulator, connected physical device, or valid signing identity.
+
+Boundary: the ignored unsigned IPA is a reproducible re-signing proof. It is
+not a public download, signed install, or physical-device acceptance artifact.

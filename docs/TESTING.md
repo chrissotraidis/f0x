@@ -1089,3 +1089,21 @@ extraction golden plus all-black internal BMP readback as separate gates.
   signature check, and plist lint pass.
 - **Boundary:** this closes the reproduced machine-settings null-address case;
   it is not physical-device or every-course texture acceptance.
+
+## 2026-08-13 — final headless Apple build and package audit
+
+- **Builds:** the current maintained source state completed Debug Xcode builds
+  for generic arm64 iPhone Simulator and unsigned arm64 iPhoneOS. No Simulator
+  was booted and no app UI was opened for this compile-only pass.
+- **Package determinism:** two consecutive `scripts/package-ios.sh` runs over
+  the current unsigned device app were byte-identical at SHA-256
+  `a04560d6a4ada0755b8b4426cc2ea9b8d993e70827bd95bba45a4c8aee32a483`.
+  `unzip -t` reported no errors; the package audit accepted both device
+  families/icons and rejected Simulator, private game-data, signing, and stale
+  signature inputs by construction.
+- **Local artifact:** the ignored output remains
+  `artifacts/F0X-0.1.0-development-unsigned.ipa`. It is a deterministic
+  re-signing proof, not a public or directly installable release.
+- **Boundary:** this host still reports no connected physical device and zero
+  valid signing identities. Signed installation, physical launch, audio/touch,
+  lifecycle, controller, performance, and thermal acceptance remain external.
