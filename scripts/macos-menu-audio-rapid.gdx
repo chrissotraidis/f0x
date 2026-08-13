@@ -1,0 +1,15 @@
+# Deterministic rapid main-menu navigation used to detect duplicate or reordered
+# menu sound-effect commands. Each direction changes the selected tile once.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 180
+PRESS DOWN 3
+WAIT 2
+PRESS RIGHT 3
+WAIT 2
+PRESS LEFT 3
+WAIT 2
+PRESS UP 3
+WAIT 180
+QUIT

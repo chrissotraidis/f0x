@@ -1043,3 +1043,49 @@ extraction golden plus all-black internal BMP readback as separate gates.
   Field. This closes a second-course timing/presentation slice, not human race
   completion, physical-device timing, high refresh, Low Power Mode, thermals,
   or repeated player-controlled course acceptance.
+
+## 2026-08-13 — menu-audio overlap review and DSP test correction
+
+- **Reported symptom:** menu audio sounded as though effects or music were
+  overlapping. The falsifier was a duplicated BGM transition, duplicated
+  channel-1 system effect, surviving title-music note, or backend-specific
+  waveform fault on a deterministic title/menu route.
+- **BGM and producer isolation:** the exact cartridge app requested only
+  `BGM_TITLE (13) -> BGM_SELECT (14)`. Dedicated-thread and legacy-fiber runs
+  produced the same transition sequence; cxd4 LLE and port HLE captures had
+  equivalent activity and peaks. No second audio producer or repeated BGM start
+  was observed.
+- **Menu-effect trace:** `scripts/macos-menu-audio-rapid.gdx` made four distinct
+  selection changes and produced four ordered channel-1 commands, each consumed
+  once. The original main-menu confirmation path writes SFX 62 then 33 in one
+  frame; both commands reached channel 1, but the sequence script consumed only
+  the final value (33). The pair therefore did not synthesize as two overlapping
+  notes. A temporary ownership probe also found no title channel-0 note surviving
+  either BGM transition. All trace code was removed before rebuilding.
+- **DSP-test correction:** the two previously red ADPCM tests initialized only
+  `book[8]` while claiming a sequential integrator. The production decoder uses
+  RSP block convolution; setting all eight newer-history columns to Q11 unity
+  expresses the intended integrator. No production decoder change was needed.
+  `gdx_dsp_tests` now passes 23/23 cases and 608/608 sub-checks.
+- **Artifact checks:** the clean packaged app rebuilt, strict deep ad-hoc
+  signature verification and plist lint passed, and the focused menu route
+  exited normally. Compact results are in
+  `docs/evidence/macos-audio-menu/2026-08-13.txt`.
+- **Boundary:** no port-level duplicated menu audio was reproduced, so authentic
+  game behavior was not changed speculatively. Owner listening and physical
+  speaker/headphone/Bluetooth/route/interruption acceptance remain open.
+
+## 2026-08-13 — partial-overlap TMEM metadata regression
+
+- **Failure:** two 32x32 I4 uploads at TMEM words `0xB0` and `0xD0` overlap.
+  The old metadata invalidation cleared the first upload's untouched `0xB0-0xCF`
+  prefix, producing null texture-address warnings in pre-race machine settings.
+- **Fix:** metadata is materialized per TMEM word, so a new upload now replaces
+  only its written range and preserves every untouched prefix/suffix. The helper
+  lives outside the renderer for direct testing.
+- **Regression/runtime:** `gdx_tmem_load_map_tests` proves ownership across
+  `0xB0-0x10F` and passes. The rebuilt packaged machine-settings route reaches
+  mode 9 without `ImportTexture: null texture address`; the app rebuild, strict
+  signature check, and plist lint pass.
+- **Boundary:** this closes the reproduced machine-settings null-address case;
+  it is not physical-device or every-course texture acceptance.

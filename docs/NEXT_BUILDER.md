@@ -1,7 +1,7 @@
 # F0X exact next-builder handoff
 
-Last reconciled: 2026-08-13 after commits `8672a1b`, `3e67f05`, `7cfcd28`, and
-`c9991ee`, plus the representative-course timing and perf-telemetry fix recorded
+Last reconciled: 2026-08-13 after commits `8672a1b`, `3e67f05`, `7cfcd28`,
+`c9991ee`, and `df857a6`, plus the menu-audio and TMEM overlap work recorded
 below.
 
 ## Read order
@@ -66,6 +66,13 @@ the exact evidence artifact before relying on a path or process ID.
   result to a distinct venue. Fire Field steady windows held p50 16.62-16.64 ms
   and p99 18.76-19.79 ms. `gdx_perf_tests` and the live route also close the
   misleading epoch-sized POST telemetry value; real POST means are 0.02-0.03 ms.
+- The reproduced pre-race null-texture warning is closed by preserving untouched
+  partial-overlap TMEM metadata; `gdx_tmem_load_map_tests` passes and the exact
+  packaged machine-settings route no longer reports a null texture address.
+- Menu-audio review found one title-to-select BGM transition, ordered one-for-one
+  rapid navigation effects, same-frame confirmation coalescing to one consumed
+  effect, and no producer/DSP-specific duplication. Corrected ADPCM vectors now
+  pass 23/23 tests and 608/608 sub-checks without a production decoder change.
 
 ## What is explicitly not finished
 
@@ -146,7 +153,8 @@ and allocation scribbling with no crash report. Do not enable
 
 Do not regress the verified core: `gdx_touch_merge_tests` (87 checks), the
 macOS sealed-bundle race route, the unsigned iPhoneOS build, and the
-`gdx_diagnostics_tests` are the standing regressions.
+`gdx_diagnostics_tests`, `gdx_dsp_tests` (23/23), and
+`gdx_tmem_load_map_tests` are the standing regressions.
 
 ## Remaining execution queue after touch
 

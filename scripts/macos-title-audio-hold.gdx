@@ -1,0 +1,5 @@
+# Deterministic title-music reference. Do not enter the menu.
+WAITTITLE 3600
+LOG title_audio_reference_start
+WAIT 900
+QUIT

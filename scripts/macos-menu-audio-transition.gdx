@@ -1,0 +1,9 @@
+# Deterministic title-to-main-menu audio transition with no later navigation SFX.
+WAITTITLE 3600
+LOG title_audio_before_menu
+WAIT 180
+PRESS START 3
+WAITMODE 7 3600
+LOG menu_audio_after_transition
+WAIT 720
+QUIT

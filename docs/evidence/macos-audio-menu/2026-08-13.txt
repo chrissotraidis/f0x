@@ -1,0 +1,42 @@
+F0X macOS menu-audio review — 2026-08-13
+
+Scope
+- Packaged cartridge-only F0X.app, 2 channels at 32000 Hz.
+- Deterministic title -> menu and rapid four-direction menu routes.
+- Dedicated and legacy producers; cxd4 LLE and port HLE synthesis.
+
+Results
+- The title/main-menu route requested exactly BGM 13 -> BGM 14. No repeated
+  background-music start was observed.
+- Dedicated and legacy producers reported the same BGM transition sequence.
+- LLE and HLE captures had equivalent activity and peaks; the reported symptom
+  was not isolated to either DSP backend.
+- Four rapid selection changes produced four channel-1 system-SFX commands in
+  order, and the sequence script consumed each once.
+- The main-menu confirmation path intentionally writes SFX 62 then 33 in one
+  frame. Both commands reached channel 1, but the sequence script consumed only
+  the final value (33), so the pair did not synthesize as two overlapping notes.
+- A temporary note-ownership probe found no surviving title-music channel-0
+  note at either BGM change. All probes were removed before the final rebuild.
+
+Regression correction
+- Two DSP cases had described a sequential integrator while initializing only
+  one column of the RSP block-convolution codebook. Initializing all eight
+  newer-history columns to Q11 unity makes the vectors test the stated filter.
+- Final result: gdx_dsp_tests 23/23 tests, 608/608 sub-checks.
+
+Artifact checks
+- Clean F0X.app rebuild succeeded after removing every temporary probe.
+- Final clean rapid-menu capture: 400000 stereo frames (1600000 bytes),
+  SHA-256 22b24ed6d5af6e8542e3518ebf763f81f8a9093cd4bf82fe4def0fdfc7c0c73e.
+- The clean log contained exactly BGM changes 0 -> 13 and 13 -> 14, then a
+  normal 13-command script exit; it contained no null-texture, timeout, or
+  script-parse error.
+- codesign --verify --deep --strict passed.
+- Info.plist passed plutil -lint.
+
+Boundary
+- No port-level duplicated BGM or menu-SFX synthesis defect was reproduced, so
+  no speculative game-audio behavior change was made.
+- This host-side review does not replace owner listening or physical iPhone/iPad
+  speaker, headphone, Bluetooth, route-change, or interruption acceptance.

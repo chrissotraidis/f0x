@@ -111,13 +111,15 @@
   now compiled and executed in the iPad Simulator. One uninterrupted Files
   picker-to-race process is verified; physical iPad extraction/gameplay and
   invalid/cancel/storage-pressure failure paths remain unverified.
-- **MAC-AUDIO-01 — physical CoreAudio route remains unverified:** cartridge
-  synthesis and the dedicated producer path now emit nonzero captured PCM.
-  The reproducible proof uses SDL's dummy device so it does not establish
-  speaker/headphone delivery, volume, route changes, interruptions, or
-  latency on a physical output device. A subsequent normal-CoreAudio launch
-  stalled inside Apple audio-device creation before F0X booted; this is an
-  external host-service boundary, not a synthesis failure.
+- **MAC-AUDIO-01 — no duplicated menu synthesis reproduced; audible route
+  acceptance remains open:** cartridge synthesis and the dedicated producer
+  emit nonzero PCM. A focused title/menu review found one `BGM_TITLE ->
+  BGM_SELECT` transition, one consumed effect per rapid selection change, no
+  surviving title note, and no LLE/HLE or dedicated/legacy duplication. The
+  original same-frame confirmation pair is coalesced by channel 1 before the
+  sequence script consumes it. The reproducible proof uses SDL's dummy device,
+  so owner listening plus speaker/headphone delivery, volume, route changes,
+  interruptions, and latency remain separate acceptance gates.
 - **MAC-PERF-01 — resolved:** the ordinary render path ended the POST sub-timer
   without beginning it, so its default steady-clock epoch appeared as millions
   of milliseconds. POST now begins in the shared post-render tail and every
@@ -143,11 +145,12 @@
   working keyboard mapping or any USB/Bluetooth controller, or a track-aware
   input test bed. Do not promote scripted race entry, partial keyboard
   driving, or file presence into finish/results acceptance.
-- **MAC-RACE-TEX-01 — residual null TMEM warnings need follow-up:** raw-ROM
-  machine textures now render after filepath emission was gated on actual
-  mounted-resource existence, and narrow windows fall back to centered 4:3.
-  The route still logs null texture addresses for TMEM tiles 5 and 6 during
-  pre-race settings; retain this as a visual regression while fixing flashing.
+- **MAC-RACE-TEX-01 — resolved for the reproduced machine-settings route:**
+  two overlapping 32x32 I4 loads previously invalidated the untouched prefix
+  of the first TMEM range. Per-word replacement now preserves that prefix;
+  `gdx_tmem_load_map_tests` passes and the packaged pre-race route reaches mode
+  9 without `ImportTexture: null texture address`. Physical-device and broader
+  course/machine texture acceptance remain under the normal hardware matrix.
 
 ## Remaining platform risks
 
