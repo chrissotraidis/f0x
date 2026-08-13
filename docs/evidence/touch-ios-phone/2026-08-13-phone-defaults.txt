@@ -1,0 +1,40 @@
+F0X phone-defaults re-run on the current build — 2026-08-13
+Environment: iPhone 17 Pro Simulator (iOS 26.5, UDID 7B639924-AD8F-4D5C-AD29-71F47C768A0D),
+one F0X process (current Simulator build: touch system + diagnostics compiled),
+archive-only boot, landscape 874x402 window. iPad Simulator was shut down first
+(one Simulator at a time).
+
+Device-class selection and live overlay (app console):
+  [F0X] touch live: overlay=attached hidden=0 menuButton={{415, 8}, {44, 44}}
+        safe={0, 62, 20, 62}
+  [F0X] touch overlay frame={{0, 0}, {874, 402}} hidden=0 alpha=1.00 userInteraction=1
+
+Per-control frames (app console) vs the kPhoneSpecs defaults
+(full-window normalized centers; window 874x402):
+  control        live frame origin/size     live center (norm)   default    verdict
+  Control Stick  (129.5, 232.3) 116x116     (0.2145, 0.7222)     0.2145/0.7222  match
+  ACCEL          (740.0, 270.5)  52x52      (0.8764, 0.7376)     0.8764/0.7376  match
+  BOOST          (678.2, 241.3)  52x52      (0.8057, 0.6650)     0.8057/0.6650  match
+  BRAKE          (737.3, 209.2)  40x40      (0.8665, 0.5701)     0.8665/0.5701  match
+  SLIDE L        (185.9, 174.6)  52x52      (0.2425, 0.4991)     0.2425/0.4991  match
+  SLIDE R        (774.0,  36.0)  76x44      (0.9291, 0.1443)     0.9451/0.1443  safe-clamped
+  START          (735.8,  36.0)  44x44      (0.8670, 0.1443)     0.8670/0.1443  match
+  VIEW           (776.3, 175.5)  40x40      (0.9111, 0.4863)     0.9111/0.4863  match
+  LOOK           (737.7, 140.1)  40x40      (0.8669, 0.3983)     0.8669/0.3983  match
+  C-left         (700.1, 175.2)  40x40      (0.8239, 0.4855)     0.8239/0.4855  match
+  L              ( 24.0,  36.0)  76x44      (0.0709, 0.1443)     0.0549/0.1443  safe-clamped
+
+Safe-rect explanation for the two pills: the iPhone 17 Pro landscape safe area is
+{top 0, left 62, bottom 20, right 62}. L's default center 0.0549*874=48 < 62, so
+the platform-neutral core clamped it to the left safe boundary (frame x 24 =
+62-38); SLIDE R's default center 0.9451*874=826 > 812 (874-62), clamped to the
+right boundary (frame x 774 = 812-38). START (757.8) and the rest are inside the
+safe rect and untouched. No saved NSUserDefaults profile exists in the container,
+so these are the code defaults.
+
+Menu button: center (437, 30) = (0.500, 0.075) — the phone top-center gameplay
+slot, clear of the Dynamic Island (left inset 62 pt in this landscape
+orientation). The live screenshot (local) shows the compact phone overlay over a
+live race (speed 972 km/h, LAP 2/3, TIME 00'27"13).
+
+Boundary: Simulator-only; physical iPhone touch acceptance remains open.

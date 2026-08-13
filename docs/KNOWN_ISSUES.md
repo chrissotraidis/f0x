@@ -13,11 +13,14 @@
   Controls -> Touch Controls page renders live with every widget; the layout
   editor opens and saves; a non-default tablet profile survives relaunch and
   drives the overlay; hold-to-cancel, the Z hold-to-latch (with AX "Locked"
-  and blue fill), and cancel-clears-latch are captured live. Open: a fresh
-  phone-defaults re-run on a phone Simulator and true multi-touch contact
-  stress, controller handoff, interruptions, haptics feel, and long sessions
-  require physical iPad/iPhone acceptance. SDL finger-to-ImGui mouse
-  translation is unchanged.
+  and blue fill), and cancel-clears-latch are captured live. The phone
+  defaults were re-verified on the current build via the iPhone 17 Pro
+  Simulator (2026-08-13): phone table selected, every control at its
+  normalized default center with edge pills safe-clamped, ••• in the phone
+  top-center slot clear of the Dynamic Island, overlay attached over a live
+  race. Open: true multi-touch contact stress, controller handoff,
+  interruptions, haptics feel, and long sessions require physical
+  iPad/iPhone acceptance. SDL finger-to-ImGui mouse translation is unchanged.
 - **IOS-LIFECYCLE-01 — mobile lifecycle is partially verified:** a Simulator
   Home background + relaunch re-attached the touch overlay neutrally and
   cancel paths clear input, but full background/foreground simulation/audio/

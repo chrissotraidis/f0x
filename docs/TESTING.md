@@ -768,3 +768,29 @@ extraction golden plus all-black internal BMP readback as separate gates.
   race pattern, default 60 Hz VSync path (interpolation off). Remaining for
   full acceptance: representative courses, physical-device timing, high
   refresh/Match Display transitions, and Low Power Mode behavior.
+
+## 2026-08-13 — phone-defaults re-run on the current build (iPhone 17 Pro Simulator)
+
+- **Expectation before editing:** the current build (touch system + diagnostics
+  compiled) must select the phone default table on an iPhone device class,
+  render every control at its normalized default position, keep the ••• in the
+  phone top-center gameplay slot clear of the Dynamic Island, and attach the
+  overlay over a live race. One Simulator at a time: the iPad Pro Simulator was
+  shut down, the iPhone 17 Pro Simulator booted, the fresh build installed and
+  launched (archive-only boot).
+- **Result:** device class selected the `kPhoneSpecs` table. All 12 controls
+  rendered at their full-window normalized default centers exactly (stick
+  0.2145/0.7222, ACCEL 0.8764/0.7376, BOOST 0.8057/0.6650, BRAKE 0.8665/0.5701,
+  SLIDE L 0.2425/0.4991, START 0.8670/0.1443, VIEW/LOOK/C-left, D-pad), with
+  the two edge pills L/SLIDE R safely clamped inward by exactly 14 pt to the
+  landscape safe boundaries (left/right 62 pt). The menu button sat at
+  (0.500, 0.075) — the phone top-center slot, clear of the Dynamic Island
+  (safe.left=62). The overlay attached live (`hidden=0 userInteraction=1`) over
+  a running race. No saved NSUserDefaults profile exists in this container, so
+  the frames are the code defaults.
+- **Evidence:** `docs/evidence/touch-ios-phone/2026-08-13-phone-defaults.txt`
+  (control-by-control verification table) plus the app console lines quoted
+  there. The local screenshot shows the compact overlay over the live race.
+- **Boundary:** Simulator-only; physical iPhone multi-touch acceptance remains
+  open. The iPad Pro Simulator was re-booted afterward to restore the standing
+  environment.

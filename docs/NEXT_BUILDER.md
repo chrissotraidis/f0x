@@ -84,11 +84,13 @@ across relaunch (see `docs/evidence/touch-ios/2026-08-12.txt` and
 `docs/evidence/touch-ios-live/2026-08-12-live-captures.txt`). The remaining
 touch work is polish and physical acceptance:
 
-1. Re-run the phone defaults on a phone Simulator (the compact layout was
-   previously verified on an iPhone 17 Pro Simulator; a fresh run on the
-   current build is the standing check), and consider a live editor pass that
-   also exercises Hide/Show and Reset on the tablet profile without leaving a
-   stale override in the Simulator container.
+1. Phone defaults were re-verified on the current build (2026-08-13): the
+   iPhone 17 Pro Simulator run selected the phone table, rendered every
+   control at its normalized default center (edge pills safe-clamped), kept
+   the ••• in the phone top-center slot clear of the Dynamic Island, and
+   attached over a live race (`docs/evidence/touch-ios-phone/`). A live editor
+   pass exercising Hide/Show and Reset on the tablet profile without leaving a
+   stale override is optional polish.
 2. Re-run the touch-driven GP flow and complete a race on Simulator, then
    replay the whole matrix on physical iPad/iPhone when a signing-capable Mac
    with a connected device is available.
