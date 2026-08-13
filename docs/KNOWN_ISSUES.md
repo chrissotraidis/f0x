@@ -77,13 +77,24 @@
   latency on a physical output device. A subsequent normal-CoreAudio launch
   stalled inside Apple audio-device creation before F0X booted; this is an
   external host-service boundary, not a synthesis failure.
-- **MAC-RACE-CONTROL-01 — player-completed race remains unverified:** the
-  deterministic harness reaches and holds a live GP race, and the real SRAM
-  settings path survives relaunch. Real mapped keyboard input has accelerated,
-  steered, damaged, and recovered the craft, but two tap-driven hands-on attempts
-  did not finish. This host currently has no connected controller and Bluetooth
-  is off. Do not promote scripted race entry, partial keyboard driving, or file
-  presence into finish/results acceptance.
+- **MAC-RACE-CONTROL-01 — player-completed race is blocked on this host (full
+  report in [`docs/blockers/MAC-RACE-CONTROL-01.md`](blockers/MAC-RACE-CONTROL-01.md)):**
+  the deterministic harness reaches and holds a live GP race, real mapped
+  keyboard input reaches the game (763 km/h proved), and the SRAM settings
+  path survives relaunch, but no available input path can complete a race.
+  Two tap-driven attempts, four System Events driver variants, and two
+  internal-harness wall-hug probes all ended in RETIRE or an off-course craft.
+  The probes are decisive: sustained A + full-left wall-rides Mute City,
+  drains energy, and the HUD shows RETIRE at TIME 00'22"05 with LAP 1/3; the
+  game then advances mode 1 -> 15 (next course) -> 18 (next machine settings).
+  Decompiled logic confirms the mechanism: `Racer_RetireRacer` sets
+  `D_800F80C4 = -1` in GP, and at race end `Racer_DecreaseLife` applies the
+  life penalty before `MENU_CHANGE_NEXT_COURSE`. That mode sequence is
+  retirement continuation, not a finish. This host has no connected controller
+  and Bluetooth is off. Smallest resume action: owner/human play with the
+  working keyboard mapping or any USB/Bluetooth controller, or a track-aware
+  input test bed. Do not promote scripted race entry, partial keyboard
+  driving, or file presence into finish/results acceptance.
 - **MAC-RACE-TEX-01 — residual null TMEM warnings need follow-up:** raw-ROM
   machine textures now render after filepath emission was gated on actual
   mounted-resource existence, and narrow windows fall back to centered 4:3.

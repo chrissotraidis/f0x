@@ -49,7 +49,11 @@ the exact evidence artifact before relying on a path or process ID.
   phone-defaults re-run on a phone Simulator for the current build.
 - Physical iPad/iPhone signing, install, launch, controller, touch, audio,
   lifecycle, performance, thermals, or long-session evidence.
-- A player-completed macOS race; two real-input attempts failed before finish.
+- A player-completed macOS race; blocked on this host with an exact report in
+  `docs/blockers/MAC-RACE-CONTROL-01.md` (two tap attempts, four System Events
+  driver variants, and two internal-harness wall-hug probes all ended in
+  RETIRE or an off-course craft; the RETIRE banner and the mode 1 -> 15 -> 18
+  retire/continue loop are captured).
 - Owner confirmation that the exact corrected current bundle no longer flashes.
 - Audible macOS/mobile speakers/headphones and route/interruption behavior.
 - Mobile lifecycle pause/resume/persistence.
@@ -116,7 +120,9 @@ and correlate it with frame/present logs. Do not close from automated luma alone
 Use real sustained input or a physical controller to complete a race. Verify A
 accelerator, C-down brake, B boost, Z/R slides and attacks, C-right camera,
 C-up look-back, pause, results, another race, and representative tracks. Record
-failures honestly.
+failures honestly. Automated blind driving is exhausted on this host (see
+`docs/blockers/MAC-RACE-CONTROL-01.md`): the smallest resume action is owner or
+human play with the working keyboard mapping, or any USB/Bluetooth controller.
 
 ### C. Physical iPad controller-first gate
 

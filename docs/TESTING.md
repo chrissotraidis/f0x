@@ -629,3 +629,55 @@ extraction golden plus all-black internal BMP readback as separate gates.
   session and is unrelated to the touch layout profile.
 - **Evidence:** `docs/evidence/touch-ios-live/2026-08-12-live-captures.txt`
   plus the log line/timestamp references quoted above.
+
+## 2026-08-12 — macOS race-control experiments and wall-hug probe (blocker audit)
+
+- **Expectation before editing:** determine, with dated evidence, whether any
+  available input path on this host can complete a real F-Zero X race, and
+  explain the earlier mode-sequence observation (1 -> 15 -> 18 -> 1) that
+  superficially resembled a completed race.
+- **Environment:** one macOS runtime (`build/macos-f0x-bundle/port/F0X.app`,
+  rebuilt 2026-08-12 21:05, HEAD `7564850`, G-Diffuser `719fd82`), window
+  `F0X (Metal)` 1440x870 at (0,30); one booted iPad Pro 11-inch (M5)
+  Simulator preserved untouched. No controller: `0 joystick(s) present at
+  boot`, Bluetooth off.
+- **Input paths compared:** (a) System Events keystrokes to the focused
+  window — the only live path that reaches SDL input (proved earlier at
+  763 km/h with exhaust trails); CGEvent and `postToPid` do not reach the
+  game; any intervening shell command steals focus. (b) The internal
+  `GDX_INPUT_SCRIPT` harness, which drives the N64 pad seam in-process with
+  no window focus requirement — new this turn.
+- **Internal-harness probe (reproduced twice):** `scripts/macos-wallhug-probe.gdx`
+  (tracked) reaches the live GP race, then `INPUT A -80 0 5400` holds
+  accelerator + full-left for 90 s. Frames captured at 1 fps for 175 s
+  (`/tmp/f0x-drive/probe2-frames/`): the craft wall-rides at 51-171 km/h,
+  energy drains, and the HUD shows **RETIRE** at TIME 00'22"05 with LAP 1/3
+  (frame `f-064`, energy bar empty, LAP never left 1/3). The race then ends
+  and the GP advances: mode 1 -> 15 (`GP_RACE_NEXT_COURSE`) -> 18
+  (`GP_RACE_NEXT_MACHINE_SETTINGS`); the JACK CUP / MUTE CITY next-course
+  intro panel is visible (`f-072`, `f-088`).
+- **Decompiled explanation:** `Racer_RetireRacer` (racer.c:769) sets
+  `D_800F80C4 = -1` for a GP player retirement; at race end
+  (racer.c:5512, case 60) `func_80095144` -> `Racer_DecreaseLife`, and the GP
+  continues via `MENU_CHANGE_NEXT_COURSE` (game.c:263). The observed
+  1 -> 15 -> 18 loop is retirement continuation with a life penalty, not a
+  finished race.
+- **All attempts, honestly retained:** two documented tap attempts; this
+  turn's accel-only (crash, RETIRE ~00'19"), alternation + boost (RETIRE),
+  pulse-throttle and continuous-accel gentle-tap variants (LAP 1/3 with TIME
+  01'24" -> 04'10" and speed 0, craft wall-riding), and the coast drive whose
+  mode sequence is now explained. None completed a lap.
+- **Flashing evidence re-verified for owner confirmation:** the current
+  bundle's dense race-region captures (`/tmp/f0x-drive/macdense/region-*.png`,
+  34 frames) and `q-*.png` (8 frames) contain 0 near-black frames and 0
+  brightness jumps; owner confirmation of the corrected Finder launch remains
+  open.
+- **Result and boundary:** a player-completed macOS race is not achievable
+  with the input paths available on this host; every sustained automated
+  pattern retires the craft (energy death on wall contact). Full exact report
+  in `docs/blockers/MAC-RACE-CONTROL-01.md`. This is not a claim that the game
+  or input seam is broken: races start, run, retire, and the GP loop advances
+  correctly.
+- **Next gate:** the macOS race acceptance resumes with owner/human play or a
+  connected controller; meanwhile the locally actionable queue continues at
+  the Share Diagnostic Log gate.

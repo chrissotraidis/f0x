@@ -1,0 +1,39 @@
+# Deterministic wall-hug race probe for the MAC-RACE-CONTROL-01 blocker audit.
+# Dev-harness input only (GDX_INPUT_SCRIPT drives the N64 pad seam in-process;
+# no window focus required). NOT player input and NOT a completed-race claim.
+# Holds accelerator + full-left stick for 90 s, then reports the resulting mode.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 120
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 9 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 1 5400
+LOG wallhug_probe_race_reached
+INPUT A -80 0 5400
+LOG wallhug_probe_segment_done
+WAITMODE 15 3600
+LOG wallhug_probe_saw_next_course
+WAITMODE 18 3600
+LOG wallhug_probe_saw_machine_settings
+WAITMODE 1 5400
+LOG wallhug_probe_saw_race_again
+QUIT
