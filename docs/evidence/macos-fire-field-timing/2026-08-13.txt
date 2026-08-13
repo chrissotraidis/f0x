@@ -1,0 +1,40 @@
+F0X representative-course macOS timing evidence — 2026-08-13
+
+Host: Apple M1 MacBook Air, macOS 26.5.2, 60 Hz built-in display
+App: build/macos-f0x-bundle/port/F0X.app, Debug cartridge-only, windowed
+Route: scripts/macos-fire-field-timing.gdx
+Gates: GDX_LOG=1 GDX_PERF=1 GDX_RACE_TIME_PROBE=1
+
+Selection proof
+- Normal GP menus selected cup option 0 -> 1 -> 2.
+- Direct window inspection showed KING CUP, 1: FIRE FIELD, ZIG-ZAG JUMP.
+- Runtime venue logs identified venue=8 (VENUE_FIRE_FIELD).
+
+Race-time proof
+- First exact mode=1 sample: host_s=30.779, raceframes=44.
+- Last exact mode=1 sample: host_s=54.242, raceframes=1452.
+- Delta: 1,408 race frames / 23.463 host seconds = 60.009 frames/s.
+- This agrees with the earlier Mute City result (59.954 frames/s) on a
+  distinct course, geometry, background, and texture set.
+
+Steady race-window pacing
+- Window 1: p50 16.64 ms, p95 17.26 ms, p99 18.76 ms, max 21.16 ms,
+  0 work spikes; audio p95 1.89 ms, max 3.10 ms.
+- Window 2: p50 16.62 ms, p95 18.27 ms, p99 19.79 ms, max 28.60 ms,
+  1 work spike; audio p95 3.19 ms, max 5.01 ms.
+- The following mixed race/retirement window returned to 0 spikes.
+
+Telemetry fix verified in the same app
+- Before the fix, the same route emitted post=52607636.39 ms.
+- The ordinary path ended POST without beginning it. POST now opens in the
+  shared post-render tail, and all sub-timers reject unmatched ends.
+- gdx_perf_tests intentionally sends 600 unmatched POST ends and requires a
+  finite, nonnegative value <=10 ms; it reports post=0.00 ms.
+- Final real-app summaries report meaningful post=0.02-0.03 ms. No summary
+  contains an epoch-sized value.
+
+Boundary
+- Centered scripted acceleration retires on Fire Field; this is timing and
+  presentation evidence, not a completed race or human-control acceptance.
+- Physical iPhone/iPad timing, high refresh, Low Power Mode, thermals, and
+  repeated human-play courses remain open.

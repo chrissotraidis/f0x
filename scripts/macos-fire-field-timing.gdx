@@ -1,0 +1,36 @@
+# Bounded representative-course timing route. This follows the normal GP menus,
+# selects King Cup / Fire Field, holds centered acceleration long enough for the
+# race-time probe and perf telemetry to sample the live course, then exits cleanly.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 120
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS RIGHT 3
+WAIT 30
+PRESS RIGHT 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 9 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 1 5400
+LOG fire_field_timing_start
+INPUT A 0 0 2400
+LOG fire_field_timing_end
+QUIT

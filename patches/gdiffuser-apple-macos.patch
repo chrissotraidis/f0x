@@ -20,7 +20,7 @@ index 789b053..a0cc2a8 100644
      if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
          return 0;
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..da74aa1 100644
+index cab4365..bd69666 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
 @@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
@@ -470,7 +470,7 @@ index cab4365..da74aa1 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +740,42 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +740,55 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -510,10 +510,23 @@ index cab4365..da74aa1 100644
 +    target_compile_options(gdx_diagnostics_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
 +endif()
 +
++# Perf timer-balance regression: compiles gdx_perf.cpp UNMODIFIED and proves an unmatched
++# sub-timer end cannot publish an epoch-sized duration in the periodic summary.
++add_executable(gdx_perf_tests
++    tests/perf_tests.cpp
++    gdx_perf.cpp
++    gdx_dev_gates.c)
++target_include_directories(gdx_perf_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
++if(MSVC)
++    target_compile_options(gdx_perf_tests PRIVATE /W3)
++elseif(GDX_PORT_WARN_FLAGS)
++    target_compile_options(gdx_perf_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
++endif()
++
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -706,6 +946,7 @@ if(GDX_BUILD_JP)
+@@ -706,6 +959,7 @@ if(GDX_BUILD_JP)
          disk_savefile.cpp
          gdx_ghost_io.c
          gdx_ghost_window.cpp
@@ -521,7 +534,7 @@ index cab4365..da74aa1 100644
          gdx_input_viewer.cpp
          gdx_fps_overlay.cpp
          gdx_perf.cpp
-@@ -764,6 +1005,8 @@ if(GDX_BUILD_JP)
+@@ -764,6 +1018,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -2930,6 +2943,47 @@ index 6a59d4d..bb7aaec 100644
      AddWidget("Settings", "Controls", SECTION_COLUMN_1,
                WidgetInfo{ .name = "Input Editor", .type = GdxUI::WIDGET_CUSTOM }
                    .CustomFunction([this](WidgetInfo&) {
+diff --git a/port/gdx_perf.cpp b/port/gdx_perf.cpp
+index 15e64d9..bf06685 100644
+--- a/port/gdx_perf.cpp
++++ b/port/gdx_perf.cpp
+@@ -43,6 +43,7 @@ struct PerfState {
+ 
+     // Main-thread-only; no lock needed.
+     Clock::time_point subStart[GDX_PERF_SUB_COUNT]{};
++    bool subOpen[GDX_PERF_SUB_COUNT]{};       // begin/end balance for the current frame
+     double subMs[GDX_PERF_SUB_COUNT]{};      // current frame
+     double subAccumMs[GDX_PERF_SUB_COUNT]{}; // summary window accumulation
+     std::thread::id mainThread{};            // captured at PerfFrameBegin; sub timers guard against it
+@@ -170,6 +171,7 @@ void PerfFrameBegin() {
+     s.frameStart = Clock::now();
+     s.mainThread = std::this_thread::get_id();
+     std::memset(s.phaseMs, 0, sizeof(s.phaseMs));
++    std::memset(s.subOpen, 0, sizeof(s.subOpen));
+     std::memset(s.subMs, 0, sizeof(s.subMs));
+ }
+ 
+@@ -250,6 +252,7 @@ extern "C" void gdx_perf_sub_begin(int id) {
+         return;
+     }
+     s.subStart[id] = gdx::Clock::now();
++    s.subOpen[id] = true;
+ }
+ 
+ extern "C" void gdx_perf_sub_end(int id) {
+@@ -260,5 +263,12 @@ extern "C" void gdx_perf_sub_end(int id) {
+     if (s.mainThread != std::this_thread::get_id()) {
+         return;
+     }
++    // A skipped/conditional begin must not turn the default time_point epoch into
++    // millions of milliseconds. Ignore an unmatched end instead of publishing a
++    // plausible-looking but meaningless diagnostic.
++    if (!s.subOpen[id]) {
++        return;
++    }
+     s.subMs[id] += gdx::toMs(gdx::Clock::now() - s.subStart[id]);
++    s.subOpen[id] = false;
+ }
 diff --git a/port/gdx_touch_controls.h b/port/gdx_touch_controls.h
 new file mode 100644
 index 0000000..a8add2e
@@ -5579,7 +5633,7 @@ index 118ee0d..687e3a0 100644
      return 0;
  }
 diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
-index 8c63a17..3036ba8 100644
+index 8c63a17..e9ed1ed 100644
 --- a/port/n64_gfx_bridge.cpp
 +++ b/port/n64_gfx_bridge.cpp
 @@ -11,6 +11,12 @@
@@ -5852,6 +5906,34 @@ index 8c63a17..3036ba8 100644
                          const char* texCensusPath = "rawcopy"; /* [tex-census] delivery classification */
                          /* Texture-pack override. `translated` is the unified source pointer for
                             BOTH delivery paths, so one lookup here covers common assets (fonts,
+@@ -9399,6 +9516,14 @@ extern "C" void gdx_gfx_run(void* dl, size_t dl_size, GdxTaskUcode taskUcode) {
+     }
+     } // end else (non-P2 path: default single Run + env-gated P0/P1 in-bridge M=2)
+ 
++    // P2 opens POST immediately after its sub-frame burst because its pacing diagnostics are
++    // part of the post-render cost. The ordinary path reaches the same shared tail here, so open
++    // the timer now rather than ending a timer that was never begun.
++    if (!gdxPostTimerOpen) {
++        gdx_perf_sub_begin(GDX_PERF_SUB_POST);
++        gdxPostTimerOpen = true;
++    }
++
+     // A real GFX task produced this host frame — the VI-scanout fallback must
+     // not also draw over it (see gdx_vi_present_fallback).
+     gHostFrameGfxTaskRan = true;
+@@ -9711,8 +9836,10 @@ extern "C" void gdx_gfx_run(void* dl, size_t dl_size, GdxTaskUcode taskUcode) {
+     // plus the per-matrix scratch records), and it is built and freed once per 60 Hz tick.
+     // A residual near zero exonerates teardown; a large one names it.
+     gdx_perf_sub_end(GDX_PERF_SUB_FBMIRROR);
+-    gdx_perf_sub_end(GDX_PERF_SUB_POST);
+-    gdxPostTimerOpen = false;
++    if (gdxPostTimerOpen) {
++        gdx_perf_sub_end(GDX_PERF_SUB_POST);
++        gdxPostTimerOpen = false;
++    }
+ }
+ 
+ /* Instrumentation: log what the transition readback actually
 diff --git a/port/n64_gfx_convert.cpp b/port/n64_gfx_convert.cpp
 index a0f7dcf..400809b 100644
 --- a/port/n64_gfx_convert.cpp
@@ -6201,6 +6283,57 @@ index b06123f..b95e91b 100644
  
      if (g_failures == 0) {
          printf("\nALL PASS\n");
+diff --git a/port/tests/perf_tests.cpp b/port/tests/perf_tests.cpp
+new file mode 100644
+index 0000000..ae3a8c0
+--- /dev/null
++++ b/port/tests/perf_tests.cpp
+@@ -0,0 +1,45 @@
++// gdx_perf_tests — timer-balance regression for the real telemetry implementation.
++
++#include "gdx_dev_gates.h"
++#include "gdx_perf.h"
++
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++
++static char sSummary[4096];
++
++static void capture_log(const char* message) {
++    if (message != nullptr && std::strstr(message, "[GDX perf] summary") != nullptr) {
++        std::snprintf(sSummary, sizeof(sSummary), "%s", message);
++    }
++}
++
++int main() {
++    gGdxDevGateCache[GDX_GATE_PERF] = 1;
++    gdx_port_log_tap = capture_log;
++
++    for (int frame = 0; frame < 600; ++frame) {
++        gdx::PerfFrameBegin();
++        gdx::PerfPhaseBegin(gdx::PerfGameTick);
++        gdx_perf_sub_begin(GDX_PERF_SUB_SETUP);
++        gdx_perf_sub_end(GDX_PERF_SUB_SETUP);
++
++        // Reproduces the original non-interpolated bridge tail: POST had no matching begin.
++        gdx_perf_sub_end(GDX_PERF_SUB_POST);
++
++        gdx::PerfPhaseEnd(gdx::PerfGameTick);
++        gdx::PerfFrameEnd();
++    }
++
++    const char* post = std::strstr(sSummary, "post=");
++    double postMs = -1.0;
++    const bool parsed = post != nullptr && std::sscanf(post, "post=%lf", &postMs) == 1;
++    if (!parsed || !std::isfinite(postMs) || postMs < 0.0 || postMs > 10.0) {
++        std::printf("FAIL: unmatched POST end corrupted summary: %s\n", sSummary);
++        return 1;
++    }
++
++    std::printf("gdx_perf_tests: unmatched end ignored, post=%.2fms\n", postMs);
++    return 0;
++}
 diff --git a/port/tests/touch_merge_tests.c b/port/tests/touch_merge_tests.c
 new file mode 100644
 index 0000000..8fa28ff

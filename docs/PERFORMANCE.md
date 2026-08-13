@@ -9,6 +9,15 @@ performance baseline.
   capture with no near-black frame or brightness jump.
 - Finder-launched F0X Home produced 544 frames over 9.500 seconds with no
   near-black frame or brightness jump.
+- On the Apple M1 host, Mute City advanced at 59.954 race frames/s over 37.36
+  seconds. A separate normal GP route visibly selected King Cup / Fire Field
+  and advanced 1,408 race frames in 23.463 host seconds: 60.009 frames/s.
+- Fire Field steady race windows reported p50 16.62-16.64 ms, p95 17.26-18.27
+  ms, p99 18.76-19.79 ms, and 0-1 work spikes per 600 frames. Audio-thread p95
+  was 1.89-3.19 ms and max 3.10-5.01 ms.
+- The perf POST sub-timer now measures 0.02-0.03 ms in real app summaries. A
+  balance regression prevents skipped begins from producing epoch-sized
+  diagnostic values.
 - During the latest Simulator picker-to-race artifact, venue translation logs
   commonly reported roughly 4.5–6.5 ms for 76 display lists and about
   1,765–1,795 output commands. This is a diagnostic sample, not an FPS or device
@@ -30,7 +39,8 @@ races on named hardware:
 - Metal validation errors and late frames;
 - audio synchronization and underruns;
 - physical-device thermal behavior and sustained sessions;
-- representative tracks, machines, effects, collisions, and repeated races.
+- additional representative tracks, machines, effects, collisions, and
+  repeated player-completed races.
 
 High refresh comes only after correct 60 Hz simulation/presentation is proven.
 120 Hz or Match Display must never accelerate game simulation.

@@ -10,7 +10,7 @@ F0X now has real native Apple targets rather than a platform plan only.
 | iPhoneOS/iPadOS SDK | Complete unsigned arm64 app compiles and validates as ROM-free | Signing, installation, physical launch, controller, touch, lifecycle, audio, performance, thermal behavior |
 
 The app is landscape-only with an iOS 16 minimum. The current host has one
-booted iPad Pro 11-inch (M5) Simulator, no connected physical Apple device, and
+booted iPhone 17 Pro Simulator, no connected physical Apple device, and
 no valid code-signing identity. Do not convert SDK/Simulator results into
 physical-device claims.
 

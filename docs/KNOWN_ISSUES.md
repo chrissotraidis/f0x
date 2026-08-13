@@ -118,12 +118,13 @@
   latency on a physical output device. A subsequent normal-CoreAudio launch
   stalled inside Apple audio-device creation before F0X booted; this is an
   external host-service boundary, not a synthesis failure.
-- **MAC-PERF-01 — perf summary `post=` sub-mean overflows in early windows:**
-  with `GDX_PERF=1`, the summary's `post` field reports millions of ms in
-  startup/menu windows (accumulator/normalization issue in the perf
-  sub-timers). The race-window sub-breakdowns are sane and the frame-time
-  p50/p95/p99/spike and audio-tick figures are unaffected. Telemetry-only;
-  no game behavior is involved.
+- **MAC-PERF-01 — resolved:** the ordinary render path ended the POST sub-timer
+  without beginning it, so its default steady-clock epoch appeared as millions
+  of milliseconds. POST now begins in the shared post-render tail and every
+  sub-timer ignores an unmatched end. The focused `gdx_perf_tests` regression
+  and a rebuilt Fire Field run pass; real summaries report 0.02-0.03 ms rather
+  than the former 52,607,636 ms. This was telemetry-only; game behavior was
+  never involved.
 - **MAC-RACE-CONTROL-01 — player-completed race is blocked on this host (full
   report in [`docs/blockers/MAC-RACE-CONTROL-01.md`](blockers/MAC-RACE-CONTROL-01.md)):**
   the deterministic harness reaches and holds a live GP race, real mapped

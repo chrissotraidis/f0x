@@ -996,11 +996,50 @@ extraction golden plus all-black internal BMP readback as separate gates.
   acceptance with an untimed suspended wait.
 - **Package:** two consecutive audited package runs produced ignored
   `F0X-0.1.0-development-unsigned.ipa` with SHA-256
-  `73443925be1304b8a5a7b33416981218f5875d56b9355ca0b66126779c2a13ed`;
+  `038f9e5482f4174f550f30cd59ff2ecc1cbef5418634a71817b9cf4119387112`;
   `unzip -t` passed and a Simulator app was rejected. This identifies the local
-  Debug proof and may change after any rebuild.
+  Debug proof after the perf-telemetry rebuild and may change after any rebuild.
 - **Regressions:** Simulator/device/macOS builds, sealed macOS signature, all 87
   touch checks, graphics-cache tests, diagnostics tests, and safety checks pass.
 - **Boundary:** physical interruptions/routes, memory pressure, Low Power Mode,
   thermals, high refresh, haptic feel, and save-at-interruption remain open. The
   IPA is unsigned/re-signable, not a public or directly installable release.
+
+## 2026-08-13 — Fire Field 60 Hz timing and perf timer-balance fix
+
+- **Expected observable:** extend the named-host 60 Hz result beyond Mute City
+  using the real GP selection path, and require every perf sub-timer summary to
+  remain finite and meaningful through startup, menus, race, and retirement.
+- **Representative route:** `scripts/macos-fire-field-timing.gdx` traversed the
+  normal menus, logged cup option 0 -> 1 -> 2, and direct window inspection
+  visibly showed `KING CUP`, `1: FIRE FIELD`, `ZIG-ZAG JUMP`. Runtime logs
+  independently identified venue 8 (`VENUE_FIRE_FIELD`).
+- **Timing:** exact `mode=1` samples advanced raceframes 44 -> 1452 while the
+  steady host clock advanced 30.779 -> 54.242 seconds: 1,408 / 23.463 =
+  **60.009 race frames/s**. This agrees with the earlier 59.954 Mute City
+  measurement on different course geometry, background, and textures.
+- **Pacing:** two steady race windows reported p50 16.62-16.64 ms, p95
+  17.26-18.27 ms, p99 18.76-19.79 ms, and 0-1 work spikes per 600 frames.
+  Audio-thread p95 was 1.89-3.19 ms and max 3.10-5.01 ms.
+- **Falsifier found:** before editing, the same route reproduced
+  `post=52607636.39ms`. The common tail ended POST on ordinary frames although
+  only the interpolation path opened it, so the steady-clock epoch was being
+  accumulated as a duration.
+- **Fix/regression:** the ordinary path now opens POST at the shared post-render
+  tail, and every sub-timer tracks begin/end balance and ignores an unmatched
+  end. `gdx_perf_tests` drives the real implementation for 600 frames with an
+  intentionally unmatched POST end and requires a finite nonnegative result
+  <=10 ms. It passes at 0.00 ms; the rebuilt app reports real POST means of
+  0.02-0.03 ms across every summary.
+- **Artifact checks:** sealed `F0X.app` rebuilt, strict deep ad-hoc signature and
+  plist lint pass, the route exited cleanly, and no WAITMODE timeout or script
+  parse error occurred. iPhone Simulator and unsigned arm64 iPhoneOS builds
+  both succeeded. Fiber, touch (87/87), diagnostics, graphics-converter,
+  perf, packing, VI, and PCM-capture regressions pass. The broader DSP harness
+  remains at its pre-existing 21/23 baseline: loop-wrap continuity and deferred
+  clamping still fail; this change touches no audio implementation. Compact
+  evidence is in `docs/evidence/macos-fire-field-timing/2026-08-13.txt`.
+- **Boundary:** centered scripted acceleration eventually retires on Fire
+  Field. This closes a second-course timing/presentation slice, not human race
+  completion, physical-device timing, high refresh, Low Power Mode, thermals,
+  or repeated player-controlled course acceptance.

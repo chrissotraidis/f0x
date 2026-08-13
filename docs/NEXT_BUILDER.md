@@ -1,8 +1,8 @@
 # F0X exact next-builder handoff
 
-Last reconciled: 2026-08-13 after commits `8672a1b`, `3e67f05`, and `7cfcd28`,
-plus the final Simulator lifecycle and deterministic unsigned-package unit
-recorded below.
+Last reconciled: 2026-08-13 after commits `8672a1b`, `3e67f05`, `7cfcd28`, and
+`c9991ee`, plus the representative-course timing and perf-telemetry fix recorded
+below.
 
 ## Read order
 
@@ -61,6 +61,11 @@ the exact evidence artifact before relying on a path or process ID.
   transition cancels input, flushes CVars, suspends simulation/Metal/audio
   production, holds the process/log quiescent, and resumes visibly from neutral
   state.
+- A normal GP route visibly selected King Cup / Fire Field and measured 60.009
+  race frames/s over 23.463 seconds, independently extending the Mute City 60 Hz
+  result to a distinct venue. Fire Field steady windows held p50 16.62-16.64 ms
+  and p99 18.76-19.79 ms. `gdx_perf_tests` and the live route also close the
+  misleading epoch-sized POST telemetry value; real POST means are 0.02-0.03 ms.
 
 ## What is explicitly not finished
 
@@ -79,7 +84,8 @@ the exact evidence artifact before relying on a path or process ID.
 - Physical-device long-session confirmation of the Simulator-resolved
   IOS-GFX-CRASH-01 display-list cache fix.
 - Physical lifecycle/interruptions, save-at-interruption, and memory pressure.
-- Representative-course/device 60 Hz and high-refresh/Low Power Mode acceptance.
+- Additional player-completed courses, physical-device 60 Hz, and high-refresh/
+  Low Power Mode acceptance.
 - Release signing/notarization and signed install/update behavior. The
   deterministic unsigned/re-signable package workflow is complete.
 - A public download/install link remains intentionally absent until physical
@@ -199,15 +205,15 @@ in-game Settings entry, live collector/error-tail ring, and iOS
 
 ### F. Timing and high refresh
 
-The macOS 60 Hz base is measured (2026-08-13): a new opt-in
-`GDX_RACE_TIME_PROBE=1` probe plus `GDX_PERF=1` showed 59.954 race frames/s
-over a 37.4 s scripted Mute City race (race timer and game frame counter in
-lockstep), race-window pacing p50 16.6 ms / p99 17.9-19.2 ms / 0 spikes, and
-audio-thread p95 2.9-4.0 ms on the Apple M1 host. Remaining: measure
-representative courses, verify the race HUD timer against wall clock on
-physical devices, then test 60/Match Display/120 transitions on capable
-hardware, including Low Power Mode and thermal behavior, without changing
-simulation speed.
+The macOS 60 Hz base is measured on two distinct courses (2026-08-13): the
+opt-in `GDX_RACE_TIME_PROBE=1` plus `GDX_PERF=1` showed 59.954 race frames/s
+over 37.4 s on Mute City and 60.009 race frames/s over 23.463 s on visibly
+selected King Cup / Fire Field. Fire Field steady pacing was p50 16.62-16.64
+ms / p99 18.76-19.79 ms, with audio-thread p95 1.89-3.19 ms. Remaining: human
+player completion on representative courses, verify the race HUD timer against
+wall clock on physical devices, then test 60/Match Display/120 transitions on
+capable hardware, including Low Power Mode and thermal behavior, without
+changing simulation speed.
 
 ### G. Release hardening and public docs — locally complete
 
