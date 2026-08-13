@@ -162,10 +162,15 @@ Errors section carries the last runtime warnings instead of "none collected".
 
 ### F. Timing and high refresh
 
-At 60 Hz, measure simulation rate, race timer, physics, AI, input, audio sync,
-frame pacing, and presentation during real races. Fix correctness before
-interpolation. Then test 60/Match Display/120 transitions on capable hardware,
-including Low Power Mode and thermal behavior, without changing simulation.
+The macOS 60 Hz base is measured (2026-08-13): a new opt-in
+`GDX_RACE_TIME_PROBE=1` probe plus `GDX_PERF=1` showed 59.954 race frames/s
+over a 37.4 s scripted Mute City race (race timer and game frame counter in
+lockstep), race-window pacing p50 16.6 ms / p99 17.9-19.2 ms / 0 spikes, and
+audio-thread p95 2.9-4.0 ms on the Apple M1 host. Remaining: measure
+representative courses, verify the race HUD timer against wall clock on
+physical devices, then test 60/Match Display/120 transitions on capable
+hardware, including Low Power Mode and thermal behavior, without changing
+simulation speed.
 
 ### G. Release hardening and public docs
 

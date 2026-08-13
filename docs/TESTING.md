@@ -731,3 +731,40 @@ extraction golden plus all-black internal BMP readback as separate gates.
   Share-sheet wiring (triggering `UIActivityViewController` from the touch
   overlay/menu) remain the next slice; the collector is platform-neutral and
   already compiled into the iOS build.
+
+## 2026-08-13 — macOS 60 Hz simulation/timer/pacing measurement
+
+- **Expectation before editing:** prove the simulation and race timer advance
+  at the correct 60 Hz rate against wall clock during a live race on named
+  hardware, with frame pacing and audio-thread behavior measured from the
+  same run.
+- **Probe (small, opt-in):** `GDX_RACE_TIME_PROBE=1` in `main.cpp` logs the
+  decompiled race frame counter (`sRaceFrameCount`), the global game frame
+  counter, the masked game mode, and the host steady clock every 64 host
+  frames. Zero cost when unset; the run also enabled the existing perf
+  telemetry (`GDX_PERF=1`) and the run-log sink (`GDX_LOG=1`).
+- **Run:** sealed `F0X.app` on Apple M1 MacBook Air, macOS 26.5.2, Debug
+  cartridge-only, one windowed runtime, `GDX_INPUT_SCRIPT=scripts/macos-wallhug-probe.gdx`
+  (Jack Cup / Mute City, sustained A + full-left via the internal harness).
+- **Simulation/timer rate:** during a 37.36 s wall-clock race window the race
+  frame counter advanced 2240 and the game frame counter advanced the same
+  2240: **59.954 race frames/s** (0.08% from 60.00 — the N64 NTSC field
+  cadence). The race TIME is derived from these frames, so the timer advances
+  1 s per wall second at the same rate. Per-second deltas were uniform (64
+  frames per probe cadence).
+- **Frame pacing (perf summaries, 600-frame windows):** steady race windows
+  show p50 16.62-16.68 ms, p95 17.43-18.33 ms, p99 17.92-19.15 ms, and
+  **0 spikes**; startup/menu windows have transient spikes (GUI/archive load),
+  with maxima 88-105 ms in the first windows settling to <=34 ms.
+- **Audio thread:** dedicated producer tick p95 2.9-4.0 ms and max 4.7-7.1 ms
+  in the clean race windows (well inside the 16.68 ms frame budget); the
+  post-race transition window shows a transient 25.9 ms audio max.
+- **Telemetry artifact found (pre-existing, not a game defect):** the perf
+  summary's `post=` sub-mean reports millions of ms in early windows
+  (accumulator/normalization issue in the perf sub-timers); the race-window
+  sub-breakdowns are sane (decomp 0.22-0.39 ms, xlate 1.9-3.4 ms, run
+  2.8-6.5 ms). Recorded in KNOWN_ISSUES.
+- **Boundary:** one named macOS host, one track (Mute City), one scripted
+  race pattern, default 60 Hz VSync path (interpolation off). Remaining for
+  full acceptance: representative courses, physical-device timing, high
+  refresh/Match Display transitions, and Low Power Mode behavior.

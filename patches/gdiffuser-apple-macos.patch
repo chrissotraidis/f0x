@@ -4349,7 +4349,7 @@ index 5900586..4b47908 100644
      // harnesses drive PORT 1 only; giving them a port argument would change their file formats.
      gdx_autoinput_apply(&buttons[0], &stick_x[0], &stick_y[0]);
 diff --git a/port/main.cpp b/port/main.cpp
-index 118ee0d..514ba9d 100644
+index 118ee0d..db667cb 100644
 --- a/port/main.cpp
 +++ b/port/main.cpp
 @@ -73,6 +73,11 @@ extern "C" void gdx_disk_save_tick(void);
@@ -4364,7 +4364,37 @@ index 118ee0d..514ba9d 100644
  extern "C" void gdx_pcm_capture_init(void);
  extern "C" int  gdx_pcm_capture_finished(void);
  extern "C" void gdx_pcm_capture_shutdown(void);
-@@ -467,6 +472,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
+@@ -143,6 +148,29 @@ static double gdx_host_now_seconds(void) {
+     using namespace std::chrono;
+     return duration<double>(steady_clock::now() - gGdxHostClockEpoch).count();
+ }
++
++// 60 Hz race-time probe (GDX_RACE_TIME_PROBE=1, opt-in): while a GP race is
++// active, sample the decompiled race frame counter and the host steady clock
++// every 64 host frames, so the simulation/timer rate vs wall clock is
++// measurable from the run log. Zero cost when unset.
++static bool sRaceTimeProbeEnabled = false;
++static uint64_t sRaceTimeProbeHostCount = 0;
++
++static void gdx_race_time_probe_tick(void) {
++    if (!sRaceTimeProbeEnabled) {
++        return;
++    }
++    sRaceTimeProbeHostCount++;
++    if ((sRaceTimeProbeHostCount & 0x3F) != 0) {
++        return;
++    }
++    extern s32 sRaceFrameCount;
++    extern u32 gGameFrameCount;
++    extern s32 gGameMode;
++    gdx_port_logf("[race-time-probe] host_s=%.3f mode=%d raceframes=%d gameframes=%u\n",
++                  gdx_host_now_seconds(), (int) (gGameMode & 0x1F), (int) sRaceFrameCount,
++                  (unsigned) gGameFrameCount);
++}
+ // Hold the host thread until `deadlineSeconds` (same base as gdx_host_now_seconds). No-op if the
+ // presents already spent the tick budget (VSync-on case). Keeps the SIM locked to 60 Hz when the
+ // sub-frame loop finished early (VSync-off case) — this is interpolation's logic pacer.
+@@ -467,6 +495,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
      return 1;
  }
  
@@ -4434,7 +4464,7 @@ index 118ee0d..514ba9d 100644
  // Deliberately no single-port variant: looping one over four ports would silently break the
  // wheel buffer and input-lag deque described above.
  
-@@ -498,6 +566,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
+@@ -498,6 +589,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
          ec.clear();
      }
  
@@ -4448,7 +4478,7 @@ index 118ee0d..514ba9d 100644
      for (std::filesystem::path dir = start; !dir.empty(); dir = dir.parent_path()) {
          roots.push_back(dir);
          roots.push_back(dir / "assets" / "extracted");
-@@ -662,7 +737,7 @@ int main(int argc, char** argv) {
+@@ -662,7 +760,7 @@ int main(int argc, char** argv) {
      }
  
      logStep("CreateUninitializedInstance");
@@ -4457,7 +4487,7 @@ index 118ee0d..514ba9d 100644
                                                            "gdiffuser.cfg.json");
      if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
  
-@@ -702,7 +777,15 @@ int main(int argc, char** argv) {
+@@ -702,7 +800,15 @@ int main(int argc, char** argv) {
      logStep("ControlDeck::Init");     controlDeck->Init(&sGdxControllerBits);
  
      // ResourceManager MUST init before the window is constructed/inited.
@@ -4474,10 +4504,12 @@ index 118ee0d..514ba9d 100644
      for (const auto& archivePath : archivePaths) {
          gdx_port_logf("[G-Diffuser] archive: %s\n", archivePath.c_str());
      }
-@@ -919,6 +1002,32 @@ int main(int argc, char** argv) {
+@@ -919,6 +1025,34 @@ int main(int argc, char** argv) {
          firstBoot.status = gdx::FirstBootStatus::SetupComplete;
      }
  
++    sRaceTimeProbeEnabled = std::getenv("GDX_RACE_TIME_PROBE") != nullptr;
++
 +#if defined(__APPLE__) && defined(GDX_MACOS_BUNDLE)
 +    // Normal app launches begin at a small product home screen. Automated input
 +    // scripts bypass it so deterministic title/race regressions keep their
@@ -4507,7 +4539,7 @@ index 118ee0d..514ba9d 100644
      // Safe this early: the thread internally waits for gAudioContextInitialized (set once decomp's
      // Audio_Init runs, well after bootproc() below) before producing anything.
      logStep("gdx_audio_thread_start()");
-@@ -1076,6 +1185,12 @@ int main(int argc, char** argv) {
+@@ -1076,6 +1210,12 @@ int main(int argc, char** argv) {
      // FrameInterpolation is on.
      gdx_gfx_interp_set_now_fn(&gdx_host_now_seconds);
  
@@ -4520,7 +4552,7 @@ index 118ee0d..514ba9d 100644
      logStep("entering frame loop");
      auto w = ctx->GetWindow();
      while (w != nullptr && w->IsRunning()) {
-@@ -1090,6 +1205,29 @@ int main(int argc, char** argv) {
+@@ -1090,6 +1230,29 @@ int main(int argc, char** argv) {
          // and the window manager crashes.
          w->HandleEvents();
          gdx::PerfPhaseEnd(gdx::PerfEvents);
@@ -4550,7 +4582,7 @@ index 118ee0d..514ba9d 100644
          gdx::PerfPhaseBegin(gdx::PerfInput);
          gdx_controller_poll();
          // Must publish the editor fixed-aspect state before this frame's gfx task runs below:
-@@ -1232,6 +1370,23 @@ int main(int argc, char** argv) {
+@@ -1232,6 +1395,23 @@ int main(int argc, char** argv) {
          gdx_gfx_interp_tick_config(interpOn ? 1 : 0, interpTickStart, kGdxInterpTickSeconds,
                                     interpMaxSubframes);
  
@@ -4574,7 +4606,7 @@ index 118ee0d..514ba9d 100644
          // The game frame ACTUALLY runs here, not in gdx_dispatch() below. gdx_vi_tick posts the VI
          // retrace message, which wakes the Main scheduler thread and dispatches the game fiber
          // inline (osSendMesg -> osStartThread -> __osDispatchThread, because __osRunningThread is
-@@ -1250,14 +1405,6 @@ int main(int argc, char** argv) {
+@@ -1250,14 +1430,6 @@ int main(int argc, char** argv) {
          if (!interpOn) {
              // Default path: one tick, one Run, one present, paced by the frame pacer. Nothing on
              // this branch touches the interpolation machinery.
@@ -4589,7 +4621,23 @@ index 118ee0d..514ba9d 100644
              gdx::PerfPhaseBegin(gdx::PerfDispatch);
              gdx_dispatch();  // run the decomp's game threads cooperatively until they block again
              gdx::PerfPhaseEnd(gdx::PerfDispatch);
-@@ -1441,5 +1588,7 @@ int main(int argc, char** argv) {
+@@ -1269,6 +1441,7 @@ int main(int argc, char** argv) {
+             // staleness notes), so this is the only window where a sample reflects this frame's
+             // post-update truth.
+             gdx_discord_tick();
++            gdx_race_time_probe_tick();
+             gdx::PerfPhaseEnd(gdx::PerfTicks);
+             gdx::PerfPhaseBegin(gdx::PerfPresent);
+             // Presents the VI framebuffer's pixels when no GFX task rendered this frame (boot logo
+@@ -1296,6 +1469,7 @@ int main(int argc, char** argv) {
+             gdx::PerfPhaseBegin(gdx::PerfTicks);
+             gdx_disk_save_tick();
+             gdx_discord_tick(); // post-dispatch sample; see the non-interp branch's note
++            gdx_race_time_probe_tick();
+             gdx::PerfPhaseEnd(gdx::PerfTicks);
+             gdx::PerfPhaseBegin(gdx::PerfPresent);
+             if (gdx_gfx_interp_presented_last_tick() == 0) {
+@@ -1441,5 +1615,7 @@ int main(int argc, char** argv) {
      // the file and folds the SHA, so it must not race a still-running audio thread calling feed().
      gdx_audio_thread_stop();
      gdx_pcm_capture_shutdown();
