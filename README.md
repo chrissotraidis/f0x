@@ -172,7 +172,7 @@ Physical multi-touch ergonomics and haptic feel remain unverified.
 | Audio | Nonzero cartridge synthesis on macOS; SDL output device and active BGM synthesis verified in Simulator |
 | Diagnostics | Privacy-scrubbed runtime report and native Share sheet verified on macOS and iPhone Simulator |
 | Stability | Converted display-list cache regression plus a 5:16 guarded Simulator race/transition soak with no crash |
-| Packaging | Sealed local macOS bundle and ROM-free unsigned arm64 iPhoneOS payload build |
+| Packaging | Sealed local macOS bundle plus deterministic, ROM-free unsigned arm64 iPhoneOS IPA workflow |
 
 Still open: physical-device acceptance, audible route/interruption matrices,
 high-refresh and Low Power Mode behavior, release signing/notarization, a
@@ -202,9 +202,11 @@ are recorded in [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 <summary><strong>Where is the IPA?</strong></summary>
 
 There is no public F0X IPA yet. The unsigned arm64 iPhoneOS app compiles and
-passes a ROM-free payload audit, but physical installation and acceptance have
-not been completed. A future downloadable build must be independently audited,
-re-signable, and described honestly before a release link appears here.
+passes a ROM-free payload audit, and `scripts/package-ios.sh` creates a
+deterministic re-signable proof artifact. Physical installation and acceptance
+have not been completed. A future downloadable build must be independently
+audited and described honestly before a release link appears here. See the
+[build and package guide](docs/BUILDING.md#unsigned-re-signable-ipa).
 </details>
 
 <details>

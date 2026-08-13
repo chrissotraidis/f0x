@@ -970,3 +970,37 @@ extraction golden plus all-black internal BMP readback as separate gates.
 - **Boundary:** visual icon proof is Simulator-only. App Store submission,
   alternate appearance variants, and physical-device icon rendering remain
   unverified.
+
+## 2026-08-13 — Simulator lifecycle suspension and unsigned IPA hardening
+
+- **Lifecycle falsifier:** UIKit cancelled held touch state, but the host loop
+  and independent audio producer had no shared application-active gate.
+- **Implementation:** resign/background publishes inactive only after cancelling
+  touch/latches. The host loop flushes CVars and stops simulation/Metal work;
+  the audio producer blocks on its condition variable until foreground/stop.
+  The observer is installed as soon as the UIKit window exists, independently
+  of the gameplay overlay, so first-time setup also stops drawing while
+  inactive without displaying gameplay controls over that surface.
+- **Live runtime:** rebuilt iPhone 17 Pro Simulator, archive-only, one process.
+  During a visible race, Home logged audio and simulation/render suspension.
+  Tapping F0X logged both resume edges and visibly returned to Metal output.
+- **Fresh-setup runtime:** a separately signed temporary bundle identifier
+  (`com.chrissotraidis.f0x.lifecycleprobe`) launched with an empty container,
+  reached the ROM-missing first-time setup surface, logged inactive/active
+  UIKit edges around Home/return, and held its setup log byte count and mtime
+  unchanged through the settled background interval. The temporary app was
+  uninstalled; the real F0X container was never changed.
+- **Quiescence:** the file-backed runtime log remained exactly 1,049,440 bytes
+  with unchanged mtime through the settled eight-second background window. An
+  initial timed-wait version still woke at 200 Hz and was replaced before
+  acceptance with an untimed suspended wait.
+- **Package:** two consecutive audited package runs produced ignored
+  `F0X-0.1.0-development-unsigned.ipa` with SHA-256
+  `73443925be1304b8a5a7b33416981218f5875d56b9355ca0b66126779c2a13ed`;
+  `unzip -t` passed and a Simulator app was rejected. This identifies the local
+  Debug proof and may change after any rebuild.
+- **Regressions:** Simulator/device/macOS builds, sealed macOS signature, all 87
+  touch checks, graphics-cache tests, diagnostics tests, and safety checks pass.
+- **Boundary:** physical interruptions/routes, memory pressure, Low Power Mode,
+  thermals, high refresh, haptic feel, and save-at-interruption remain open. The
+  IPA is unsigned/re-signable, not a public or directly installable release.

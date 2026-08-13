@@ -1,0 +1,43 @@
+F0X release-hardening evidence — 2026-08-13
+
+Lifecycle
+- Target: iPhone 17 Pro Simulator, iOS 26.5, arm64, windowed Simulator.
+- Active-race Home transition logged dedicated-audio and simulation/render
+  suspension; returning to F0X logged resume and visibly restored Metal output.
+- Settled eight-second background sample kept gdiffuser-run.log at 1,049,440
+  bytes with unchanged mtime.
+- Lifecycle observation is installed before first-time setup without attaching
+  the gameplay touch overlay. Setup stops drawing while inactive.
+- An isolated ad-hoc-signed probe bundle with an empty container reached the
+  ROM-missing setup screen, logged UIKit inactive/active around Home/return,
+  and held gdiffuser-run.log at 1,573 bytes with unchanged mtime through the
+  settled background sample. It was uninstalled afterward; the real F0X
+  container was not modified.
+
+Unsigned package
+- Input: unsigned arm64 iPhoneOS Debug F0X.app, iOS/iPadOS 16.0 minimum,
+  bundle identifier com.chrissotraidis.f0x, iPhone and iPad families.
+- Two consecutive package runs were byte-identical:
+  73443925be1304b8a5a7b33416981218f5875d56b9355ca0b66126779c2a13ed
+  artifacts/F0X-0.1.0-development-unsigned.ipa
+- unzip -t: no errors detected.
+- Negative control: the iPhone Simulator app was refused as a non-device
+  product.
+- The IPA is ignored, unsigned, re-signable proof only; it is not a public or
+  directly installable release.
+
+Regression/build matrix
+- Apple Silicon macOS bundle build: pass; strict deep code-sign verification:
+  pass.
+- iPhone Simulator build: pass.
+- unsigned arm64 iPhoneOS build: pass.
+- gdx_touch_merge_tests: 87 sub-checks, 0 failures.
+- gdx_gfx_convert_tests: all pass, including cache eviction/rebuild.
+- gdx_diagnostics_tests: pass.
+- scripts/check-repo-safety.sh: pass.
+
+Open boundaries
+- No physical Apple device and no valid signing identity were available.
+- Physical touch/audio/lifecycle/thermals/high-refresh, signed install/update,
+  App Store/TestFlight distribution, and player-completed race acceptance are
+  not established by this evidence.

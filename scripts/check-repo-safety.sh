@@ -26,7 +26,8 @@ grep -q 'hasAlpha: no' <<<"$icon_info"
 bash -n \
   "$root_dir/scripts/setup-sources.sh" \
   "$root_dir/scripts/apply-apple-baseline-patches.sh" \
-  "$root_dir/scripts/check-repo-safety.sh"
+  "$root_dir/scripts/check-repo-safety.sh" \
+  "$root_dir/scripts/package-ios.sh"
 
 python3 - "$root_dir" <<'PY'
 import pathlib

@@ -652,6 +652,83 @@ index 0000000..bf857f4
 +#else
 +#include "../decomp/src/audio/rom/lib/effects.c"
 +#endif
+diff --git a/port/gdx_audio_thread.cpp b/port/gdx_audio_thread.cpp
+index 3588c29..f000e64 100644
+--- a/port/gdx_audio_thread.cpp
++++ b/port/gdx_audio_thread.cpp
+@@ -77,6 +77,7 @@ std::condition_variable sWakeCv;
+ std::thread sAudioThread;
+ std::atomic<bool> sStopRequested{ false };
+ std::atomic<bool> sThreadActive{ false }; // resolved kill-switch value, cached for this run
++std::atomic<bool> sSuspended{ false };
+ 
+ // AudioThread_CreateTaskImpl can legitimately return without producing a task (its own
+ // totalTaskCount % specUnk4 gating), which means "not yet", not "stop" -- so the catch-up loop
+@@ -219,11 +220,20 @@ void AudioThreadMain() {
+ 
+     while (!sStopRequested.load(std::memory_order_relaxed)) {
+         {
+-            // 5ms self-pump: this thread never depends on gdx_audio_thread_notify_frame()
+-            // arriving in a timely fashion, only on it eventually arriving OR this timeout
+-            // firing, so a stalled main thread cannot stop production.
+             std::unique_lock<std::mutex> wakeLock(sWakeMutex);
+-            sWakeCv.wait_for(wakeLock, 5ms);
++            if (sSuspended.load(std::memory_order_acquire)) {
++                // A timed wait here would still wake 200 times per second while
++                // iOS keeps the process resident in the background. Resume and
++                // stop both notify, so sleep until either state actually changes.
++                sWakeCv.wait(wakeLock, [] {
++                    return sStopRequested.load(std::memory_order_relaxed) ||
++                           !sSuspended.load(std::memory_order_acquire);
++                });
++            } else {
++                // 5ms self-pump: active production never depends on the main
++                // thread's notify arriving in a timely fashion.
++                sWakeCv.wait_for(wakeLock, 5ms);
++            }
+         }
+         if (sStopRequested.load(std::memory_order_relaxed)) {
+             break;
+@@ -265,6 +275,7 @@ extern "C" void gdx_audio_thread_start(int argc, char** argv) {
+     }
+ 
+     sStopRequested.store(false, std::memory_order_relaxed);
++    sSuspended.store(false, std::memory_order_relaxed);
+     sAudioThread = std::thread(AudioThreadMain);
+ 
+     // libultraship's crash handler installs a SIGTERM/SIGINT/SIGQUIT ShutdownHandler that calls
+@@ -304,6 +315,15 @@ extern "C" int gdx_audio_thread_active(void) {
+     return sThreadActive.load(std::memory_order_relaxed) ? 1 : 0;
+ }
+ 
++extern "C" void gdx_audio_thread_set_suspended(int suspended) {
++    const bool next = suspended != 0;
++    const bool previous = sSuspended.exchange(next, std::memory_order_acq_rel);
++    if (previous != next) {
++        gdx_port_logf("[audio-thread] lifecycle %s\n", next ? "suspended" : "resumed");
++        sWakeCv.notify_all();
++    }
++}
++
+ extern "C" void gdx_audio_ctx_lock(void) {
+     sAudioCtxMutex.lock();
+ }
+diff --git a/port/gdx_audio_thread.h b/port/gdx_audio_thread.h
+index c8b5c78..9e910ce 100644
+--- a/port/gdx_audio_thread.h
++++ b/port/gdx_audio_thread.h
+@@ -30,6 +30,11 @@ void gdx_audio_thread_notify_frame(void);
+ //     only needed on the legacy fiber path.
+ int gdx_audio_thread_active(void);
+ 
++// Stops/resumes production without destroying the device or audio context.
++// The iOS lifecycle gate uses this before simulation/render suspension so the
++// background interval cannot build a stale output queue.
++void gdx_audio_thread_set_suspended(int suspended);
++
+ // Guards the threadCmdBuf handoff between the game thread (AudioThread_QueueCmd in
+ // decomp/src/audio/disk/lib/thread.c) and the audio thread (AudioThread_CreateTask's drain).
+ // RECURSIVE: a command handler inside the mutexed drain may re-enter QueueCmd, which a plain
 diff --git a/port/gdx_audio_thread_source.c b/port/gdx_audio_thread_source.c
 new file mode 100644
 index 0000000..2438a4d
@@ -1555,7 +1632,7 @@ index 34478c6..ad4daa9 100644
 +
  } // namespace gdx
 diff --git a/port/gdx_firstboot_gui.cpp b/port/gdx_firstboot_gui.cpp
-index 1ed3da6..c2b91d1 100644
+index 1ed3da6..5c0c631 100644
 --- a/port/gdx_firstboot_gui.cpp
 +++ b/port/gdx_firstboot_gui.cpp
 @@ -14,9 +14,12 @@
@@ -1571,7 +1648,7 @@ index 1ed3da6..c2b91d1 100644
  #include "ship/window/Window.h"
  #include "ship/window/MouseStateManager.h"
  #include "ship/window/FileDropMgr.h"
-@@ -26,6 +29,13 @@
+@@ -26,21 +29,138 @@
  
  #include <imgui.h>
  
@@ -1581,11 +1658,15 @@ index 1ed3da6..c2b91d1 100644
 +#endif
 +
 +#include <algorithm>
++#include <chrono>
 +#include <cstdlib>
  #include <filesystem>
  #include <string>
  #include <system_error>
-@@ -35,12 +45,120 @@
++#include <thread>
+ #include <utility>
+ #include <vector>
+ 
  namespace fs = std::filesystem;
  
  namespace gdx {
@@ -1706,7 +1787,7 @@ index 1ed3da6..c2b91d1 100644
  enum class Phase {
      Acquire,       // Waiting for the three inputs to be provided + validated.
      Extracting,    // Async extraction is running; showing live progress.
-@@ -77,13 +195,15 @@ struct Row {
+@@ -77,13 +197,15 @@ struct Row {
  // ── Setup screen state machine ───────────────────────────────────────────────────────────────────
  class SetupScreen {
    public:
@@ -1726,7 +1807,7 @@ index 1ed3da6..c2b91d1 100644
          }
      }
  
-@@ -101,6 +221,13 @@ class SetupScreen {
+@@ -101,9 +223,20 @@ class SetupScreen {
              fileDrop->RegisterDropHandler(&SetupScreen::OnFileDroppedThunk);
          }
  
@@ -1740,7 +1821,14 @@ index 1ed3da6..c2b91d1 100644
          gdx_port_logf("[setup] entering in-window first-time setup\n");
          while (w->IsRunning()) {
              w->HandleEvents(); // drag-and-drop events dispatch synchronously here (main thread)
-@@ -115,11 +242,29 @@ class SetupScreen {
++            if (!gdx_touch_controls_app_active()) {
++                std::this_thread::sleep_for(std::chrono::milliseconds(100));
++                continue;
++            }
+             Tick();
+             if (mPhase == Phase::Done) {
+                 break;
+@@ -115,11 +248,29 @@ class SetupScreen {
              w->RunGuiOnly();          // clear/bind the game FB, run no gfx task
              w->GetGui()->EndDraw();   // composite + ImGui::Render + present floating windows
              w->EndFrame();
@@ -1770,7 +1858,7 @@ index 1ed3da6..c2b91d1 100644
  
          const bool completed = (mPhase == Phase::Done);
          if (completed) {
-@@ -141,8 +286,9 @@ class SetupScreen {
+@@ -141,8 +292,9 @@ class SetupScreen {
          }
          std::string src(path);
          std::string why;
@@ -1782,7 +1870,7 @@ index 1ed3da6..c2b91d1 100644
              std::string reason;
              if (r.validate(src, reason)) {
                  if (CopyInputInto(src, mDataDir, r.canonicalName)) {
-@@ -155,7 +301,11 @@ class SetupScreen {
+@@ -155,7 +307,11 @@ class SetupScreen {
                  return;
              }
          }
@@ -1794,7 +1882,7 @@ index 1ed3da6..c2b91d1 100644
          gdx_port_logf("[setup] rejected dropped file (matches no expected input): %s\n", src.c_str());
      }
  
-@@ -305,8 +455,8 @@ class SetupScreen {
+@@ -305,8 +461,8 @@ class SetupScreen {
      }
  
      bool AllRowsOk() const {
@@ -1805,7 +1893,7 @@ index 1ed3da6..c2b91d1 100644
                  return false;
              }
          }
-@@ -350,6 +500,11 @@ class SetupScreen {
+@@ -350,6 +506,11 @@ class SetupScreen {
          if (!AllRowsOk()) {
              return;
          }
@@ -1817,7 +1905,7 @@ index 1ed3da6..c2b91d1 100644
          // A managed-copy-only re-run (original .ndd deleted after a prior setup made the backup)
          // validated against <dataDir>/media, so RowPath(1) would record a nonexistent canonical path
          // in the sidecar and make EnsureManagedDiskCopy warn about a copy that already exists.
-@@ -376,6 +531,7 @@ class SetupScreen {
+@@ -376,6 +537,7 @@ class SetupScreen {
          }
          gdx_port_logf("[setup] user confirmed all inputs; wrote completion marker; starting extraction\n");
          StartExtraction();
@@ -1825,7 +1913,7 @@ index 1ed3da6..c2b91d1 100644
      }
  
      void MountArchive() {
-@@ -442,8 +598,14 @@ class SetupScreen {
+@@ -442,8 +604,14 @@ class SetupScreen {
                          GdxExtractResetAsync();
                          mPhase = Phase::ExtractFailed;
                      } else {
@@ -1841,7 +1929,7 @@ index 1ed3da6..c2b91d1 100644
                          mPhase = Phase::Done;
                      }
                  }
-@@ -458,14 +620,25 @@ class SetupScreen {
+@@ -458,14 +626,25 @@ class SetupScreen {
      // ── Rendering ────────────────────────────────────────────────────────────────────────────────
      void DrawUI() {
          const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -1869,7 +1957,7 @@ index 1ed3da6..c2b91d1 100644
              return;
          }
  
-@@ -473,15 +646,32 @@ class SetupScreen {
+@@ -473,15 +652,32 @@ class SetupScreen {
          if (large != nullptr) {
              ImGui::PushFont(large);
          }
@@ -1906,7 +1994,7 @@ index 1ed3da6..c2b91d1 100644
          switch (mPhase) {
              case Phase::Acquire:
              case Phase::Done:
-@@ -495,11 +685,19 @@ class SetupScreen {
+@@ -495,11 +691,19 @@ class SetupScreen {
                  break;
          }
  
@@ -1927,7 +2015,7 @@ index 1ed3da6..c2b91d1 100644
              Row& r = mRows[i];
              ImGui::PushID(i);
              ImGui::SeparatorText(r.label);
-@@ -536,11 +734,17 @@ class SetupScreen {
+@@ -536,11 +740,17 @@ class SetupScreen {
              }
  
              if (NativeFilePickerAvailable()) {
@@ -1946,7 +2034,7 @@ index 1ed3da6..c2b91d1 100644
              } else {
                  ImGui::TextDisabled("Drag & drop the file onto this window");
              }
-@@ -552,6 +756,7 @@ class SetupScreen {
+@@ -552,6 +762,7 @@ class SetupScreen {
              ImGui::TextColored(ImVec4(0.90f, 0.45f, 0.35f, 1.0f), "%s", mDropError.c_str());
          }
          if (AllRowsOk()) {
@@ -1954,7 +2042,7 @@ index 1ed3da6..c2b91d1 100644
              ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.35f, 1.0f), "All three files are verified.");
              ImGui::TextWrapped("Confirm to build fzerox.o2r from your ROM and continue to the game.");
              // The deletable-files statement names each file, so the reader never has to guess which
-@@ -577,8 +782,24 @@ class SetupScreen {
+@@ -577,8 +788,24 @@ class SetupScreen {
              if (ImGui::Button("Build game data and continue", ImVec2(-1.0f, 0.0f))) {
                  ConfirmAndStartExtraction();
              }
@@ -1979,7 +2067,7 @@ index 1ed3da6..c2b91d1 100644
          }
      }
  
-@@ -590,6 +811,8 @@ class SetupScreen {
+@@ -590,6 +817,8 @@ class SetupScreen {
              stageLabel = "Validating extracted archive...";
          } else if (mSubStage == 2) {
              stageLabel = "Extracting IPL font data...";
@@ -1988,7 +2076,7 @@ index 1ed3da6..c2b91d1 100644
          }
          ImGui::TextUnformatted(stageLabel);
          ImGui::TextWrapped("This happens once and usually takes only a few seconds.");
-@@ -600,7 +823,7 @@ class SetupScreen {
+@@ -600,7 +829,7 @@ class SetupScreen {
          // (gdx_extract_launch.cpp's looksLikeEntryProgressLine). The validating sub-stage is a few
          // hash/zip checks after the child exited, with no per-entry signal, so it stays indeterminate.
          const int total = (mSubStage == 2) ? GdxExtractExpectedIplEntryCount() : GdxExtractExpectedCartEntryCount();
@@ -1997,7 +2085,7 @@ index 1ed3da6..c2b91d1 100644
              int done = mEntriesSeen;
              if (done > total) {
                  done = total; // clamp: the "Processing" heuristic can occasionally over-count
-@@ -673,12 +896,15 @@ class SetupScreen {
+@@ -673,12 +902,15 @@ class SetupScreen {
  
      std::string mDataDir;
      std::string mExeDir;
@@ -2014,7 +2102,7 @@ index 1ed3da6..c2b91d1 100644
      std::vector<std::string> mLog; // GUI-owned copy of the extractor stdout ring buffer; see Tick()
                                      // for why it must survive GdxExtractResetAsync()
      int mEntriesSeen = 0;          // real per-entry progress counter for the current sub-stage
-@@ -696,12 +922,143 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
+@@ -696,12 +928,147 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
  
  } // namespace
  
@@ -2044,6 +2132,10 @@ index 1ed3da6..c2b91d1 100644
 +    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 +    while (w->IsRunning() && !finished) {
 +        w->HandleEvents();
++        if (!gdx_touch_controls_app_active()) {
++            std::this_thread::sleep_for(std::chrono::milliseconds(100));
++            continue;
++        }
 +        w->GetMouseStateManager()->StartFrame();
 +        w->GetGui()->StartDraw();
 +
@@ -2840,10 +2932,10 @@ index 6a59d4d..bb7aaec 100644
                    .CustomFunction([this](WidgetInfo&) {
 diff --git a/port/gdx_touch_controls.h b/port/gdx_touch_controls.h
 new file mode 100644
-index 0000000..0d620f3
+index 0000000..a8add2e
 --- /dev/null
 +++ b/port/gdx_touch_controls.h
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,210 @@
 +// port/gdx_touch_controls.h — cross-platform touch-controls API for F0X.
 +//
 +// One small state-oriented API is exposed to the port. Exactly one implementation
@@ -2913,6 +3005,11 @@ index 0000000..0d620f3
 +// overlay never covers first-time setup or the F0X Home surface.
 +GDX_TOUCH_API void gdx_touch_controls_start(void);
 +
++// Installs the lifecycle observer without attaching the gameplay overlay.
++// Called after the host window exists so Home and first-time setup obey the
++// same foreground/background gate as gameplay.
++GDX_TOUCH_API void gdx_touch_controls_prepare_lifecycle(void);
++
 +// Called once per host frame from the main loop. menuVisible is the live
 +// GdxMenu visibility; physicalGamepadConnected is 1 when the Auto-hide-with-
 +// controller policy should suppress the overlay (main.cpp folds the CVar and the
@@ -2929,6 +3026,11 @@ index 0000000..0d620f3
 +// Clears every button and the stick, and releases every live UIKit touch view
 +// state. Safe to call from any thread; the UIKit part hops to the main thread.
 +GDX_TOUCH_API void gdx_touch_controls_cancel_all(void);
++
++// True while the application may advance simulation, render, and produce
++// audio. iOS flips this around lifecycle notifications; other platforms stay
++// active. Held touch state is cancelled before this becomes false.
++GDX_TOUCH_API int gdx_touch_controls_app_active(void);
 +
 +// Enters layout-editor mode: cancels all gameplay input, closes the in-game menu
 +// if open, shows every control at full opacity, and hands the overlay to the
@@ -3046,10 +3148,10 @@ index 0000000..0d620f3
 +#endif // GDX_TOUCH_CONTROLS_H
 diff --git a/port/gdx_touch_controls_ios.mm b/port/gdx_touch_controls_ios.mm
 new file mode 100644
-index 0000000..025eadb
+index 0000000..0ee9dc3
 --- /dev/null
 +++ b/port/gdx_touch_controls_ios.mm
-@@ -0,0 +1,1510 @@
+@@ -0,0 +1,1529 @@
 +// port/gdx_touch_controls_ios.mm — iOS/iPadOS UIKit touch-controls overlay.
 +//
 +// F0X-specific adaptation of the proven HarkinianPad product patterns
@@ -3069,10 +3171,12 @@ index 0000000..025eadb
 +#import <UIKit/UIKit.h>
 +
 +#include <algorithm>
++#include <atomic>
 +#include <cmath>
 +#include <vector>
 +
 +#include "gdx_touch_controls.h"
++#include "port_log.h"
 +
 +// Host callback provided by port/main.cpp: toggles the live GdxMenu GuiWindow
 +// (not a bare CVar write — a constructed GuiWindow owns its visibility).
@@ -3103,6 +3207,7 @@ index 0000000..025eadb
 +static BOOL sHapticsEnabled = YES;
 +static BOOL sEditorRequested = NO;
 +static BOOL sLifecycleObserversInstalled = NO;
++static std::atomic_bool sAppActive{ true };
 +
 +// ── GdxTouchButton: one N64 button, true per-control UIKit touch tracking ─────
 +@interface GdxTouchButton : UIControl
@@ -4411,6 +4516,9 @@ index 0000000..025eadb
 +                                   if (sOverlay != nil) {
 +                                       [sOverlay cancelAllInputs];
 +                                   }
++                                   if (sAppActive.exchange(false, std::memory_order_acq_rel)) {
++                                       gdx_port_logf("[lifecycle] UIKit application inactive\n");
++                                   }
 +                               }];
 +    }
 +    [notifications addObserverForName:UIApplicationDidBecomeActiveNotification
@@ -4418,6 +4526,9 @@ index 0000000..025eadb
 +                                queue:NSOperationQueue.mainQueue
 +                           usingBlock:^(NSNotification* notification) {
 +                               (void)notification;
++                               if (!sAppActive.exchange(true, std::memory_order_acq_rel)) {
++                                   gdx_port_logf("[lifecycle] UIKit application active\n");
++                               }
 +                               gdx_apply_touch_state();
 +                           }];
 +}
@@ -4425,6 +4536,12 @@ index 0000000..025eadb
 +// ── Public API ────────────────────────────────────────────────────────────────
 +int gdx_touch_controls_available(void) {
 +    return 1;
++}
++
++void gdx_touch_controls_prepare_lifecycle(void) {
++    gdx_main_sync(^{
++        gdx_install_lifecycle_observers();
++    });
 +}
 +
 +void gdx_touch_controls_start(void) {
@@ -4500,6 +4617,10 @@ index 0000000..025eadb
 +    });
 +}
 +
++int gdx_touch_controls_app_active(void) {
++    return sAppActive.load(std::memory_order_acquire) ? 1 : 0;
++}
++
 +void gdx_touch_controls_begin_layout_editor(void) {
 +    gdx_main_sync(^{
 +        if (!sDesiredEnabled || !sStarted) {
@@ -4562,10 +4683,10 @@ index 0000000..025eadb
 +}
 diff --git a/port/gdx_touch_controls_stub.c b/port/gdx_touch_controls_stub.c
 new file mode 100644
-index 0000000..6e8d13a
+index 0000000..43774ff
 --- /dev/null
 +++ b/port/gdx_touch_controls_stub.c
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,57 @@
 +// port/gdx_touch_controls_stub.c — neutral non-iOS touch-controls implementation.
 +//
 +// macOS, Linux, and Windows builds compile this file so every C/C++ call site
@@ -4584,6 +4705,8 @@ index 0000000..6e8d13a
 +}
 +
 +void gdx_touch_controls_start(void) {}
++
++void gdx_touch_controls_prepare_lifecycle(void) {}
 +
 +void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected,
 +                             int enabled, float opacity) {
@@ -4604,6 +4727,10 @@ index 0000000..6e8d13a
 +
 +void gdx_touch_controls_cancel_all(void) {
 +    gdx_touch_state_cancel_all();
++}
++
++int gdx_touch_controls_app_active(void) {
++    return 1;
 +}
 +
 +void gdx_touch_controls_begin_layout_editor(void) {}
@@ -4928,7 +5055,7 @@ index 5900586..4b47908 100644
      // harnesses drive PORT 1 only; giving them a port argument would change their file formats.
      gdx_autoinput_apply(&buttons[0], &stick_x[0], &stick_y[0]);
 diff --git a/port/main.cpp b/port/main.cpp
-index 118ee0d..f659cd0 100644
+index 118ee0d..687e3a0 100644
 --- a/port/main.cpp
 +++ b/port/main.cpp
 @@ -23,7 +23,7 @@
@@ -4949,11 +5076,12 @@ index 118ee0d..f659cd0 100644
  #include "n64_gfx_bridge.h"
  #include <SDL2/SDL.h>
  
-@@ -73,6 +75,11 @@ extern "C" void gdx_disk_save_tick(void);
+@@ -73,6 +75,12 @@ extern "C" void gdx_disk_save_tick(void);
  extern "C" void gdx_disk_save_flush(void);
  extern "C" void gdx_discord_tick(void);
  extern "C" void gdx_discord_shutdown(void);
 +extern "C" void gdx_touch_controls_start(void);
++extern "C" void gdx_touch_controls_prepare_lifecycle(void);
 +extern "C" void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected, int enabled,
 +                                        float opacity);
 +extern "C" void gdx_touch_controls_set_haptics_enabled(int enabled);
@@ -4961,7 +5089,7 @@ index 118ee0d..f659cd0 100644
  extern "C" void gdx_pcm_capture_init(void);
  extern "C" int  gdx_pcm_capture_finished(void);
  extern "C" void gdx_pcm_capture_shutdown(void);
-@@ -143,6 +150,182 @@ static double gdx_host_now_seconds(void) {
+@@ -143,6 +151,182 @@ static double gdx_host_now_seconds(void) {
      using namespace std::chrono;
      return duration<double>(steady_clock::now() - gGdxHostClockEpoch).count();
  }
@@ -5144,7 +5272,7 @@ index 118ee0d..f659cd0 100644
  // Hold the host thread until `deadlineSeconds` (same base as gdx_host_now_seconds). No-op if the
  // presents already spent the tick budget (VSync-on case). Keeps the SIM locked to 60 Hz when the
  // sub-frame loop finished early (VSync-off case) — this is interpolation's logic pacer.
-@@ -467,6 +650,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
+@@ -467,6 +651,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
      return 1;
  }
  
@@ -5214,7 +5342,7 @@ index 118ee0d..f659cd0 100644
  // Deliberately no single-port variant: looping one over four ports would silently break the
  // wheel buffer and input-lag deque described above.
  
-@@ -498,6 +744,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
+@@ -498,6 +745,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
          ec.clear();
      }
  
@@ -5228,7 +5356,7 @@ index 118ee0d..f659cd0 100644
      for (std::filesystem::path dir = start; !dir.empty(); dir = dir.parent_path()) {
          roots.push_back(dir);
          roots.push_back(dir / "assets" / "extracted");
-@@ -662,7 +915,7 @@ int main(int argc, char** argv) {
+@@ -662,7 +916,7 @@ int main(int argc, char** argv) {
      }
  
      logStep("CreateUninitializedInstance");
@@ -5237,7 +5365,7 @@ index 118ee0d..f659cd0 100644
                                                            "gdiffuser.cfg.json");
      if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
  
-@@ -702,7 +955,15 @@ int main(int argc, char** argv) {
+@@ -702,7 +956,15 @@ int main(int argc, char** argv) {
      logStep("ControlDeck::Init");     controlDeck->Init(&sGdxControllerBits);
  
      // ResourceManager MUST init before the window is constructed/inited.
@@ -5254,7 +5382,7 @@ index 118ee0d..f659cd0 100644
      for (const auto& archivePath : archivePaths) {
          gdx_port_logf("[G-Diffuser] archive: %s\n", archivePath.c_str());
      }
-@@ -826,7 +1087,7 @@ int main(int argc, char** argv) {
+@@ -826,7 +1088,7 @@ int main(int argc, char** argv) {
          // port target (cvars.cmake is include()d only inside libultraship/src).
          pgui->AddGuiWindow(std::make_shared<LUS::GfxDebuggerWindow>("gGfxDebuggerEnabled", "Gfx Debugger"));
          pgui->AddGuiWindow(
@@ -5263,7 +5391,19 @@ index 118ee0d..f659cd0 100644
          pgui->AddGuiWindow(
              std::make_shared<GdxGhostWindow>("gEnhancements.Practice.GhostBrowserOpen", "Ghost Browser"));
          pgui->AddGuiWindow(std::make_shared<GdxInputViewer>());
-@@ -919,6 +1180,34 @@ int main(int argc, char** argv) {
+@@ -902,6 +1164,11 @@ int main(int argc, char** argv) {
+     logStep("InitEventSystem");       ctx->InitEventSystem();
+     logStep("InitFileDropMgr");       ctx->InitFileDropMgr();
+ 
++    // Register lifecycle notifications as soon as UIKit and the host window are
++    // available. This does not attach the gameplay overlay; that remains after
++    // setup/Home so those product surfaces stay unobstructed.
++    gdx_touch_controls_prepare_lifecycle();
++
+     // ── In-window first-time setup (NeedsSetup path) ─────────────────────────────────────────────
+     // FirstBootRun defers acquisition to here when the ROM/EK disk/IPL are missing: this is the
+     // first point where the window, Gui and FileDropMgr exist while the game has NOT booted —
+@@ -919,6 +1186,34 @@ int main(int argc, char** argv) {
          firstBoot.status = gdx::FirstBootStatus::SetupComplete;
      }
  
@@ -5298,7 +5438,7 @@ index 118ee0d..f659cd0 100644
      // Safe this early: the thread internally waits for gAudioContextInitialized (set once decomp's
      // Audio_Init runs, well after bootproc() below) before producing anything.
      logStep("gdx_audio_thread_start()");
-@@ -1076,6 +1365,12 @@ int main(int argc, char** argv) {
+@@ -1076,6 +1371,12 @@ int main(int argc, char** argv) {
      // FrameInterpolation is on.
      gdx_gfx_interp_set_now_fn(&gdx_host_now_seconds);
  
@@ -5311,10 +5451,35 @@ index 118ee0d..f659cd0 100644
      logStep("entering frame loop");
      auto w = ctx->GetWindow();
      while (w != nullptr && w->IsRunning()) {
-@@ -1090,6 +1385,38 @@ int main(int argc, char** argv) {
+@@ -1090,6 +1391,63 @@ int main(int argc, char** argv) {
          // and the window manager crashes.
          w->HandleEvents();
          gdx::PerfPhaseEnd(gdx::PerfEvents);
++        // UIKit may leave a short execution window after resign-active and
++        // before process suspension. Do not advance N64 time or submit Metal
++        // work in it. Keep draining SDL lifecycle events so foreground can
++        // resume, and pause the independent audio producer at the same edge.
++        {
++            const bool appActive = gdx_touch_controls_app_active() != 0;
++            static bool previousAppActive = true;
++            if (appActive != previousAppActive) {
++                previousAppActive = appActive;
++                gdx_audio_thread_set_suspended(appActive ? 0 : 1);
++                if (!appActive) {
++                    CVarSave();
++                }
++                gdx_port_logf("[lifecycle] application %s; simulation/render %s\n",
++                              appActive ? "active" : "inactive",
++                              appActive ? "resumed" : "suspended");
++            }
++            if (!appActive) {
++                // UIKit notifications still enter through SDL's event pump,
++                // but a backgrounded game does not need a 60 Hz poll. Keep
++                // foreground response bounded without burning a core.
++                std::this_thread::sleep_for(std::chrono::milliseconds(100));
++                continue;
++            }
++        }
 +        // Touch overlay state, once per host frame and BEFORE the controller
 +        // poll that merges its state: menu visibility comes from the live
 +        // GdxMenu, the physical-controller policy folds the Auto-hide CVar and
@@ -5350,7 +5515,7 @@ index 118ee0d..f659cd0 100644
          gdx::PerfPhaseBegin(gdx::PerfInput);
          gdx_controller_poll();
          // Must publish the editor fixed-aspect state before this frame's gfx task runs below:
-@@ -1232,6 +1559,23 @@ int main(int argc, char** argv) {
+@@ -1232,6 +1590,23 @@ int main(int argc, char** argv) {
          gdx_gfx_interp_tick_config(interpOn ? 1 : 0, interpTickStart, kGdxInterpTickSeconds,
                                     interpMaxSubframes);
  
@@ -5374,7 +5539,7 @@ index 118ee0d..f659cd0 100644
          // The game frame ACTUALLY runs here, not in gdx_dispatch() below. gdx_vi_tick posts the VI
          // retrace message, which wakes the Main scheduler thread and dispatches the game fiber
          // inline (osSendMesg -> osStartThread -> __osDispatchThread, because __osRunningThread is
-@@ -1250,14 +1594,6 @@ int main(int argc, char** argv) {
+@@ -1250,14 +1625,6 @@ int main(int argc, char** argv) {
          if (!interpOn) {
              // Default path: one tick, one Run, one present, paced by the frame pacer. Nothing on
              // this branch touches the interpolation machinery.
@@ -5389,7 +5554,7 @@ index 118ee0d..f659cd0 100644
              gdx::PerfPhaseBegin(gdx::PerfDispatch);
              gdx_dispatch();  // run the decomp's game threads cooperatively until they block again
              gdx::PerfPhaseEnd(gdx::PerfDispatch);
-@@ -1269,6 +1605,7 @@ int main(int argc, char** argv) {
+@@ -1269,6 +1636,7 @@ int main(int argc, char** argv) {
              // staleness notes), so this is the only window where a sample reflects this frame's
              // post-update truth.
              gdx_discord_tick();
@@ -5397,7 +5562,7 @@ index 118ee0d..f659cd0 100644
              gdx::PerfPhaseEnd(gdx::PerfTicks);
              gdx::PerfPhaseBegin(gdx::PerfPresent);
              // Presents the VI framebuffer's pixels when no GFX task rendered this frame (boot logo
-@@ -1296,6 +1633,7 @@ int main(int argc, char** argv) {
+@@ -1296,6 +1664,7 @@ int main(int argc, char** argv) {
              gdx::PerfPhaseBegin(gdx::PerfTicks);
              gdx_disk_save_tick();
              gdx_discord_tick(); // post-dispatch sample; see the non-interp branch's note
@@ -5405,7 +5570,7 @@ index 118ee0d..f659cd0 100644
              gdx::PerfPhaseEnd(gdx::PerfTicks);
              gdx::PerfPhaseBegin(gdx::PerfPresent);
              if (gdx_gfx_interp_presented_last_tick() == 0) {
-@@ -1441,5 +1779,7 @@ int main(int argc, char** argv) {
+@@ -1441,5 +1810,7 @@ int main(int argc, char** argv) {
      // the file and folds the SHA, so it must not race a still-running audio thread calling feed().
      gdx_audio_thread_stop();
      gdx_pcm_capture_shutdown();

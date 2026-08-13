@@ -1,8 +1,8 @@
 # F0X exact next-builder handoff
 
-Last reconciled: 2026-08-13 from repository `main` commit `8672a1b`, with the
-verified touch/Input Editor/audio/diagnostics unit committed and the subsequent
-IOS-GFX-CRASH-01 fix recorded in the maintained patch and this handoff.
+Last reconciled: 2026-08-13 after commits `8672a1b`, `3e67f05`, and `7cfcd28`,
+plus the final Simulator lifecycle and deterministic unsigned-package unit
+recorded below.
 
 ## Read order
 
@@ -42,6 +42,9 @@ the exact evidence artifact before relying on a path or process ID.
   in-process extraction → atomic install/hot mount → visible live race process.
 - Archive-only Simulator race without the ROM.
 - Complete unsigned arm64 iPhoneOS app compile and ROM-free payload audit.
+- Deterministic unsigned/re-signable IPA workflow; unchanged device apps produce
+  identical package SHA-256 values, and Simulator/private-data/signing inputs
+  are rejected.
 - Touch visual/Input Editor Simulator acceptance on iPad Pro 11-inch (M5) and
   iPhone 17 Pro: compact reference-aligned controls, responsive editor, no
   overlay obstruction, and neutral close/restore behavior.
@@ -53,6 +56,11 @@ the exact evidence artifact before relying on a path or process ID.
   (59.954 race frames/s, race-window p50 16.6 ms / p99 17.9-19.2 ms / 0 spikes
   on the Apple M1 host), the macOS race-control blocker report, and the
   phone-defaults re-run on the current build (iPhone 17 Pro Simulator).
+- iPhone 17 Pro Simulator lifecycle: notification observation starts before
+  first-time setup without attaching the gameplay overlay; an active-race Home
+  transition cancels input, flushes CVars, suspends simulation/Metal/audio
+  production, holds the process/log quiescent, and resumes visibly from neutral
+  state.
 
 ## What is explicitly not finished
 
@@ -70,10 +78,12 @@ the exact evidence artifact before relying on a path or process ID.
   physical hardware. The Simulator SDL device now opens and synthesis runs.
 - Physical-device long-session confirmation of the Simulator-resolved
   IOS-GFX-CRASH-01 display-list cache fix.
-- Mobile lifecycle pause/resume/persistence.
-- Correct 60 Hz timing evidence and high-refresh acceptance.
-- Release signing/notarization/re-signable package workflow.
-- HarkinianPad-quality final public README/screenshots/install guide.
+- Physical lifecycle/interruptions, save-at-interruption, and memory pressure.
+- Representative-course/device 60 Hz and high-refresh/Low Power Mode acceptance.
+- Release signing/notarization and signed install/update behavior. The
+  deterministic unsigned/re-signable package workflow is complete.
+- A public download/install link remains intentionally absent until physical
+  acceptance; the polished HarkinianPad-style README and Apple icon are complete.
 - Expansion Kit.
 
 ## Environment boundary at handoff
@@ -111,10 +121,12 @@ prohibited files.
 
 ## Highest-priority actionable work
 
-1. Continue the locally actionable queue: representative-course 60 Hz
-   measurement, high-refresh behavior, packaging, README, and Expansion Kit.
-2. Resume physical iPad/iPhone acceptance when a device and signing identity
-   are available; this remains externally blocked on this host.
+1. Obtain owner/human macOS race completion and corrected-bundle flashing
+   confirmation, or attach a controller.
+2. Resume physical iPad/iPhone acceptance, representative-course timing,
+   high-refresh/Low Power Mode, signing, and update tests when a capable device
+   and signing identity are available. This host has neither.
+3. Start Expansion Kit only after cartridge physical acceptance.
 
 IOS-GFX-CRASH-01 is Simulator-resolved. Converted-wide dialect metadata now
 lives inside `GfxWideCache::Entry` and is copied into each queued list, instead
@@ -132,12 +144,11 @@ macOS sealed-bundle race route, the unsigned iPhoneOS build, and the
 
 ## Remaining execution queue after touch
 
-### A. Touch completion and Simulator evidence
+### A. Touch completion and Simulator evidence — complete
 
-Finish every mapping, separate phone/tablet defaults, settings, editor,
-persistence, opacity, haptics, menu visibility, controller auto-hide, and all
-cancel paths. Run the full matrix in the touch reference. Commit only after
-patch replay and macOS/device-build regressions pass.
+Mappings, phone/tablet defaults, settings, editor, persistence, opacity,
+haptics, menu visibility, controller auto-hide, and cancel paths are complete
+in Simulator with 87/87 focused checks. Physical ergonomics remain in section D.
 
 ### B. macOS human acceptance and flashing confirmation
 
@@ -175,7 +186,7 @@ layout editing, both orientations, safe areas, controller handoff, interruption
 clearing, audio routes, save/reload, and extended sessions. Simulator results
 remain separate.
 
-### E. Diagnostics
+### E. Diagnostics — complete in macOS and Simulator
 
 The macOS Home "Share Diagnostic Log" action is implemented and verified
 (2026-08-13): the privacy-scrubbed text report covers app/OS/device, Metal
@@ -183,11 +194,8 @@ device, window/refresh/interpolation, game-data validation, save, controller/
 touch, scheduler, audio/timing state, and errors; `NSSharingServicePicker`
 presented the artifact; `gdx_diagnostics_tests` passes; the report contains no
 ROM/save contents, signing material, or private paths (see TESTING.md). The
-next slice is the in-game entry and the iOS wiring: trigger the same collector
-from the GdxMenu (and/or the touch overlay) and present
-`UIActivityViewController` on iOS — the share module already compiles into the
-unsigned device build. Consider a live log-tail error ring so the report's
-Errors section carries the last runtime warnings instead of "none collected".
+in-game Settings entry, live collector/error-tail ring, and iOS
+`UIActivityViewController` are also verified. Physical sharing remains open.
 
 ### F. Timing and high refresh
 
@@ -201,14 +209,14 @@ physical devices, then test 60/Match Display/120 transitions on capable
 hardware, including Low Power Mode and thermal behavior, without changing
 simulation speed.
 
-### G. Release hardening and public docs
+### G. Release hardening and public docs — locally complete
 
-Add reproducible build/package/audit scripts, exact checksums, clean-machine
-replay, update/container behavior, Developer ID/notarization or explicitly
-unsigned/re-signable boundaries, and complete ROM/signing scans. Replace the
-current concise README with a polished public guide only as features are proven.
-Use real captures, controls/settings tables, install/build/first-run/diagnostics/
-performance/FAQ content, and retain every limitation.
+Pinned setup, clean patch replay, source/icon/README checks, ROM/signing scans,
+deterministic unsigned IPA creation, and exact SHA-256 output are scripted. The
+public README includes install truth, build/first-run, controls/settings,
+diagnostics/performance, FAQ, legal boundaries, and the original Apple icon.
+Developer ID/notarization, signed installation, update/container behavior, and
+any public download remain hardware/account gates.
 
 ### H. Expansion Kit
 

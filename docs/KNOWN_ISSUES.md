@@ -21,11 +21,18 @@
   race. Open: true multi-touch contact stress, controller handoff,
   interruptions, haptics feel, and long sessions require physical
   iPad/iPhone acceptance. SDL finger-to-ImGui mouse translation is unchanged.
-- **IOS-LIFECYCLE-01 — mobile lifecycle is partially verified:** a Simulator
-  Home background + relaunch re-attached the touch overlay neutrally and
-  cancel paths clear input, but full background/foreground simulation/audio/
-  presentation suspension, config/save flush, interruption, memory pressure,
-  and resume still need runtime proof.
+- **IOS-LIFECYCLE-01 — Simulator lifecycle is verified; physical acceptance
+  remains:** UIKit resign/background first cancels every touch/latch, then the
+  host loop flushes CVars and stops simulation/Metal submission while the
+  dedicated audio producer blocks on its condition variable. Foreground wakes
+  the producer and resumes the host loop from neutral input. Lifecycle
+  observation starts before first-time setup, independently of the gameplay
+  overlay, so the pre-game surface also stops drawing while inactive. An iPhone 17 Pro
+  Simulator live-race Home/return cycle logged both suspend/resume edges, kept
+  the process alive, held the file-backed log byte count/timestamp stable after
+  settling, and visibly returned to Metal output. Physical interruptions,
+  route changes, memory pressure, OS termination, save-at-interruption,
+  Low Power Mode, and thermal behavior remain under IOS-HARDWARE-01.
 - **IOS-AUDIO-01 — launch backend resolved in Simulator; physical audible
   route remains under IOS-HARDWARE-01:** libultraship now excludes iOS from
   the Apple CoreAudio default and falls through to SDL, matching the pinned

@@ -106,3 +106,26 @@ Product: `build/f0x-ios-device/port/Debug-iphoneos/F0X.app`.
 This proves compilation/package structure only. Physical installation requires
 an Apple Development identity, a provisioning profile, a controlled bundle ID,
 and a connected device. Never commit team IDs or signing material.
+
+## Unsigned re-signable IPA
+
+After the unsigned iPhoneOS build succeeds, audit it and create a deterministic
+developer artifact with:
+
+```sh
+scripts/package-ios.sh
+```
+
+The default output is
+`artifacts/F0X-0.1.0-development-unsigned.ipa`. The script accepts an optional
+app path and output path as its first two arguments. It refuses Simulator or
+non-arm64 products, unexpected identity/platform metadata, missing iPhone/iPad
+icons, ROMs, `fzerox.o2r`, saves, signing credentials, provisioning profiles,
+valid or stale signatures, and prohibited files inside the engine archive.
+It normalizes package metadata and file order so an unchanged `.app` produces
+the same IPA SHA-256 on repeated runs.
+
+This IPA is a package/re-signing proof, not a public download and not directly
+installable on a standard iPhone or iPad. A compatible personal-signing tool or
+Xcode must sign it for an installer's device. Never publish an IPA produced
+from an app containing a maintainer profile or signature.
