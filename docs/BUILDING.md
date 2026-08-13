@@ -5,14 +5,16 @@ tracked `patches/`. Never add a ROM or generated archive to a build or package.
 
 ## Prepare sources
 
-If `ref/G-Diffuser` is absent, restore the pinned sources according to
-[`DEPENDENCIES.md`](DEPENDENCIES.md), then apply the maintained series:
+Clone the exact upstream pin, initialize its submodules, and apply the
+maintained series with:
 
 ```sh
-scripts/apply-apple-baseline-patches.sh
+scripts/setup-sources.sh
 ```
 
-The script is idempotent and treats a clean reverse-check as already applied.
+The setup refuses to overwrite a non-Git path or switch an edited checkout.
+The underlying patch step is idempotent and treats a clean reverse-check as
+already applied.
 
 ## Apple Silicon macOS app
 

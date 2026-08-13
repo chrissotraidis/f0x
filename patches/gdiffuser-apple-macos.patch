@@ -20,7 +20,7 @@ index 789b053..a0cc2a8 100644
      if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
          return 0;
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..b4a3140 100644
+index cab4365..da74aa1 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
 @@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
@@ -160,7 +160,7 @@ index cab4365..b4a3140 100644
  if(GDX_EXPANSION_KIT)
      # All four files reference EK-only symbols (gdx_ek_assets_fill, machine_create labels, EK
      # overlay .data), so they must not build in US-only configs.
-@@ -296,6 +361,94 @@ if(GDX_EXPANSION_KIT)
+@@ -296,6 +361,99 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
  
@@ -198,6 +198,10 @@ index cab4365..b4a3140 100644
 +        VERBATIM)
 +    add_dependencies(G-Diffuser gdx_remove_legacy_macos_bundle)
 +elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
++    set(F0X_ASSET_CATALOG "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets")
++    target_sources(G-Diffuser PRIVATE "${F0X_ASSET_CATALOG}")
++    set_source_files_properties("${F0X_ASSET_CATALOG}" PROPERTIES
++        MACOSX_PACKAGE_LOCATION Resources)
 +    set(MACOSX_BUNDLE_EXECUTABLE_NAME "F0X")
 +    set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x")
 +    set(MACOSX_BUNDLE_BUNDLE_NAME "F0X")
@@ -214,6 +218,7 @@ index cab4365..b4a3140 100644
 +        MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0"
 +        MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0"
 +        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.chrissotraidis.f0x"
++        XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
 +        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
 +        XCODE_ATTRIBUTE_INFOPLIST_KEY_UILaunchScreen_Generation YES
 +        XCODE_ATTRIBUTE_INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad
@@ -255,7 +260,7 @@ index cab4365..b4a3140 100644
  target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
  
  if(WIN32)
-@@ -337,30 +490,38 @@ add_custom_command(
+@@ -337,30 +495,38 @@ add_custom_command(
  add_custom_target(gdiffuser_engine_o2r DEPENDS "${GDIFFUSER_ENGINE_O2R}")
  add_dependencies(G-Diffuser gdiffuser_engine_o2r)
  add_custom_command(TARGET G-Diffuser POST_BUILD
@@ -300,7 +305,7 @@ index cab4365..b4a3140 100644
      VERBATIM)
  
  # Keep the project license and every bundled/static dependency notice with binary releases.
-@@ -369,10 +530,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -369,10 +535,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
              "${CMAKE_SOURCE_DIR}/LICENSE"
              "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
@@ -313,7 +318,7 @@ index cab4365..b4a3140 100644
      VERBATIM)
  
  # gdx-extract, the standalone deterministic O2R extractor first boot spawns as a child process.
-@@ -381,48 +542,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -381,48 +547,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
  # clashes with libultraship's spdlog/fmt (docs/investigation/.../W0_TORCH_DEPENDENCIES.md).
  # GDX_DETERMINISTIC=ON => byte-identical archives for identical ROM + recipes. CMP0091=NEW lets
  # Torch's /MT runtime take effect so the exe needs no VC++ redist.
@@ -402,7 +407,7 @@ index cab4365..b4a3140 100644
  # The EK slice manifest ships beside the recipes so the runtime disk step can pass it to
  # `gdx-extract disk -m`.
  set(GDX_EK_SLICE_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/gen/ek_slice_manifest.txt")
-@@ -449,6 +615,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -449,6 +620,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
              --ek-yaml-dir "${CMAKE_SOURCE_DIR}/fzerox-expansion-kit/assets/yaml/jp"
      VERBATIM)
  
@@ -428,7 +433,7 @@ index cab4365..b4a3140 100644
  target_include_directories(G-Diffuser PRIVATE
      "${CMAKE_CURRENT_SOURCE_DIR}"   # for "resource/ResourceFactories.h"
      "${DECOMP}/include"
-@@ -457,7 +642,16 @@ target_include_directories(G-Diffuser PRIVATE
+@@ -457,7 +647,16 @@ target_include_directories(G-Diffuser PRIVATE
  )
  
  target_link_libraries(G-Diffuser PRIVATE cxd4_rsp)
@@ -446,7 +451,7 @@ index cab4365..b4a3140 100644
  
  if(WIN32)
      # user32: MessageBox; Comdlg32: ROM picker; Comctl32: extraction progress marquee.
-@@ -467,6 +661,9 @@ else()
+@@ -467,6 +666,9 @@ else()
      # (needed on older glibc, harmless on newer).
      find_package(Threads REQUIRED)
      target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -456,7 +461,7 @@ index cab4365..b4a3140 100644
      # Release tarballs carry the dependencies no distribution can be relied on to provide in
      # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
      # which beats a wrapper script because the binary stays directly runnable. No effect on a
-@@ -483,6 +680,8 @@ endif()
+@@ -483,6 +685,8 @@ endif()
  # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
  if(NOT MSVC)
      target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
@@ -465,7 +470,7 @@ index cab4365..b4a3140 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +735,42 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +740,42 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -508,7 +513,7 @@ index cab4365..b4a3140 100644
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -706,6 +941,7 @@ if(GDX_BUILD_JP)
+@@ -706,6 +946,7 @@ if(GDX_BUILD_JP)
          disk_savefile.cpp
          gdx_ghost_io.c
          gdx_ghost_window.cpp
@@ -516,7 +521,7 @@ index cab4365..b4a3140 100644
          gdx_input_viewer.cpp
          gdx_fps_overlay.cpp
          gdx_perf.cpp
-@@ -764,6 +1000,8 @@ if(GDX_BUILD_JP)
+@@ -764,6 +1005,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -525,6 +530,84 @@ index cab4365..b4a3140 100644
          target_link_options(G-Diffuser-JP PRIVATE
              "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/gdx_hide_libm.map")
      endif()
+diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
+new file mode 100644
+index 0000000..f6ab8d2
+--- /dev/null
++++ b/port/F0X-Info.plist.in
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++    <key>CFBundleDevelopmentRegion</key>
++    <string>en</string>
++    <key>CFBundleExecutable</key>
++    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
++    <key>CFBundleIdentifier</key>
++    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
++    <key>CFBundleInfoDictionaryVersion</key>
++    <string>6.0</string>
++    <key>CFBundleName</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
++    <key>CFBundlePackageType</key>
++    <string>APPL</string>
++    <key>CFBundleShortVersionString</key>
++    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
++    <key>CFBundleVersion</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
++    <key>LSMinimumSystemVersion</key>
++    <string>13.0</string>
++    <key>NSHighResolutionCapable</key>
++    <true/>
++</dict>
++</plist>
+diff --git a/port/F0X-iOS-Info.plist.in b/port/F0X-iOS-Info.plist.in
+new file mode 100644
+index 0000000..1fe08ed
+--- /dev/null
++++ b/port/F0X-iOS-Info.plist.in
+@@ -0,0 +1,40 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++    <key>CFBundleDevelopmentRegion</key>
++    <string>en</string>
++    <key>CFBundleExecutable</key>
++    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
++    <key>CFBundleIdentifier</key>
++    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
++    <key>CFBundleInfoDictionaryVersion</key>
++    <string>6.0</string>
++    <key>CFBundleName</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
++    <key>CFBundlePackageType</key>
++    <string>APPL</string>
++    <key>CFBundleShortVersionString</key>
++    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
++    <key>CFBundleVersion</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
++    <key>CFBundleIconName</key>
++    <string>AppIcon</string>
++    <key>UIApplicationSupportsIndirectInputEvents</key>
++    <true/>
++    <key>UIRequiresFullScreen</key>
++    <true/>
++    <key>UILaunchScreen</key>
++    <dict/>
++    <key>UISupportedInterfaceOrientations</key>
++    <array>
++        <string>UIInterfaceOrientationLandscapeLeft</string>
++        <string>UIInterfaceOrientationLandscapeRight</string>
++    </array>
++    <key>UISupportedInterfaceOrientations~ipad</key>
++    <array>
++        <string>UIInterfaceOrientationLandscapeLeft</string>
++        <string>UIInterfaceOrientationLandscapeRight</string>
++    </array>
++</dict>
++</plist>
 diff --git a/port/decomp_port.c b/port/decomp_port.c
 index dc07873..f7e2c0e 100644
 --- a/port/decomp_port.c
@@ -557,6 +640,30 @@ index dc07873..f7e2c0e 100644
      gSegments[segment] = (unsigned long long)resolved;
      gdx_seg_log("SetAddr", segment, addr, resolved);
      return addr;
+diff --git a/port/gdx_audio_effects_source.c b/port/gdx_audio_effects_source.c
+new file mode 100644
+index 0000000..bf857f4
+--- /dev/null
++++ b/port/gdx_audio_effects_source.c
+@@ -0,0 +1,6 @@
++/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/effects.c. */
++#ifdef EXPANSION_KIT
++#include "../decomp/src/audio/disk/lib/effects.c"
++#else
++#include "../decomp/src/audio/rom/lib/effects.c"
++#endif
+diff --git a/port/gdx_audio_thread_source.c b/port/gdx_audio_thread_source.c
+new file mode 100644
+index 0000000..2438a4d
+--- /dev/null
++++ b/port/gdx_audio_thread_source.c
+@@ -0,0 +1,6 @@
++/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/thread.c. */
++#ifdef EXPANSION_KIT
++#include "../decomp/src/audio/disk/lib/thread.c"
++#else
++#include "../decomp/src/audio/rom/lib/thread.c"
++#endif
 diff --git a/port/gdx_console_log.cpp b/port/gdx_console_log.cpp
 index 0f7a027..d75da3b 100644
 --- a/port/gdx_console_log.cpp
@@ -1019,6 +1126,18 @@ index 0000000..d63c301
 +}
 +
 +} // extern "C"
+diff --git a/port/gdx_discord_stub.cpp b/port/gdx_discord_stub.cpp
+new file mode 100644
+index 0000000..2968a71
+--- /dev/null
++++ b/port/gdx_discord_stub.cpp
+@@ -0,0 +1,6 @@
++/* Discord desktop IPC is unavailable on iOS. Keep main-loop call sites platform-neutral. */
++extern "C" void gdx_discord_tick(void) {
++}
++
++extern "C" void gdx_discord_shutdown(void) {
++}
 diff --git a/port/gdx_dump_launch.cpp b/port/gdx_dump_launch.cpp
 index 3a04fc0..dd762a9 100644
 --- a/port/gdx_dump_launch.cpp
@@ -2087,6 +2206,179 @@ index 7255291..8c5aeb4 100644
 +F0XHomeAction GdxF0XHomeRun(const std::string& dataDir);
  
  } // namespace gdx
+diff --git a/port/gdx_firstboot_picker.mm b/port/gdx_firstboot_picker.mm
+new file mode 100644
+index 0000000..7ec09fa
+--- /dev/null
++++ b/port/gdx_firstboot_picker.mm
+@@ -0,0 +1,62 @@
++// Native macOS file-picker bridge for the in-window first-launch setup.
++
++#import <AppKit/AppKit.h>
++#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
++
++#include <string>
++
++namespace {
++
++std::string pickFile(NSString* title, NSArray<UTType*>* contentTypes) {
++    @autoreleasepool {
++        NSOpenPanel* panel = [NSOpenPanel openPanel];
++        panel.title = title;
++        panel.message = @"Choose a local game-data file. F0X copies it into its Application Support folder.";
++        panel.canChooseFiles = YES;
++        panel.canChooseDirectories = NO;
++        panel.allowsMultipleSelection = NO;
++        panel.allowedContentTypes = contentTypes;
++        if ([panel runModal] != NSModalResponseOK || panel.URL == nil) {
++            return {};
++        }
++        return panel.URL.path.UTF8String;
++    }
++}
++
++} // namespace
++
++namespace gdx {
++
++std::string GdxPickRomFileMacOS() {
++    return pickFile(@"Select your F-Zero X ROM (US rev0)", @[
++        [UTType typeWithFilenameExtension:@"z64"],
++        [UTType typeWithFilenameExtension:@"n64"],
++        [UTType typeWithFilenameExtension:@"v64"],
++    ]);
++}
++
++std::string GdxPickDiskFileMacOS() {
++    return pickFile(@"Select your F-Zero X Expansion Kit disk", @[
++        [UTType typeWithFilenameExtension:@"ndd"],
++    ]);
++}
++
++std::string GdxPickIplFileMacOS() {
++    return pickFile(@"Select your 64DD IPL ROM", @[
++        [UTType typeWithFilenameExtension:@"n64"],
++        [UTType typeWithFilenameExtension:@"z64"],
++    ]);
++}
++
++bool GdxRevealDataDirectoryMacOS(const std::string& path) {
++    @autoreleasepool {
++        if (path.empty()) {
++            return false;
++        }
++        NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]
++                               isDirectory:YES];
++        return url != nil && [[NSWorkspace sharedWorkspace] openURL:url];
++    }
++}
++
++} // namespace gdx
+diff --git a/port/gdx_firstboot_picker_ios.mm b/port/gdx_firstboot_picker_ios.mm
+new file mode 100644
+index 0000000..02f1e38
+--- /dev/null
++++ b/port/gdx_firstboot_picker_ios.mm
+@@ -0,0 +1,99 @@
++// Native iOS/iPadOS document-picker bridge for the first-launch setup.
++
++#import <UIKit/UIKit.h>
++#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
++
++#include <string>
++
++@interface GdxDocumentPickerDelegate : NSObject <UIDocumentPickerDelegate>
++@property(nonatomic, copy) NSURL* selectedURL;
++@property(nonatomic) BOOL finished;
++@end
++
++@implementation GdxDocumentPickerDelegate
++- (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
++    self.selectedURL = urls.firstObject;
++    self.finished = YES;
++}
++
++- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller {
++    self.finished = YES;
++}
++@end
++
++namespace {
++
++UIViewController* presentingViewController() {
++    UIWindow* window = nil;
++    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
++        if (scene.activationState == UISceneActivationStateForegroundActive &&
++            [scene isKindOfClass:UIWindowScene.class]) {
++            for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
++                if (candidate.isKeyWindow) {
++                    window = candidate;
++                    break;
++                }
++            }
++        }
++        if (window != nil) {
++            break;
++        }
++    }
++    UIViewController* controller = window.rootViewController;
++    while (controller.presentedViewController != nil) {
++        controller = controller.presentedViewController;
++    }
++    return controller;
++}
++
++std::string pickFile(NSArray<UTType*>* contentTypes) {
++    @autoreleasepool {
++        UIViewController* presenter = presentingViewController();
++        if (presenter == nil) {
++            return {};
++        }
++
++        GdxDocumentPickerDelegate* delegate = [[GdxDocumentPickerDelegate alloc] init];
++        UIDocumentPickerViewController* picker =
++            [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:NO];
++        picker.allowsMultipleSelection = NO;
++        picker.delegate = delegate;
++        [presenter presentViewController:picker animated:YES completion:nil];
++
++        while (!delegate.finished && UIApplication.sharedApplication.applicationState == UIApplicationStateActive) {
++            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
++                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
++        }
++
++        NSURL* url = delegate.selectedURL;
++        if (url == nil || ![url startAccessingSecurityScopedResource]) {
++            return {};
++        }
++        // Browse() validates and copies this path immediately. Keep its security scope alive for
++        // the remainder of this short setup process so the C++ copy remains authorized.
++        return url.fileSystemRepresentation;
++    }
++}
++
++UTType* typeForExtension(NSString* extension) {
++    UTType* type = [UTType typeWithFilenameExtension:extension];
++    return type != nil ? type : UTTypeData;
++}
++
++} // namespace
++
++namespace gdx {
++
++std::string GdxPickRomFileIOS() {
++    return pickFile(@[ typeForExtension(@"z64"), typeForExtension(@"n64"), typeForExtension(@"v64") ]);
++}
++
++std::string GdxPickDiskFileIOS() {
++    return pickFile(@[ typeForExtension(@"ndd") ]);
++}
++
++std::string GdxPickIplFileIOS() {
++    return pickFile(@[ typeForExtension(@"n64"), typeForExtension(@"z64") ]);
++}
++
++} // namespace gdx
 diff --git a/port/gdx_frame_pacer.c b/port/gdx_frame_pacer.c
 index d80931c..849e312 100644
 --- a/port/gdx_frame_pacer.c
@@ -2172,6 +2464,73 @@ index b4af69a..e870c2b 100644
      if (sFontStandard == nullptr) {
          sFontStandard = fallback;
      }
+diff --git a/port/gdx_input_editor_window.cpp b/port/gdx_input_editor_window.cpp
+new file mode 100644
+index 0000000..c683982
+--- /dev/null
++++ b/port/gdx_input_editor_window.cpp
+@@ -0,0 +1,41 @@
++#include "gdx_input_editor_window.h"
++
++#include <algorithm>
++
++#include <imgui.h>
++
++void GdxInputEditorWindow::Draw() {
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    if (!IsVisible()) {
++        return;
++    }
++
++    ImGuiViewport* viewport = ImGui::GetMainViewport();
++    if (viewport != nullptr) {
++        // The SDL/ImGui viewport already represents the UIKit drawable's safe
++        // content. A small visual gutter keeps the close affordance and scroll
++        // bar away from the device edge while using the width required by the
++        // editor's mapping rows on both iPhone and iPad landscape.
++        const float gutter = std::max(8.0f, ImGui::GetFontSize() * 0.75f);
++        const ImVec2 size(std::max(320.0f, viewport->WorkSize.x - gutter * 2.0f),
++                          std::max(240.0f, viewport->WorkSize.y - gutter * 2.0f));
++        ImGui::SetNextWindowPos(viewport->WorkPos + ImVec2(gutter, gutter), ImGuiCond_Always);
++        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
++        ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
++    }
++
++    // These values are scoped to this window and all of its sections. They
++    // preserve the existing desktop density while giving mobile controls a
++    // comfortable touch target and readable separation throughout.
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
++                        ImVec2(ImGui::GetFontSize() * 0.75f, ImGui::GetFontSize() * 0.75f));
++    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
++                        ImVec2(ImGui::GetFontSize() * 0.55f, ImGui::GetFontSize() * 0.38f));
++    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
++                        ImVec2(ImGui::GetFontSize() * 0.55f, ImGui::GetFontSize() * 0.45f));
++    LUS::InputEditorWindow::Draw();
++    ImGui::PopStyleVar(3);
++#else
++    LUS::InputEditorWindow::Draw();
++#endif
++}
+diff --git a/port/gdx_input_editor_window.h b/port/gdx_input_editor_window.h
+new file mode 100644
+index 0000000..48545c1
+--- /dev/null
++++ b/port/gdx_input_editor_window.h
+@@ -0,0 +1,14 @@
++#pragma once
++
++#include "libultraship/window/gui/InputEditorWindow.h"
++
++// F0X product wrapper around libultraship's binding editor. Desktop keeps the
++// upstream floating-window behavior; iOS/iPadOS gets a viewport-sized editor so
++// the same rows, popups, stick settings, rumble, gyro, and LED sections remain
++// usable instead of inheriting a stale narrow desktop window rectangle.
++class GdxInputEditorWindow final : public LUS::InputEditorWindow {
++  public:
++    using LUS::InputEditorWindow::InputEditorWindow;
++
++    void Draw() override;
++};
 diff --git a/port/gdx_input_script.c b/port/gdx_input_script.c
 index cef7cfb..1b79c48 100644
 --- a/port/gdx_input_script.c
@@ -5555,6 +5914,57 @@ index 0000000..2023a5f
 +    }
 +    printf("gdx_diagnostics_tests: %d failure(s)\n", s_failures);
 +    return 1;
++}
+diff --git a/port/tests/fiber_smoketest.c b/port/tests/fiber_smoketest.c
+new file mode 100644
+index 0000000..d02c86d
+--- /dev/null
++++ b/port/tests/fiber_smoketest.c
+@@ -0,0 +1,45 @@
++#include "gdx_fiber.h"
++
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++enum { kFiberCount = 3, kSwitches = 10000 };
++
++static GdxFiber* sHost;
++static GdxFiber* sFibers[kFiberCount];
++static uint64_t sCanary[kFiberCount];
++static unsigned sSteps[kFiberCount];
++
++static void fiber_main(void* arg) {
++    const unsigned index = (unsigned)(uintptr_t)arg;
++    const uint64_t expected = UINT64_C(0xA5A5000000000000) | index;
++    sCanary[index] = expected;
++    for (;;) {
++        if (sCanary[index] != expected) {
++            fprintf(stderr, "fiber %u canary corrupted\n", index);
++            abort();
++        }
++        if (sSteps[index] < kSwitches) {
++            ++sSteps[index];
++        }
++        gdx_fiber_switch(sHost);
++    }
++}
++
++int main(void) {
++    sHost = gdx_fiber_convert_thread();
++    if (sHost == NULL) return 1;
++    for (unsigned i = 0; i < kFiberCount; ++i) {
++        sFibers[i] = gdx_fiber_create(fiber_main, (void*)(uintptr_t)i, 0);
++        if (sFibers[i] == NULL) return 2;
++    }
++    for (unsigned round = 0; round < kSwitches; ++round) {
++        for (unsigned i = 0; i < kFiberCount; ++i) gdx_fiber_switch(sFibers[i]);
++    }
++    for (unsigned i = 0; i < kFiberCount; ++i) {
++        if (sSteps[i] != kSwitches) return 3;
++    }
++    puts("gdx_fiber_smoketest: PASS");
++    return 0;
 +}
 diff --git a/port/tests/gfx_convert_tests.cpp b/port/tests/gfx_convert_tests.cpp
 index b06123f..b95e91b 100644

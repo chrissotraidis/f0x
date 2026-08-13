@@ -1,71 +1,288 @@
 # F0X
 
-F0X is an in-progress native Apple port of **F-Zero X** built on
-[G-Diffuser](https://github.com/Zorkats/G-Diffuser). It runs the decompiled
-game logic as native host code and renders through libultraship/Fast3D's Metal
-backend. It is not a generic N64 emulator frontend.
+<p align="center">
+  <img src="assets/AppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png" alt="F0X app icon" width="160">
+</p>
 
-F0X never includes F-Zero X, a ROM, extracted Nintendo assets, saves, or a
-ROM-derived archive. The current product validates a user-owned US revision 0
-big-endian `.z64` locally and creates its private resource archive on the
-device. Nothing is uploaded.
+<p align="center">
+  <strong>F-Zero X rebuilt as a native Apple app.</strong><br>
+  Metal rendering, local game-data setup, customizable touch controls, and
+  support for keyboards and iOS-compatible game controllers.
+</p>
 
-## Current status
+<p align="center">
+  <a href="https://www.buymeacoffee.com/chrissotraidis"><img alt="Buy me a coffee" src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="36"></a>
+</p>
 
-| Area | Evidence-backed status |
-| --- | --- |
-| Apple Silicon macOS | Native arm64 `F0X.app` builds, seals, launches, shows F0X Home, imports game data, and renders a live Metal race |
-| iPad Simulator | Native arm64 app launches, uses the Files picker, performs in-process extraction, and reaches a visible live race |
-| iPhoneOS | Complete arm64 app compiles and passes a ROM-free unsigned payload audit; no physical-device run yet |
-| Metal stability | Current bundle passed dense race and Finder/Home capture tests; owner confirmation of the previously reported flashing remains open |
-| Saves | A real 32 KiB settings-SRAM write, relaunch, load, and exact reversal are verified on macOS |
-| Audio | Cartridge synthesis produces nonzero PCM; audible speaker/headphone delivery is not verified |
-| Touch controls | Implemented; core Simulator-verified. The UIKit overlay writes direct N64 pad state merged at the port-1 seam, with settings, auto-hide, opacity, haptics, permanent menu access, and an editor. Simulator evidence covers the full control set, menu open/close with overlay hiding, controller auto-hide, and a touch-driven GP flow to a live race; physical-device acceptance remains open |
-| Diagnostics | macOS Share Diagnostic Log implemented and verified: a Home action collects privacy-scrubbed system/runtime state and presents the macOS Share sheet; `gdx_diagnostics_tests` passes. In-game entry and the iOS share-sheet wiring remain open |
-| Physical controller/device | Not verified on iPhone or iPad; this Mac currently has no connected device or signing identity |
-| Timing/high refresh | Not measured or accepted |
-| Expansion Kit | Deferred; current builds are cartridge-only |
+<p align="center">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple">
+  <img alt="iOS and iPadOS 16 or newer" src="https://img.shields.io/badge/iOS%20%2F%20iPadOS-16%2B-0A84FF?logo=apple">
+  <img alt="Metal renderer" src="https://img.shields.io/badge/renderer-Metal-5E5CE6">
+  <img alt="Development preview" src="https://img.shields.io/badge/status-development%20preview-FF9F0A">
+  <img alt="Game data not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
+</p>
 
-The visible Simulator picker-to-race run and the unsigned iPhoneOS compile are
-not physical-device acceptance. Likewise, scripted entry into a race is not a
-player-completed race.
+F0X packages the native decompiled F-Zero X game logic from
+[G-Diffuser](https://github.com/Zorkats/G-Diffuser) with
+[libultraship/Fast3D](https://github.com/Zorkats/libultraship) and its Metal
+backend. It is a source-port integration, not a general Nintendo 64 emulator.
 
-## Architecture
+This repository contains the Apple integration, maintained patches,
+documentation, and original F0X artwork. It does **not** contain F-Zero X, a
+ROM, extracted Nintendo assets, saves, or a playable ROM-derived archive. You
+must supply your own legally acquired supported cartridge dump; setup and
+extraction happen locally, and nothing is uploaded.
 
-```text
-Your supported F-Zero X ROM
-        ↓ local validation and Torch preparation
-G-Diffuser native F-Zero X runtime
-        ↓
-libultraship / Fast3D
-        ↓
-Metal
-        ↓
-F0X on macOS, iPhone, and iPad
+## Install status
+
+| Option | Status | What to do |
+|---|---|---|
+| Public `.ipa` | **Not available yet** | No downloadable developer-preview build has been published. |
+| App Store / TestFlight | **Not announced** | F0X has no store listing or public TestFlight. |
+| Local iPhone/iPad build | **Compiles; hardware acceptance pending** | Build with Xcode and your own Apple development team. This Mac has no connected device or signing identity, so a physical install has not been claimed. |
+| iPhone/iPad Simulator | **Available for development** | The native arm64 app imports local game data, renders through Metal, and has completed touch/UI/race stability verification. Simulator evidence is not physical-device acceptance. |
+| Apple Silicon macOS | **Available for development** | The native `F0X.app` builds, seals locally, imports game data, persists saves, and renders a live Metal race. |
+
+F0X is close to a public developer preview, but it is not being presented as a
+finished release. Physical iPhone/iPad touch, audio, lifecycle, thermals,
+controller, and long-session testing remain open. See the exact
+[evidence ledger](docs/STATUS.md) rather than inferring completion from a build
+or Simulator screenshot.
+
+## Get started
+
+You need:
+
+- an Apple Silicon Mac with Xcode and its command-line tools;
+- CMake, Ninja, and Python 3;
+- your own legally acquired supported F-Zero X ROM; and
+- an Apple ID configured in Xcode if you intend to install on hardware.
+
+Install the basic host tools with [Homebrew](https://brew.sh):
+
+```sh
+brew install cmake ninja python
 ```
 
-The active engineering checkpoint, exact open gates, and evidence boundaries
-are in [`docs/STATUS.md`](docs/STATUS.md). Builders should start with
-[`docs/NEXT_BUILDER.md`](docs/NEXT_BUILDER.md), then use
-[`docs/TOUCH_CONTROLS_IMPLEMENTATION.md`](docs/TOUCH_CONTROLS_IMPLEMENTATION.md)
-for the F-Zero-specific touch work. The paste-ready autonomous loop is
-[`docs/BUILDER_GOAL_LOOP.md`](docs/BUILDER_GOAL_LOOP.md).
+Clone F0X and run the pinned-source setup. Generated sources and build products
+live under ignored `ref/` and `build/`; maintained Apple changes stay
+reviewable in `patches/`.
 
-## Repository map
+```sh
+git clone https://github.com/chrissotraidis/f0x.git
+cd f0x
+scripts/setup-sources.sh
+```
 
-- `docs/STATUS.md` — canonical evidence and gate ledger
-- `docs/NEXT_BUILDER.md` — exact ordered continuation plan
-- `docs/TOUCH_CONTROLS_IMPLEMENTATION.md` — input mappings, reference mapping,
-  file-by-file design, and touch acceptance tests
-- `docs/TESTING.md` — dated engineering evidence
-- `docs/KNOWN_ISSUES.md` — open defects and boundaries
-- `docs/BUILDING.md` — current macOS, Simulator, and unsigned-device recipes
-- `docs/GAME_DATA.md` — supported input and private-data lifecycle
-- `patches/` — maintained changes applied to ignored pinned sources
-- `ref/README.md` — ignored reference/source policy
+Build the Apple Silicon macOS app:
 
-## Legal boundary
+```sh
+cmake -S ref/G-Diffuser -B build/macos-f0x-bundle -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DGDX_EXPANSION_KIT=OFF \
+  -DGDX_MACOS_BUNDLE=ON \
+  -DPython3_EXECUTABLE="$PWD/build/python-build-tools/bin/python"
 
-F0X is an unofficial community integration. Nintendo game data is neither
-distributed nor licensed by this repository. See
-[`docs/LEGAL_AND_PROVENANCE.md`](docs/LEGAL_AND_PROVENANCE.md).
+cmake --build build/macos-f0x-bundle --target G-Diffuser --parallel 4
+open build/macos-f0x-bundle/port/F0X.app
+```
+
+The iPhone/iPad Simulator and unsigned arm64 device recipes are in
+[`docs/BUILDING.md`](docs/BUILDING.md). Device installation additionally
+requires a development team, provisioning profile, controlled bundle ID, and
+connected iPhone or iPad. Never commit signing material or team identifiers.
+
+## First launch
+
+F0X never downloads or bundles game data.
+
+1. Open F0X and choose **Manage Game Data** or the first-run setup action.
+2. Select your supported ROM with the native file picker.
+3. F0X copies the file into its private container and validates its identity.
+4. Choose **Build game data and continue**.
+5. The in-process Torch pipeline creates and validates `fzerox.o2r` locally.
+6. F0X activates the archive atomically and continues into the native game.
+
+The verified iPad Simulator path completes selection, validation, in-process
+extraction, hot mounting, and a visible race without starting a second app.
+Archive-only relaunch also works after the original ROM is removed. Physical
+device storage-pressure, interruption, invalid-input, and cancellation paths
+still need hardware acceptance.
+
+## Supported game data
+
+| Property | Supported value |
+|---|---|
+| Game | F-Zero X |
+| Region / revision | US revision 0 |
+| Format | Big-endian `.z64` |
+| Size | 16 MiB (`16,777,216` bytes) |
+| SHA-1 | `5f658e88ffa9de23cba6986a8fd3d3a90d7b4340` |
+| Local archive | `fzerox.o2r`, 3,610 records |
+
+Byte-swapped `.v64` and `.n64` inputs are not currently advertised. Do not
+open issues requesting ROMs, extracted archives, or download links.
+
+## Touch controls
+
+F0X uses an original UIKit touch controller adapted to F-Zero X rather than
+simulating keyboard events. It writes atomic N64 pad state directly into port
+1 and merges cleanly with a physical controller.
+
+- **Left:** continuous analog steering, a separate D-pad, and the left
+  slide/attack control.
+- **Right:** accelerator, boost, brake, right slide/attack, camera, look-back,
+  Start, and secondary controls.
+- **Menu:** `•••` remains available whenever the game surface is active.
+- **Settings:** use **Settings → Controls → Touch Controls** for visibility,
+  controller auto-hide, haptics, opacity, and reset controls.
+- **Customize:** move, resize, show, or hide controls in independent phone and
+  tablet layouts; saved layouts survive relaunch.
+- **Input Editor:** the mobile-safe editor uses two balanced columns on iPad
+  and one on iPhone, with every stick, rumble, gyro, and LED section reachable.
+
+Opening Settings or the Input Editor releases and hides gameplay input. Closing
+it restores a neutral controller state. The focused merge/profile suite passes
+87 checks, and live iPad/iPhone Simulator verification covers visual layout,
+menu/editor behavior, persistence, and a touch-driven route into a race.
+Physical multi-touch ergonomics and haptic feel remain unverified.
+
+| Touch label | F-Zero X action |
+|---|---|
+| Analog stick | Steering and menu navigation |
+| A | Accelerate / confirm |
+| B | Boost / cancel |
+| C↓ | Brake |
+| Z / R | Left / right slide and attack inputs |
+| C→ | Change camera |
+| C↑ | Look back |
+| Start | Start / pause |
+| D-pad | Menus and editor functions |
+
+## What works
+
+| Area | Current evidence-backed result |
+|---|---|
+| Native runtime | Decompiled F-Zero X logic runs as host arm64 code; this is not an emulator frontend |
+| Rendering | libultraship/Fast3D renders through Metal on Apple Silicon macOS and iOS Simulator |
+| Game setup | Native picker, local validation, in-process extraction, atomic install, hot mount, and archive-only relaunch |
+| Touch | Full control set, phone/tablet layouts, customization, persistence, safe cancellation, menu access, and controller auto-hide |
+| Input Editor | Responsive iPhone/iPad layout with aligned mappings and unobstructed controls |
+| Saves | Exact 32 KiB settings-SRAM write, relaunch, load, and reversal verified on macOS |
+| Audio | Nonzero cartridge synthesis on macOS; SDL output device and active BGM synthesis verified in Simulator |
+| Diagnostics | Privacy-scrubbed runtime report and native Share sheet verified on macOS and iPhone Simulator |
+| Stability | Converted display-list cache regression plus a 5:16 guarded Simulator race/transition soak with no crash |
+| Packaging | Sealed local macOS bundle and ROM-free unsigned arm64 iPhoneOS payload build |
+
+Still open: physical-device acceptance, audible route/interruption matrices,
+high-refresh and Low Power Mode behavior, release signing/notarization, a
+human-completed macOS race on this host, and Expansion Kit support.
+
+## Reproducible and ROM-free
+
+```mermaid
+flowchart LR
+    A["F0X repository"] --> B["Pinned G-Diffuser sources"]
+    B --> C["Maintained Apple patches"]
+    C --> D["ROM-free F0X app"]
+    E["Your supported ROM"] --> F["Local validation"]
+    D --> G["In-process extraction"]
+    F --> G
+    G --> H["Private fzerox.o2r and gameplay"]
+```
+
+The compile never needs or packages your ROM. Repository and package audits
+must reject original game media, derived playable archives, saves, credentials,
+provisioning profiles, certificates, and signing keys. Exact pins and licenses
+are recorded in [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
+
+## Frequently asked questions
+
+<details>
+<summary><strong>Where is the IPA?</strong></summary>
+
+There is no public F0X IPA yet. The unsigned arm64 iPhoneOS app compiles and
+passes a ROM-free payload audit, but physical installation and acceptance have
+not been completed. A future downloadable build must be independently audited,
+re-signable, and described honestly before a release link appears here.
+</details>
+
+<details>
+<summary><strong>Does F0X include F-Zero X?</strong></summary>
+
+No. You must provide your own legally acquired supported ROM. F0X does not
+download, distribute, or upload game data.
+</details>
+
+<details>
+<summary><strong>Does audio work?</strong></summary>
+
+The synthesis path produces nonzero PCM on macOS. On iPhone Simulator, SDL
+opens a 2-channel 32 kHz output device while the dedicated producer and BGM
+synthesis run. Speaker, headphones, Bluetooth, route changes, and interruption
+recovery remain physical-hardware tests.
+</details>
+
+<details>
+<summary><strong>Can I use a controller?</strong></summary>
+
+SDL controller support and the existing libultraship mappings are compiled in,
+and touch can auto-hide when a physical controller is visible. Physical iOS
+controller gameplay, reconnect, rumble, and motion behavior still require a
+device matrix.
+</details>
+
+<details>
+<summary><strong>Is Expansion Kit content supported?</strong></summary>
+
+Not in the current product build. F0X is cartridge-only while the core Apple
+experience is completed and accepted. Expansion Kit work remains a separate
+later gate and requires its own legally obtained inputs.
+</details>
+
+<details>
+<summary><strong>Is this an official Nintendo release?</strong></summary>
+
+No. F0X is an unofficial community integration and is not affiliated with or
+endorsed by Nintendo or the upstream projects.
+</details>
+
+## Project map
+
+| Path | Purpose |
+|---|---|
+| [`patches/`](patches/) | Maintained F0X changes replayed onto pinned upstream sources |
+| [`assets/`](assets/) | Original F0X branding and Apple app-icon source assets |
+| [`scripts/setup-sources.sh`](scripts/setup-sources.sh) | Clone exact upstream pins and apply the maintained series |
+| [`scripts/apply-apple-baseline-patches.sh`](scripts/apply-apple-baseline-patches.sh) | Idempotent patch and app-icon setup |
+| [`docs/BUILDING.md`](docs/BUILDING.md) | macOS, Simulator, and unsigned-device build recipes |
+| [`docs/GAME_DATA.md`](docs/GAME_DATA.md) | Supported input and private-data lifecycle |
+| [`docs/STATUS.md`](docs/STATUS.md) | Canonical evidence and completion ledger |
+| [`docs/TESTING.md`](docs/TESTING.md) | Dated runtime and regression evidence |
+| [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) | Open defects, limitations, and external blockers |
+| [`docs/TOUCH_CONTROLS_IMPLEMENTATION.md`](docs/TOUCH_CONTROLS_IMPLEMENTATION.md) | Touch architecture, mappings, and acceptance contract |
+| [`docs/NEXT_BUILDER.md`](docs/NEXT_BUILDER.md) | Exact continuation order for the next engineering run |
+| [`ref/`](ref/) | Ignored, disposable source/reference area; only its policy README is tracked |
+
+Generated source trees, build directories, ROMs, archives, saves, screenshots
+containing private game imagery, and signing material must never be committed.
+
+## Contributing and support
+
+Please include exact platform, build SHA, reproduction steps, and a privacy-
+scrubbed diagnostic report with defect reports. Never attach game data, private
+paths, signing material, or ROM-derived files. Check
+[`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) before opening a duplicate issue.
+
+## Legal and acknowledgements
+
+F0X is an unofficial community project. It does not provide the game, ROM
+downloads, Expansion Kit disks, or playable ROM-derived data. Nintendo and
+F-Zero are trademarks of Nintendo; all game copyrights and trademarks belong
+to their respective owners.
+
+F0X builds on G-Diffuser, libultraship/Fast3D, Torch, the F-Zero X matching
+decompilation project, SDL, and their contributors. Each upstream component
+retains its own license and copyright. See
+[`docs/LEGAL_AND_PROVENANCE.md`](docs/LEGAL_AND_PROVENANCE.md) for the scoped
+rights and provenance boundary.

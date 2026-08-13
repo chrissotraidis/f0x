@@ -1,0 +1,45 @@
+F0X iOS/iPadOS app icon verification
+Date: 2026-08-13
+
+Tracked master
+--------------
+Path: assets/AppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png
+Dimensions: 1024 x 1024
+Format: RGB PNG
+Alpha: no
+SHA-256: fa0fffe4ffc545324ad9c8e9d95a11b7d6ed19575242d8a85186fb7ff6db5bea
+
+Xcode / bundle proof
+--------------------
+- ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+- target device families: iPhone and iPad
+- actool outputs:
+  AppIcon60x60@2x.png (120 x 120)
+  AppIcon76x76@2x~ipad.png (152 x 152)
+  Assets.car
+- generated Info.plist contains CFBundleIconName=AppIcon plus primary icon
+  dictionaries for iPhone and iPad.
+- Simulator bundle validation and full build: pass.
+- Unsigned arm64 iPhoneOS build, icon compile, and bundle validation: pass.
+- Sealed macOS build and focused graphics/touch/diagnostics tests: pass.
+
+Visible proof
+-------------
+The older iconless install initially retained a SpringBoard placeholder. After
+uninstalling the bundle, refreshing SpringBoard, and reinstalling the rebuilt
+app, iPhone 17 Pro Simulator Spotlight visibly rendered the real rounded F0X
+icon as the top hit. The red/orange F0X mark and blue speed accent remain
+legible at launcher scale.
+
+Claim boundary
+--------------
+This is iPhone Simulator evidence. Physical iPhone/iPad icon rendering and App
+Store submission remain unverified.
+
+Reproducibility proof
+---------------------
+The regenerated G-Diffuser patch now includes every new source and plist file,
+including files that had existed only as untracked inputs in the ignored live
+checkout. A pristine checkout at 719fd82 clean-applies the patch, then the setup
+copy produces an icon master with the tracked SHA-256 above; audited files are
+byte-identical to the tested tree.

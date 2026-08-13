@@ -933,3 +933,40 @@ extraction golden plus all-black internal BMP readback as separate gates.
   the valid soak rather than misreported as an IOS-GFX-CRASH-01 recurrence.
 - **Boundary:** this closes the reproducible Simulator failure. Physical-device
   long-session, memory pressure, thermal, and interruption proof remain open.
+
+## 2026-08-13 — public README and iOS/iPadOS app icon
+
+- **Artwork source:** original generated F0X monogram artwork is tracked at
+  `assets/AppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png`. The master is
+  exactly 1024x1024 RGB PNG, opaque, and contains no game screenshot,
+  Nintendo character, vehicle, box art, or official F-Zero logo artwork.
+- **Small-size inspection:** a 60x60 reduction retains a readable `F0X`
+  silhouette and the restrained blue speed accent.
+- **Build integration:** CMake registers the catalog as an Xcode resource and
+  sets `ASSETCATALOG_COMPILER_APPICON_NAME=AppIcon`; the iOS plist names the
+  same primary icon. The Simulator `actool` pass emitted
+  `AppIcon60x60@2x.png`, `AppIcon76x76@2x~ipad.png`, and `Assets.car`, then
+  generated iPhone and iPad `CFBundleIcons` dictionaries. Bundle validation
+  and the complete build succeeded.
+- **Cross-target regression:** the unsigned arm64 iPhoneOS build also compiled,
+  linked, emitted both iPhone/iPad icon renditions, and passed Xcode bundle
+  validation. The sealed macOS app rebuilt; `gdx_gfx_convert_tests`, all 87
+  touch sub-checks, and `gdx_diagnostics_tests` pass.
+- **Visible proof:** the first reinstall retained SpringBoard's cached
+  placeholder from the older iconless app. Uninstall, SpringBoard refresh, and
+  clean reinstall removed that false state. iPhone 17 Pro Simulator Spotlight
+  then visibly rendered the real rounded F0X icon as the top hit.
+- **Reproducibility:** `scripts/apply-apple-baseline-patches.sh` copies the
+  tracked catalog into the ignored disposable source tree after applying the
+  maintained patches. A replay audit found ten existing untracked source/plist
+  files that the previous default Git diff had omitted despite successful live
+  builds; they are now represented in the regenerated patch. A pristine pinned
+  clone clean-applies it and matches the tested files plus copied icon bytes.
+- **README:** the public entry point now follows the reference project's useful
+  hierarchy—identity, truthful install status, quick start, first launch,
+  supported input, touch, capability matrix, ROM-free flow, FAQ, project map,
+  and acknowledgements—without inheriting its physical-device or published-IPA
+  claims.
+- **Boundary:** visual icon proof is Simulator-only. App Store submission,
+  alternate appearance variants, and physical-device icon rendering remain
+  unverified.

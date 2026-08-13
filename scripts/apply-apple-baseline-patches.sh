@@ -18,3 +18,12 @@ apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-fiber-s
 apply_patch_file "$root_dir/ref/G-Diffuser/decomp" "$root_dir/patches/fzerox-decomp-apple.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser/libultraship" "$root_dir/patches/libultraship-apple-metal.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser/torch" "$root_dir/patches/torch-inprocess-apple.patch"
+
+icon_source="$root_dir/assets/AppIcon.xcassets"
+icon_destination="$root_dir/ref/G-Diffuser/port/Assets.xcassets"
+mkdir -p "$icon_destination/AppIcon.appiconset"
+cp "$icon_source/Contents.json" "$icon_destination/Contents.json"
+cp "$icon_source/AppIcon.appiconset/Contents.json" \
+   "$icon_destination/AppIcon.appiconset/Contents.json"
+cp "$icon_source/AppIcon.appiconset/AppIcon-1024.png" \
+   "$icon_destination/AppIcon.appiconset/AppIcon-1024.png"

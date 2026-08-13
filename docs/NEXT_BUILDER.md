@@ -45,6 +45,9 @@ the exact evidence artifact before relying on a path or process ID.
 - Touch visual/Input Editor Simulator acceptance on iPad Pro 11-inch (M5) and
   iPhone 17 Pro: compact reference-aligned controls, responsive editor, no
   overlay obstruction, and neutral close/restore behavior.
+- Original F0X iOS/iPadOS app icon compiled by Xcode and visibly accepted in
+  iPhone Simulator Spotlight, plus a public-release-oriented README that keeps
+  every unavailable distribution and hardware claim explicit.
 - macOS Share Diagnostic Log Home action (collector + privacy scrub + share
   sheet + `gdx_diagnostics_tests`), macOS 60 Hz sim/timer/pacing measurement
   (59.954 race frames/s, race-window p50 16.6 ms / p99 17.9-19.2 ms / 0 spikes
