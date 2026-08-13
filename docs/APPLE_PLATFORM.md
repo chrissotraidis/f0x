@@ -5,7 +5,7 @@ F0X now has real native Apple targets rather than a platform plan only.
 | Platform | Current proof | Not yet proven |
 | --- | --- | --- |
 | Apple Silicon macOS | Native arm64 build, sealed Finder-launchable `F0X.app`, F0X Home, managed data, Metal title/race, SRAM relaunch, dense presentation captures | Owner confirmation of prior flashing, player-completed race, audible route, release signing/notarization, long acceptance matrix |
-| iPad Simulator | Native arm64 SDL/UIKit/Metal app, Files picker, one-process ROM selection/extraction/hot mount, visible race | Touch gameplay, lifecycle, subjective audio, physical ergonomics |
+| iPad Simulator | Native arm64 SDL/UIKit/Metal app, Files picker, one-process ROM selection/extraction/hot mount, visible race, touch overlay with settings/editor/persistence and live cancel/latch captures | Complete touch race, lifecycle, subjective audio, physical ergonomics |
 | iPhone Simulator | Build architecture exists | Compact-layout implementation and direct phone-Simulator acceptance |
 | iPhoneOS/iPadOS SDK | Complete unsigned arm64 app compiles and validates as ROM-free | Signing, installation, physical launch, controller, touch, lifecycle, audio, performance, thermal behavior |
 
@@ -19,5 +19,8 @@ and in-process Torch. Immutable bundle resources and writable Documents are
 explicitly separate. Desktop-only Discord, folder, fullscreen, process-spawn,
 and CoreAudio assumptions are excluded where inappropriate.
 
-Touch is not implemented. The existing SDL finger-to-ImGui mouse path only
-operates menus/setup; it is not an N64 gameplay controller.
+Touch gameplay is implemented and Simulator-verified: a UIKit overlay writes
+direct atomic N64 pad state merged at the port-1 seam, with settings, an
+editor, versioned profiles that survive relaunch, hold-to-cancel, and the Z
+hold-to-latch. The existing SDL finger-to-ImGui mouse path only operates
+menus/setup; it is not an N64 gameplay controller.

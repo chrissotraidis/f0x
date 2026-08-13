@@ -2,24 +2,27 @@
 
 ## F0X-specific
 
-- **IOS-TOUCH-01 — gameplay touch controls are implemented; physical and
-  settings-page acceptance remain open:** the UIKit overlay now writes direct
-  atomic N64 pad state merged at the port-1 seam, with hand-authored phone/
-  tablet defaults, settings CVars, auto-hide with physical controller,
-  opacity, haptics, permanent menu access, menu-state hiding, a layout editor
-  with versioned `NSUserDefaults` profiles, and lifecycle cancel paths. The
+- **IOS-TOUCH-01 — gameplay touch controls are implemented; physical
+  acceptance remains open:** the UIKit overlay now writes direct atomic N64
+  pad state merged at the port-1 seam, with hand-authored phone/tablet
+  defaults, settings CVars, auto-hide with physical controller, opacity,
+  haptics, permanent menu access, menu-state hiding, a layout editor with
+  versioned `NSUserDefaults` profiles, and lifecycle cancel paths. The
   Simulator verified the complete control set and a touch-driven GP flow to a
-  live race; `gdx_touch_merge_tests` passes 87 sub-checks. Open: rendering of
-  the Settings -> Controls -> Touch Controls widgets could not be captured by
-  synthetic clicks (the embedded ImGui Input Editor page did not scroll), the
-  editor and profile persistence have not been exercised on-device, phone
-  defaults have not been run on a phone Simulator, and true multi-touch
-  contact stress, controller handoff, interruptions, and long sessions require
-  physical iPad/iPhone acceptance. SDL finger-to-ImGui mouse translation is
-  unchanged.
-- **IOS-LIFECYCLE-01 — mobile lifecycle is unverified:** background/foreground,
-  simulation/audio/presentation suspension, config/save flush, input clearing,
-  interruption, memory pressure, and resume have not received F0X runtime proof.
+  live race; `gdx_touch_merge_tests` passes 87 sub-checks. The Settings ->
+  Controls -> Touch Controls page renders live with every widget; the layout
+  editor opens and saves; a non-default tablet profile survives relaunch and
+  drives the overlay; hold-to-cancel, the Z hold-to-latch (with AX "Locked"
+  and blue fill), and cancel-clears-latch are captured live. Open: a fresh
+  phone-defaults re-run on a phone Simulator and true multi-touch contact
+  stress, controller handoff, interruptions, haptics feel, and long sessions
+  require physical iPad/iPhone acceptance. SDL finger-to-ImGui mouse
+  translation is unchanged.
+- **IOS-LIFECYCLE-01 — mobile lifecycle is partially verified:** a Simulator
+  Home background + relaunch re-attached the touch overlay neutrally and
+  cancel paths clear input, but full background/foreground simulation/audio/
+  presentation suspension, config/save flush, interruption, memory pressure,
+  and resume still need runtime proof.
 - **IOS-HARDWARE-01 — physical mobile acceptance externally blocked here:** the
   current Mac reports no connected device and zero valid signing identities.
   Simulator and unsigned device-SDK builds do not establish physical rendering,

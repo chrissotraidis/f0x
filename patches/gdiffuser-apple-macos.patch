@@ -1,3 +1,15 @@
+diff --git a/decomp b/decomp
+--- a/decomp
++++ b/decomp
+@@ -1 +1 @@
+-Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809
++Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809-dirty
+diff --git a/libultraship b/libultraship
+--- a/libultraship
++++ b/libultraship
+@@ -1 +1 @@
+-Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71
++Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71-dirty
 diff --git a/port/AssetLoader.cpp b/port/AssetLoader.cpp
 index 789b053..a0cc2a8 100644
 --- a/port/AssetLoader.cpp
@@ -1672,7 +1684,7 @@ index e6d2ef7..ac0ca70 100644
      // load to a mounted pack's "textures/pack/<key>" resource.
      CVarRegisterInteger("gEnhancements.Workshop.TexturePacks", 0);
 diff --git a/port/gdx_menu_registry.cpp b/port/gdx_menu_registry.cpp
-index 6a59d4d..1386e69 100644
+index 6a59d4d..023cf87 100644
 --- a/port/gdx_menu_registry.cpp
 +++ b/port/gdx_menu_registry.cpp
 @@ -58,6 +58,13 @@ using namespace gdxmenu;
@@ -1689,17 +1701,30 @@ index 6a59d4d..1386e69 100644
  
  // From port/n64_gfx_bridge.cpp: frame-interpolation telemetry for the "subframes last tick" line.
  extern "C" int gdx_gfx_interp_last_subframes(void);
-@@ -569,6 +576,98 @@ void GdxMenu::RegisterMenu() {
-                   })
-                   .SearchTerms("controller keyboard mouse deadzone sensitivity mapping bindings remap port"));
+@@ -151,7 +158,8 @@ void GdxMenu::RegisterMenu() {
+                     "graphics internal resolution msaa texture filter vsync fullscreen z fighting");
+     AddSidebarEntry("Settings", "Audio", 2, "audio lle hle filter low pass volume reverb latency buffer");
+     AddSidebarEntry("Settings", "Controls", 1,
+-                    "controls controller configuration keyboard gamepad mouse bindings remap");
++                    "controls controller configuration keyboard gamepad mouse bindings remap "
++                    "touch overlay opacity haptics layout editor");
+     AddSidebarEntry("Settings", "Input Viewer", 2, "input viewer overlay analog stick buttons speedrun");
  
-+    // ═════════════════════════════════════════════════════════════════════════════════════════
-+    // SETTINGS -> Controls -> Touch Controls (iOS/iPadOS gameplay overlay)
-+    // The whole block hides on platforms without the bridge. Callbacks apply
-+    // live: the frame loop reads the CVars every tick, and the editor/reset
-+    // actions reach the overlay through the C API. Opacity never changes the
-+    // controls' frames or hit areas, only their alpha.
-+    // ═════════════════════════════════════════════════════════════════════════════════════════
+     AddSidebarEntry("Enhancements", "Visuals", 2,
+@@ -558,9 +566,99 @@ void GdxMenu::RegisterMenu() {
+ 
+     // ═════════════════════════════════════════════════════════════════════════════════════════
+     // SETTINGS -> Controls
+-    // InputEditorWindow is registered in main.cpp at boot under the name "Input Editor"; this page
+-    // embeds it, or pops it out.
++    // Touch Controls is first so the iOS/iPadOS overlay settings are immediately
++    // visible. The Input Editor embed follows; it is registered in main.cpp at
++    // boot under the name "Input Editor" and this page embeds it or pops it out.
++    // The Touch Controls block hides on platforms without the bridge. Callbacks
++    // apply live: the frame loop reads the CVars every tick, and the
++    // editor/reset actions reach the overlay through the C API. Opacity never
++    // changes the controls' frames or hit areas, only their alpha.
+     // ═════════════════════════════════════════════════════════════════════════════════════════
 +    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
 +              WidgetInfo{ .name = "Touch Controls", .type = GdxUI::WIDGET_SEPARATOR_TEXT }
 +                  .PreFunc([](WidgetInfo& info) {
@@ -1785,9 +1810,9 @@ index 6a59d4d..1386e69 100644
 +                  .Callback([](WidgetInfo&) { gdx_touch_controls_reset_current_layout(); })
 +                  .SearchTerms("restore defaults reset profile"));
 +
-     // ═════════════════════════════════════════════════════════════════════════════════════════
-     // SETTINGS -> Input Viewer (2 columns)
-     // ═════════════════════════════════════════════════════════════════════════════════════════
+     AddWidget("Settings", "Controls", SECTION_COLUMN_1,
+               WidgetInfo{ .name = "Input Editor", .type = GdxUI::WIDGET_CUSTOM }
+                   .CustomFunction([this](WidgetInfo&) {
 diff --git a/port/gdx_touch_controls.h b/port/gdx_touch_controls.h
 new file mode 100644
 index 0000000..0d620f3
@@ -1996,10 +2021,10 @@ index 0000000..0d620f3
 +#endif // GDX_TOUCH_CONTROLS_H
 diff --git a/port/gdx_touch_controls_ios.mm b/port/gdx_touch_controls_ios.mm
 new file mode 100644
-index 0000000..87ea923
+index 0000000..4ef2a26
 --- /dev/null
 +++ b/port/gdx_touch_controls_ios.mm
-@@ -0,0 +1,1290 @@
+@@ -0,0 +1,1435 @@
 +// port/gdx_touch_controls_ios.mm — iOS/iPadOS UIKit touch-controls overlay.
 +//
 +// F0X-specific adaptation of the proven HarkinianPad product patterns
@@ -2030,7 +2055,10 @@ index 0000000..87ea923
 +
 +// Shared haptic confirmation, defined at the bottom of this file; used by the
 +// button press path and the editor Done action before its definition.
-+void gdx_touch_controls_haptic_feedback(void);
++// medium != 0 selects the medium impact used for deliberate latches (the
++// HarkinianPad Z-latch confirmation); 0 uses the light impact for editor
++// actions. Gated by the Haptics CVar.
++void gdx_touch_controls_haptic_feedback(int medium);
 +
 +static void gdx_main_sync(void (^block)(void)) {
 +    if ([NSThread isMainThread]) {
@@ -2056,9 +2084,13 @@ index 0000000..87ea923
 +@property(nonatomic) int buttonBit;          // N64 bit (GDX_TOUCH_BTN_*)
 +@property(nonatomic, copy) NSString* controlKey; // layout spec id (stringified GDX_TOUCH_CTL_*)
 +@property(nonatomic) BOOL inputPressed;
++@property(nonatomic) BOOL inputLatched;      // Z hold-to-latch (HarkinianPad pattern)
++@property(nonatomic) BOOL holdToLatch;       // hold ~0.5 s to lock the button down
++@property(nonatomic) BOOL layoutEditing;     // editor mode: gameplay emission off
 +@property(nonatomic) BOOL usesPillShape;
 +@property(nonatomic, strong) UIColor* idleColor;
 +@property(nonatomic, strong) UIColor* pressedColor;
++@property(nonatomic, strong) UIColor* latchedColor;
 +@property(nonatomic, readonly) UILabel* label;
 +
 +- (instancetype)initWithLabel:(NSString*)label
@@ -2071,6 +2103,7 @@ index 0000000..87ea923
 +
 +@implementation GdxTouchButton {
 +    UILabel* _label;
++    NSUInteger _latchGeneration;
 +}
 +
 +- (UILabel*)label {
@@ -2086,6 +2119,7 @@ index 0000000..87ea923
 +        self.multipleTouchEnabled = YES;
 +        self.idleColor = [UIColor colorWithWhite:0.04 alpha:0.38];
 +        self.pressedColor = [UIColor colorWithWhite:0.72 alpha:0.48];
++        self.latchedColor = [UIColor colorWithRed:0.22 green:0.58 blue:0.96 alpha:0.92];
 +        self.backgroundColor = self.idleColor;
 +        self.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.58].CGColor;
 +        self.layer.borderWidth = 2.0;
@@ -2105,7 +2139,10 @@ index 0000000..87ea923
 +
 +        [self addTarget:self
 +                      action:@selector(inputDown)
-+            forControlEvents:UIControlEventTouchDown | UIControlEventTouchDragEnter];
++            forControlEvents:UIControlEventTouchDown];
++        [self addTarget:self
++                      action:@selector(inputDragEnter)
++            forControlEvents:UIControlEventTouchDragEnter];
 +        [self addTarget:self
 +                      action:@selector(inputUp)
 +            forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside |
@@ -2128,22 +2165,80 @@ index 0000000..87ea923
 +    [self refreshColors];
 +}
 +
-+- (void)refreshColors {
-+    self.backgroundColor = self.inputPressed ? self.pressedColor : self.idleColor;
++- (void)setHoldToLatch:(BOOL)holdToLatch {
++    if (_holdToLatch == holdToLatch) {
++        return;
++    }
++    if (!holdToLatch) {
++        [self cancelInput];
++    }
++    _holdToLatch = holdToLatch;
 +}
 +
-+- (void)inputDown {
-+    if (self.inputPressed) {
++- (void)refreshColors {
++    self.backgroundColor = self.inputLatched
++                               ? self.latchedColor
++                               : (self.inputPressed ? self.pressedColor : self.idleColor);
++    self.layer.borderColor =
++        (self.inputLatched ? [UIColor colorWithRed:0.62 green:0.82 blue:1.0 alpha:1.0]
++                           : [UIColor colorWithWhite:1.0 alpha:0.58]).CGColor;
++}
++
++- (void)beginInput {
++    if (self.layoutEditing || self.inputPressed) {
 +        return;
 +    }
 +    self.inputPressed = YES;
 +    [self refreshColors];
 +    gdx_touch_state_set_button(self.buttonBit, 1);
-+    gdx_touch_controls_haptic_feedback();
++    if (self.holdToLatch) {
++        // HarkinianPad's Z latch: a sustained ~0.5 s hold locks the button
++        // down with a haptic confirmation; a later tap releases it.
++        NSUInteger generation = ++_latchGeneration;
++        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
++                       dispatch_get_main_queue(), ^{
++                           if (self->_latchGeneration == generation) {
++                               [self latchInput];
++                           }
++                       });
++    }
++}
++
++- (void)inputDown {
++    if (self.layoutEditing) {
++        return;
++    }
++    if (self.inputLatched) {
++        // Tap while latched: release the latch.
++        self.inputLatched = NO;
++        self.inputPressed = NO;
++        self.accessibilityValue = nil;
++        [self refreshColors];
++        gdx_touch_state_set_button(self.buttonBit, 0);
++        return;
++    }
++    [self beginInput];
++}
++
++- (void)inputDragEnter {
++    if (!self.inputLatched) {
++        [self beginInput];
++    }
++}
++
++- (void)latchInput {
++    if (!self.holdToLatch || self.layoutEditing || !self.inputPressed) {
++        return;
++    }
++    self.inputLatched = YES;
++    self.accessibilityValue = @"Locked";
++    [self refreshColors];
++    gdx_touch_controls_haptic_feedback(1); // deliberate latch: medium pulse
 +}
 +
 +- (void)inputUp {
-+    if (!self.inputPressed) {
++    _latchGeneration++;
++    if (self.layoutEditing || self.inputLatched || !self.inputPressed) {
 +        return;
 +    }
 +    self.inputPressed = NO;
@@ -2152,7 +2247,16 @@ index 0000000..87ea923
 +}
 +
 +- (void)cancelInput {
-+    [self inputUp];
++    _latchGeneration++;
++    self.inputLatched = NO;
++    self.accessibilityValue = nil;
++    if (!self.inputPressed) {
++        [self refreshColors];
++        return;
++    }
++    self.inputPressed = NO;
++    [self refreshColors];
++    gdx_touch_state_set_button(self.buttonBit, 0);
 +}
 +
 +- (void)applyOpacity:(CGFloat)opacity editing:(BOOL)editing {
@@ -2165,6 +2269,7 @@ index 0000000..87ea923
 +@interface GdxTouchStick : UIControl
 +@property(nonatomic, strong) UIView* knob;
 +@property(nonatomic, copy) NSString* controlKey;
++@property(nonatomic) BOOL layoutEditing; // editor mode: gameplay emission off
 +- (void)cancelInput;
 +@end
 +
@@ -2226,6 +2331,9 @@ index 0000000..87ea923
 +}
 +
 +- (void)touchesBegan:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event {
++    if (self.layoutEditing) {
++        return;
++    }
 +    UITouch* touch = touches.anyObject;
 +    if (touch != nil && _activeTouch == nil) {
 +        _activeTouch = touch;
@@ -2235,6 +2343,9 @@ index 0000000..87ea923
 +}
 +
 +- (void)touchesMoved:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event {
++    if (self.layoutEditing) {
++        return;
++    }
 +    for (UITouch* touch in touches) {
 +        if (touch == _activeTouch) {
 +            [self updateForPoint:[touch locationInView:self]];
@@ -2264,9 +2375,15 @@ index 0000000..87ea923
 +@end
 +
 +// ── Device-class data ─────────────────────────────────────────────────────────
-+// Hand-authored per-device defaults. Sizes are base point sizes at scale 1.0;
-+// the layout editor rescales them 70%..150%. Positions are normalized within
-+// the safe-area rect (0..1 each axis).
++// Defaults adapted from the HarkinianPad reference (pinned at 1197472) accepted
++// physical layouts: the normalized centers promoted from the accepted phone and
++// tablet profiles (customizable-touch-controls.patch), the base sizes from the
++// grip-first design (touch-controls-design.md), and the L/R/Start/D-pad base
++// rail positions from that design's frame math. Centers are FULL-WINDOW
++// normalized (0..1 of the window), exactly like the reference's
++// finishControlLayoutForCompact; the platform-neutral layout core clamps them
++// into the live safe rect. Sizes are base point sizes at scale 1.0; the editor
++// rescales them 70%..150%.
 +typedef struct GdxBaseSpec {
 +    int controlId;
 +    float x;
@@ -2276,33 +2393,33 @@ index 0000000..87ea923
 +} GdxBaseSpec;
 +
 +static const GdxBaseSpec kTabletSpecs[] = {
-+    { GDX_TOUCH_CTL_STICK,    0.150f, 0.740f, 150.0f, 0.0f },
-+    { GDX_TOUCH_CTL_ACCEL,    0.880f, 0.740f, 68.0f, 0.0f },
-+    { GDX_TOUCH_CTL_BOOST,    0.730f, 0.620f, 64.0f, 0.0f },
-+    { GDX_TOUCH_CTL_BRAKE,    0.870f, 0.520f, 64.0f, 0.0f },
-+    { GDX_TOUCH_CTL_SLIDE_L,  0.600f, 0.400f, 88.0f, 54.0f },
-+    { GDX_TOUCH_CTL_SLIDE_R,  0.940f, 0.470f, 88.0f, 54.0f },
-+    { GDX_TOUCH_CTL_START,    0.470f, 0.130f, 46.0f, 0.0f },
-+    { GDX_TOUCH_CTL_VIEW,     0.960f, 0.300f, 46.0f, 0.0f },
-+    { GDX_TOUCH_CTL_LOOK,     0.900f, 0.220f, 46.0f, 0.0f },
-+    { GDX_TOUCH_CTL_CLEFT,    0.970f, 0.400f, 42.0f, 0.0f },
-+    { GDX_TOUCH_CTL_L,        0.100f, 0.360f, 42.0f, 64.0f },
-+    { GDX_TOUCH_CTL_DPAD,     0.290f, 0.560f, 52.0f, 0.0f },
++    { GDX_TOUCH_CTL_STICK,    0.1644f, 0.7453f, 150.0f, 0.0f },  // stick
++    { GDX_TOUCH_CTL_ACCEL,    0.8933f, 0.6930f, 66.0f, 0.0f },  // A
++    { GDX_TOUCH_CTL_BOOST,    0.8260f, 0.6351f, 66.0f, 0.0f },  // B
++    { GDX_TOUCH_CTL_BRAKE,    0.9022f, 0.9052f, 46.0f, 0.0f },  // C-down
++    { GDX_TOUCH_CTL_VIEW,     0.9483f, 0.8529f, 46.0f, 0.0f },  // C-right
++    { GDX_TOUCH_CTL_LOOK,     0.9033f, 0.8055f, 46.0f, 0.0f },  // C-up
++    { GDX_TOUCH_CTL_CLEFT,    0.8565f, 0.8539f, 46.0f, 0.0f },  // C-left
++    { GDX_TOUCH_CTL_SLIDE_L,  0.1931f, 0.6129f, 66.0f, 0.0f },  // Z
++    { GDX_TOUCH_CTL_SLIDE_R,  0.9208f, 0.5180f, 106.0f, 54.0f }, // R pill
++    { GDX_TOUCH_CTL_L,        0.0587f, 0.5180f, 106.0f, 54.0f }, // L pill
++    { GDX_TOUCH_CTL_START,    0.8446f, 0.5180f, 54.0f, 0.0f },  // Start
++    { GDX_TOUCH_CTL_DPAD,     0.0785f, 0.6058f, 52.0f, 0.0f },  // D-pad
 +};
 +
 +static const GdxBaseSpec kPhoneSpecs[] = {
-+    { GDX_TOUCH_CTL_STICK,    0.130f, 0.760f, 116.0f, 0.0f },
-+    { GDX_TOUCH_CTL_ACCEL,    0.870f, 0.760f, 54.0f, 0.0f },
-+    { GDX_TOUCH_CTL_BOOST,    0.700f, 0.620f, 50.0f, 0.0f },
-+    { GDX_TOUCH_CTL_BRAKE,    0.860f, 0.520f, 50.0f, 0.0f },
-+    { GDX_TOUCH_CTL_SLIDE_L,  0.520f, 0.380f, 70.0f, 44.0f },
-+    { GDX_TOUCH_CTL_SLIDE_R,  0.930f, 0.450f, 70.0f, 44.0f },
-+    { GDX_TOUCH_CTL_START,    0.440f, 0.130f, 42.0f, 0.0f },
-+    { GDX_TOUCH_CTL_VIEW,     0.950f, 0.290f, 40.0f, 0.0f },
-+    { GDX_TOUCH_CTL_LOOK,     0.880f, 0.210f, 40.0f, 0.0f },
-+    { GDX_TOUCH_CTL_CLEFT,    0.960f, 0.390f, 38.0f, 0.0f },
-+    { GDX_TOUCH_CTL_L,        0.080f, 0.360f, 38.0f, 54.0f },
-+    { GDX_TOUCH_CTL_DPAD,     0.250f, 0.560f, 44.0f, 0.0f },
++    { GDX_TOUCH_CTL_STICK,    0.2145f, 0.7222f, 116.0f, 0.0f },  // stick
++    { GDX_TOUCH_CTL_ACCEL,    0.8764f, 0.7376f, 52.0f, 0.0f },  // A
++    { GDX_TOUCH_CTL_BOOST,    0.8057f, 0.6650f, 52.0f, 0.0f },  // B
++    { GDX_TOUCH_CTL_BRAKE,    0.8665f, 0.5701f, 40.0f, 0.0f },  // C-down
++    { GDX_TOUCH_CTL_VIEW,     0.9111f, 0.4863f, 40.0f, 0.0f },  // C-right
++    { GDX_TOUCH_CTL_LOOK,     0.8669f, 0.3983f, 40.0f, 0.0f },  // C-up
++    { GDX_TOUCH_CTL_CLEFT,    0.8239f, 0.4855f, 40.0f, 0.0f },  // C-left
++    { GDX_TOUCH_CTL_SLIDE_L,  0.2425f, 0.4991f, 52.0f, 0.0f },  // Z
++    { GDX_TOUCH_CTL_SLIDE_R,  0.9451f, 0.1443f, 76.0f, 44.0f }, // R pill
++    { GDX_TOUCH_CTL_L,        0.0549f, 0.1443f, 76.0f, 44.0f }, // L pill
++    { GDX_TOUCH_CTL_START,    0.8670f, 0.1443f, 44.0f, 0.0f },  // Start
++    { GDX_TOUCH_CTL_DPAD,     0.0732f, 0.3980f, 44.0f, 0.0f },  // D-pad
 +};
 +
 +static const float kDpadRadius = 48.0f; // tablet center-to-button distance
@@ -2382,12 +2499,19 @@ index 0000000..87ea923
 +                       pressedColor:[UIColor colorWithRed:0.14 green:0.48 blue:1.00 alpha:0.88]];
 +        [self.btnBoost setIdleColor:[UIColor colorWithRed:0.05 green:0.55 blue:0.24 alpha:0.58]
 +                       pressedColor:[UIColor colorWithRed:0.10 green:0.76 blue:0.34 alpha:0.88]];
-+        [self.btnBrake setIdleColor:[UIColor colorWithRed:0.62 green:0.22 blue:0.10 alpha:0.58]
-+                       pressedColor:[UIColor colorWithRed:0.86 green:0.36 blue:0.18 alpha:0.88]];
-+        [self.btnSlideL setIdleColor:[UIColor colorWithRed:0.85 green:0.45 blue:0.08 alpha:0.55]
-+                        pressedColor:[UIColor colorWithRed:1.00 green:0.62 blue:0.16 alpha:0.88]];
-+        [self.btnSlideR setIdleColor:[UIColor colorWithRed:0.85 green:0.45 blue:0.08 alpha:0.55]
-+                        pressedColor:[UIColor colorWithRed:1.00 green:0.62 blue:0.16 alpha:0.88]];
++        // HarkinianPad hierarchy: A blue, B green, C buttons amber, L/Z/R the
++        // neutral dark pill/face, Start red.
++        [self.btnBrake setIdleColor:[UIColor colorWithRed:0.95 green:0.67 blue:0.12 alpha:0.48]
++                       pressedColor:[UIColor colorWithRed:1.00 green:0.78 blue:0.20 alpha:0.86]];
++        [self.btnSlideL setIdleColor:[UIColor colorWithWhite:0.04 alpha:0.38]
++                        pressedColor:[UIColor colorWithWhite:0.72 alpha:0.48]];
++        // HarkinianPad's shared Z hold-to-latch, adapted to F-Zero X's left
++        // slide/attack (Z): hold ~0.5 s to lock the slide on with a haptic
++        // confirmation; tap again to release. The latch clears on every cancel
++        // path (menu open, editor, background, interruption, release).
++        self.btnSlideL.holdToLatch = YES;
++        [self.btnSlideR setIdleColor:[UIColor colorWithWhite:0.04 alpha:0.38]
++                        pressedColor:[UIColor colorWithWhite:0.72 alpha:0.48]];
 +        [self.btnStart setIdleColor:[UIColor colorWithRed:0.68 green:0.12 blue:0.16 alpha:0.52]
 +                       pressedColor:[UIColor colorWithRed:0.94 green:0.22 blue:0.26 alpha:0.88]];
 +        [self.btnView setIdleColor:[UIColor colorWithRed:0.95 green:0.67 blue:0.12 alpha:0.48]
@@ -2477,8 +2601,18 @@ index 0000000..87ea923
 +    }
 +
 +    std::vector<GdxTouchControlSpec> resolved(defaults.size());
++    // Full-window normalized safe rect: centers are fractions of the whole
++    // window (HarkinianPad semantics) and the core clamps them into the live
++    // safe area.
++    const CGFloat width = CGRectGetWidth(self.bounds);
++    const CGFloat height = CGRectGetHeight(self.bounds);
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const float safeX0 = (width > 0.0f) ? (float)(safe.left / width) : 0.0f;
++    const float safeY0 = (height > 0.0f) ? (float)(safe.top / height) : 0.0f;
++    const float safeW = (width > 0.0f) ? (float)((width - safe.left - safe.right) / width) : 1.0f;
++    const float safeH = (height > 0.0f) ? (float)((height - safe.top - safe.bottom) / height) : 1.0f;
 +    gdx_touch_layout_apply(defaults.data(), (int)defaults.size(), overrides.data(),
-+                           (int)overrides.size(), 0.0f, 0.0f, 1.0f, 1.0f,
++                           (int)overrides.size(), safeX0, safeY0, safeW, safeH,
 +                           resolved.data(), (int)resolved.size());
 +    return resolved;
 +}
@@ -2516,7 +2650,6 @@ index 0000000..87ea923
 +    const UIEdgeInsets safe = self.safeAreaInsets;
 +    const CGFloat width = CGRectGetWidth(self.bounds);
 +    const CGFloat height = CGRectGetHeight(self.bounds);
-+    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
 +
 +    std::vector<GdxTouchControlSpec> resolved = [self resolvedSpecs];
 +    const GdxBaseSpec* bases = compact ? kPhoneSpecs : kTabletSpecs;
@@ -2537,8 +2670,7 @@ index 0000000..87ea923
 +        const CGFloat size = bases[i].baseSize * spec->scale;
 +        const CGFloat pillHeight = bases[i].baseHeight > 0.0f ? bases[i].baseHeight * spec->scale : 0.0f;
 +        const CGPoint center =
-+            CGPointMake(safeRect.origin.x + spec->centerX * safeRect.size.width,
-+                        safeRect.origin.y + spec->centerY * safeRect.size.height);
++            CGPointMake(spec->centerX * width, spec->centerY * height);
 +
 +        UIView* view = [self viewForControlId:bases[i].controlId];
 +        if (bases[i].controlId == GDX_TOUCH_CTL_DPAD) {
@@ -2606,6 +2738,16 @@ index 0000000..87ea923
 +        _layoutNeedsProfileLoad = YES; // device class changed (rotation on phone)
 +    }
 +    [self applyLayout];
++}
++
++- (void)safeAreaInsetsDidChange {
++    [super safeAreaInsetsDidChange];
++    // The window's safe area can settle after launch (status bar / home
++    // indicator transitions). Relayout so the controls and the permanent menu
++    // button always agree on the current safe rect instead of drifting apart.
++    // Profile overrides are normalized and clamp against the live safe rect,
++    // so a relayout is enough — no profile reload.
++    [self setNeedsLayout];
 +}
 +
 +- (void)cancelAllInputs {
@@ -2733,6 +2875,11 @@ index 0000000..87ea923
 +    }
 +    [self cancelAllInputs];
 +    self.layoutEditing = YES;
++    for (UIView* control in self.editableControls) {
++        if ([control respondsToSelector:@selector(setLayoutEditing:)]) {
++            [(id)control setLayoutEditing:YES];
++        }
++    }
 +    for (UIGestureRecognizer* gesture in self.editGestures) {
 +        gesture.enabled = YES;
 +    }
@@ -2748,6 +2895,11 @@ index 0000000..87ea923
 +    }
 +    [self saveCurrentLayout];
 +    self.layoutEditing = NO;
++    for (UIView* control in self.editableControls) {
++        if ([control respondsToSelector:@selector(setLayoutEditing:)]) {
++            [(id)control setLayoutEditing:NO];
++        }
++    }
 +    for (UIGestureRecognizer* gesture in self.editGestures) {
 +        gesture.enabled = NO;
 +    }
@@ -2755,7 +2907,7 @@ index 0000000..87ea923
 +    self.selectedControl = nil;
 +    [self cancelAllInputs];
 +    [self applyLayout];
-+    gdx_touch_controls_haptic_feedback();
++    gdx_touch_controls_haptic_feedback(0); // editor Done: light confirmation
 +    NSLog(@"[F0X] touch layout saved");
 +}
 +
@@ -2828,15 +2980,15 @@ index 0000000..87ea923
 +}
 +
 +- (void)recordGroupCenter {
-+    const UIEdgeInsets safe = self.safeAreaInsets;
-+    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
 +    const CGFloat cx = (self.dUp.center.x + self.dDown.center.x + self.dLeft.center.x +
 +                        self.dRight.center.x) * 0.25;
 +    const CGFloat cy = (self.dUp.center.y + self.dDown.center.y + self.dLeft.center.y +
 +                        self.dRight.center.y) * 0.25;
++    const CGFloat width = CGRectGetWidth(self.bounds);
++    const CGFloat height = CGRectGetHeight(self.bounds);
 +    self.layoutCenters[@"11"] = @[
-+        @((cx - safeRect.origin.x) / MAX(safeRect.size.width, 1.0)),
-+        @((cy - safeRect.origin.y) / MAX(safeRect.size.height, 1.0)),
++        @(cx / MAX(width, 1.0)),
++        @(cy / MAX(height, 1.0)),
 +    ];
 +}
 +
@@ -2858,11 +3010,11 @@ index 0000000..87ea923
 +    if (key.length == 0) {
 +        return;
 +    }
-+    const UIEdgeInsets safe = self.safeAreaInsets;
-+    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
++    const CGFloat width = CGRectGetWidth(self.bounds);
++    const CGFloat height = CGRectGetHeight(self.bounds);
 +    self.layoutCenters[key] = @[
-+        @((control.center.x - safeRect.origin.x) / MAX(safeRect.size.width, 1.0)),
-+        @((control.center.y - safeRect.origin.y) / MAX(safeRect.size.height, 1.0)),
++        @(control.center.x / MAX(width, 1.0)),
++        @(control.center.y / MAX(height, 1.0)),
 +    ];
 +}
 +
@@ -2907,6 +3059,7 @@ index 0000000..87ea923
 +    if (self.layoutEditing) {
 +        [self selectControl:self.btnAccel];
 +    }
++    gdx_touch_controls_haptic_feedback(0); // editor Reset: light confirmation
 +    NSLog(@"[F0X] touch layout reset to defaults (%@)", self.layoutProfile);
 +}
 +
@@ -2918,8 +3071,8 @@ index 0000000..87ea923
 +    const GdxBaseSpec* bases = compact ? kPhoneSpecs : kTabletSpecs;
 +    const int baseCount = compact ? (int)(sizeof(kPhoneSpecs) / sizeof(kPhoneSpecs[0]))
 +                                  : (int)(sizeof(kTabletSpecs) / sizeof(kTabletSpecs[0]));
-+    const UIEdgeInsets safe = self.safeAreaInsets;
-+    const CGRect safeRect = UIEdgeInsetsInsetRect(self.bounds, safe);
++    const CGFloat width = CGRectGetWidth(self.bounds);
++    const CGFloat height = CGRectGetHeight(self.bounds);
 +    std::vector<GdxTouchControlSpec> specs;
 +    for (int i = 0; i < baseCount; i++) {
 +        GdxTouchControlSpec spec;
@@ -2934,8 +3087,8 @@ index 0000000..87ea923
 +            spec.scale = (float)(h / baseH);
 +        }
 +        NSString* key = view.accessibilityIdentifier;
-+        spec.centerX = (float)((view.center.x - safeRect.origin.x) / MAX(safeRect.size.width, 1.0));
-+        spec.centerY = (float)((view.center.y - safeRect.origin.y) / MAX(safeRect.size.height, 1.0));
++        spec.centerX = (float)(view.center.x / MAX(width, 1.0));
++        spec.centerY = (float)(view.center.y / MAX(height, 1.0));
 +        spec.hidden = [self.hiddenControls containsObject:key] ? 1 : 0;
 +        specs.push_back(spec);
 +    }
@@ -2986,6 +3139,20 @@ index 0000000..87ea923
 +    NSLog(@"[F0X] touch overlay frame=%@ hidden=%d alpha=%.2f userInteraction=%d",
 +          NSStringFromCGRect(overlay.frame), overlay.hidden ? 1 : 0, overlay.alpha,
 +          overlay.userInteractionEnabled ? 1 : 0);
++    // One-shot post-layout dump so Simulator evidence can verify the exact
++    // control frames match the HarkinianPad reference positions.
++    static BOOL sFramesLogged = NO;
++    if (!sFramesLogged) {
++        sFramesLogged = YES;
++        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
++                       dispatch_get_main_queue(), ^{
++                           for (UIView* control in overlay.editableControls) {
++                               NSLog(@"[F0X]   control %@ frame=%@",
++                                     control.accessibilityLabel,
++                                     NSStringFromCGRect(control.frame));
++                           }
++                       });
++    }
 +}
 +
 +static void gdx_install_menu_button(UIWindow* window) {
@@ -3017,19 +3184,19 @@ index 0000000..87ea923
 +    }
 +    sMenuButton.hidden = NO;
 +    if (compact) {
-+        // Phone: dedicated safe slot clear of the Dynamic Island and the menu tab
-+        // strip. Upper-left during gameplay; bottom-center while the menu is open.
++        // Phone: the HarkinianPad accepted slot — top-center during gameplay
++        // (clear of the Dynamic Island, which sits at a landscape corner) and
++        // bottom-center while the menu is open so it never covers the menu tabs.
 +        const CGFloat y =
 +            sMenuVisible ? height - safe.bottom - size - 8.0 : safe.top + 8.0;
 +        sMenuButton.frame =
 +            sMenuVisible
 +                ? CGRectMake(width * 0.5 - size * 0.5, y, size, size)
-+                : CGRectMake(safe.left + 8.0, y, size, size);
++                : CGRectMake(width * 0.5 - size * 0.5, y, size, size);
 +        sMenuButton.autoresizingMask =
-+            sMenuVisible
-+                ? (UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin |
-+                   UIViewAutoresizingFlexibleTopMargin)
-+                : (UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleBottomMargin);
++            UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin |
++            (sMenuVisible ? UIViewAutoresizingFlexibleTopMargin
++                          : UIViewAutoresizingFlexibleBottomMargin);
 +    } else {
 +        // Tablet: upper-right safe area, clear of the menu content.
 +        sMenuButton.frame =
@@ -3281,13 +3448,16 @@ index 0000000..87ea923
 +    gdx_touch_state_cancel_all();
 +}
 +
-+// Haptic confirmation, shared by buttons and the editor Done action.
-+void gdx_touch_controls_haptic_feedback(void) {
++// Haptic confirmation for deliberate actions only (the Z latch and editor
++// actions), matching the HarkinianPad reference and the F0X contract.
++void gdx_touch_controls_haptic_feedback(int medium) {
 +    if (!sHapticsEnabled) {
 +        return;
 +    }
 +    UIImpactFeedbackGenerator* generator =
-+        [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
++        [[UIImpactFeedbackGenerator alloc]
++            initWithStyle:(medium != 0 ? UIImpactFeedbackStyleMedium
++                                       : UIImpactFeedbackStyleLight)];
 +    [generator impactOccurred];
 +}
 diff --git a/port/gdx_touch_controls_stub.c b/port/gdx_touch_controls_stub.c
@@ -4446,3 +4616,9 @@ index f5f427a..2f4ebca 100644
 +  "source_sha256": "7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a",
    "total_entries": 3610
  }
+diff --git a/torch b/torch
+--- a/torch
++++ b/torch
+@@ -1 +1 @@
+-Subproject commit c1bdc6fde97fbaa4495c9e859f635290840a12d3
++Subproject commit c1bdc6fde97fbaa4495c9e859f635290840a12d3-dirty

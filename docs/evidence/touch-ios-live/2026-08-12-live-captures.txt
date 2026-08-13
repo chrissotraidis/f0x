@@ -1,0 +1,65 @@
+F0X touch Simulator live captures — 2026-08-12 (continuation turn)
+Environment: one booted iPad Pro 11-inch (M5) iOS 26.5 Simulator (UDID
+DE8E956F-6B29-4FF3-AF4A-77034CE8588A), one F0X process (archive-only boot),
+window Fit Screen 1113x850 at (163,40). Physical device/signing unavailable.
+
+Interaction seams used
+- AX element clicks via System Events (reliable; used for Menu toggle and
+  editor control selection).
+- CGEvent mouse down/up/hold at host coordinates derived from a calibrated
+  app-point -> host affine map (ACCEL, SLIDE L, Menu anchors verified by the
+  app's own [F0X] touch state log).
+
+1) Hold-to-cancel while pressing the menu button
+   - ACCEL held: repeated "[F0X] touch state buttons=0x8000 ..." every 2 s.
+   - While held, the Menu (•••) button was pressed via AX.
+   - Result at the press instant:
+       15872:18:44:38.263 [F0X] touch state neutral (input released)
+     i.e. the held ACCEL cleared exactly when the menu press landed, and the
+     menu then opened ("touch menu visible -> gameplay overlay hidden"). No
+     stuck control.
+
+2) Z (SLIDE L) hold-to-latch, tap-to-release, cancel-clears-latch
+   - Hold SLIDE L ~0.9 s at host (150,510):
+       15907:19:09:57.660 [F0X] touch state buttons=0x2000 ...
+       15908:19:09:59.666 [F0X] touch state buttons=0x2000 ...   <- still held
+     after the finger was released (19:09:58.5) the button REMAINED 0x2000:
+       15909:19:10:01.673 [F0X] touch state buttons=0x2000 ...   <- latched
+   - AccessibilityValue on SLIDE L was "Locked" while latched; the overlay
+     screenshot shows the blue fill on SLIDE L.
+   - Tap again to release:
+       15928:19:10:39.775 [F0X] touch state buttons=0x2000 ...
+       15929:19:10:41.722 [F0X] touch state neutral (input released)
+     AX value back to nil.
+   - Cancel path (open menu while latched):
+       15944:19:11:48.426 [F0X] touch menu visible -> gameplay overlay hidden
+       15945:19:11:48.426 [F0X] touch state neutral (input released)
+     Latch cleared by the menu/cancel path.
+
+3) Layout editor open/save and profile persistence across relaunch
+   - Customize Touch Layout opened the editor:
+       22903:19:52:13.504 [F0X] touch layout editor opened
+   - A control override was changed (size slider / selection; D-pad group
+     moved) and Done saved:
+       22905:19:56:41.556 [F0X] touch layout saved
+   - NSUserDefaults profile before the edit contained the prior D-pad group
+     y (0.433138); after the edit and relaunch it contains a NON-DEFAULT
+     override:
+       F0X.TouchLayout.tablet-v1 -> "v1 11 0.078500 0.318030 1.000 0"
+     (code default for the D-pad group in gdx_touch_controls_ios.mm is
+      y=0.6058).
+   - After relaunch the live overlay applied the saved override: D-pad up
+     arrow frame y=191.24 vs the default 383.24 from the pre-edit launch
+     (console logs). The profile survives relaunch and drives layout.
+
+4) Lifecycle cancel
+   - Simulator Home button backgrounded F0X; relaunch re-attached the overlay
+     with neutral state ("touch overlay frame={{0,0},{1210,834}} hidden=0
+     ... userInteraction=1").
+
+Boundary
+- Simulator evidence only; not physical-device acceptance. The Input Editor
+  pop-out window (libultraship) overlays the lower game area during part of
+  this session; it is unrelated to the touch layout profile and does not
+  change the N64 pad merge. Settings/editor interaction used AX and CGEvent
+  synthesis; true two-finger contact stress still requires physical devices.

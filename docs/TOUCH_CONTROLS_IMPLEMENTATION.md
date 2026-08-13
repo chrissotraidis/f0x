@@ -17,22 +17,34 @@ core on 2026-08-12 (evidence: `docs/evidence/touch-ios/2026-08-12.txt`).
 - `port/input_bridge.c` merges one touch snapshot into port 1 immediately after
   the single ControlDeck read and before developer overrides; the touch layer
   never computes edges.
-- The UIKit overlay renders the hand-authored tablet layout and writes direct
-  atomic N64 pad state (no keyboard synthesis). `gdx_touch_merge_tests` passes
-  87 sub-checks. On the iPad Simulator, START/L/ACCEL/BOOST/BRAKE/D-pad produced
-  the exact N64 bits, the analog stick reported continuous values, the •••
-  button opened/closed the GdxMenu with overlay hide/restore, auto-hide reacted
-  to SDL-visible gamepads, and a touch-driven GP flow reached a live race.
+- The UIKit overlay writes direct atomic N64 pad state (no keyboard synthesis)
+  and its default geometries are adapted exactly from the accepted
+  HarkinianPad physical layouts (the promoted normalized centers and the
+  grip-first base rail frames, with the reference A blue / B green / C amber /
+  L/Z/R neutral / Start red palette and the reference ••• slots). SLIDE L
+  carries the reference's shared Z hold-to-latch with haptic confirmation.
+  `gdx_touch_merge_tests` passes 87 sub-checks. On the iPad Simulator,
+  START/L/ACCEL/BOOST/BRAKE/D-pad produced the exact N64 bits, the analog stick
+  reported continuous values, the ••• button opened/closed the GdxMenu with
+  overlay hide/restore, auto-hide reacted to SDL-visible gamepads, and a
+  touch-driven GP flow reached a live race. The phone defaults rendered on an
+  iPhone 17 Pro Simulator (one Simulator booted at a time).
 - `ref/harkinianpad` and its patches remain references only; the F0X overlay is
   an original adaptation that writes the N64 pad seam directly instead of
   synthesizing keyboard events.
-- The Settings -> Controls page now registers the Touch Controls section
-  (hidden when `gdx_touch_controls_available()==0`); the widgets compile and
-  register but their rendering has not yet been captured in a live screenshot
-  (the embedded ImGui Input Editor page would not scroll under synthetic
-  clicks). The layout editor, NSUserDefaults profile persistence, phone
-  defaults, and physical-device multi-touch acceptance are implemented but not
-  yet exercised live.
+- The Settings -> Controls -> Touch Controls page now renders live with every
+  widget visible (Touch Controls, Auto-hide with Physical Controller, Haptics,
+  Touch Control Opacity, Customize Touch Layout, Reset Current Layout). The
+  layout editor opens from Customize Touch Layout and exposes the Size slider
+  plus Hide/Reset/Done chrome. Live captures also cover hold-to-cancel
+  (ACCEL held -> Menu press -> neutral), the Z hold-to-latch (0x2000 persists
+  after release, AX "Locked", blue fill, tap releases, cancel clears it), and
+  editor persistence: a non-default tablet profile saved through the editor
+  (`F0X.TouchLayout.tablet-v1`, D-pad y=0.318030 vs code default 0.6058)
+  survives relaunch and drives the live overlay. See
+  `docs/evidence/touch-ios-live/2026-08-12-live-captures.txt`.
+- Physical-device multi-touch acceptance and a fresh phone-defaults re-run on
+  a phone Simulator remain open.
 
 Claim touch as Simulator-verified only for the control set and game flow above;
 physical acceptance remains open.

@@ -44,7 +44,9 @@ the exact evidence artifact before relying on a path or process ID.
 
 ## What is explicitly not finished
 
-- Gameplay touch controls or touch menu options: no implementation exists.
+- Physical-device touch acceptance (multi-touch stress, controller handoff,
+  interruptions, haptics feel, long sessions, thermals) and a fresh
+  phone-defaults re-run on a phone Simulator for the current build.
 - Physical iPad/iPhone signing, install, launch, controller, touch, audio,
   lifecycle, performance, thermals, or long-session evidence.
 - A player-completed macOS race; two real-input attempts failed before finish.
@@ -70,24 +72,25 @@ the exact evidence artifact before relying on a path or process ID.
 
 ## Highest-priority actionable work
 
-The touch system is implemented and Simulator-verified at its core (see
-`docs/evidence/touch-ios/2026-08-12.txt`). The remaining touch work is
-verification and polish, not greenfield:
+The touch system is implemented and Simulator-verified at its core, including
+live captures of the settings page, editor open/save, hold-to-cancel, the
+Z hold-to-latch, cancel-clears-latch, and non-default profile persistence
+across relaunch (see `docs/evidence/touch-ios/2026-08-12.txt` and
+`docs/evidence/touch-ios-live/2026-08-12-live-captures.txt`). The remaining
+touch work is polish and physical acceptance:
 
-1. Capture the Settings -> Controls -> Touch Controls page rendering (navigate
-   to Controls with a real input method — the seeded
-   `gSettings.Menu.Sidebar.Settings` CVar lands the menu on the page) and
-   exercise the live toggles, opacity slider, and editor callbacks on the
-   Simulator.
-2. Exercise the layout editor (select/move/resize/hide/reset/Done), verify the
-   `F0X.TouchLayout.phone-v1` / `tablet-v1` NSUserDefaults profiles persist
-   across relaunch, and run the phone defaults on a phone Simulator.
-3. Verify cancel paths live: opening the menu/editor while a button is held
-   must release it (the tick's menu-transition log is the evidence seam), and
-   background/foreground must return neutral.
-4. Re-run the touch-driven GP flow and complete a race on Simulator, then
+1. Re-run the phone defaults on a phone Simulator (the compact layout was
+   previously verified on an iPhone 17 Pro Simulator; a fresh run on the
+   current build is the standing check), and consider a live editor pass that
+   also exercises Hide/Show and Reset on the tablet profile without leaving a
+   stale override in the Simulator container.
+2. Re-run the touch-driven GP flow and complete a race on Simulator, then
    replay the whole matrix on physical iPad/iPhone when a signing-capable Mac
    with a connected device is available.
+3. Physical touch acceptance remains the only Simulator-independent proof:
+   sustained simultaneous steering + accelerator + brake/boost/attack,
+   four-contact stress, controller handoff, interruptions, haptics feel,
+   long sessions, and thermals.
 
 Do not regress the verified core: `gdx_touch_merge_tests` (87 checks), the
 macOS sealed-bundle race route, and the unsigned iPhoneOS build are the

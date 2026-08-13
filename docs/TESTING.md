@@ -459,11 +459,14 @@ extraction golden plus all-black internal BMP readback as separate gates.
 
 ## 2026-08-12 — touch implementation audit
 
-- **Audit result:** no gameplay touch implementation exists in current F0X.
+- **Audit result (historical, superseded below):** at this checkpoint no
+  gameplay touch implementation existed in current F0X.
   SDL finger events translate only to ImGui mouse interaction. No
   `gdx_touch_controls` bridge, UIKit gameplay overlay, racing controls, touch
   CVars/settings, editor, phone/tablet profiles, lifecycle cancel, or controller
-  handoff is compiled.
+  handoff was compiled. The later "touch system implemented and
+  Simulator-verified" entry and the 2026-08-12 live-captures entry supersede
+  this audit.
 - **Reference boundary:** HarkinianPad `1197472` contains proven UIKit overlay,
   editor, profile, menu-lifecycle, and opacity patterns, but its patches target
   Shipwright and synthesize keyboard inputs. They have not been applied to F0X
@@ -482,7 +485,8 @@ extraction golden plus all-black internal BMP readback as separate gates.
   against current source, commits, tracked evidence, the latest private
   picker-to-race artifact, current device/signing state, and HarkinianPad
   `1197472`. Stale Gate-0, “Apple not built,” and “picker still open” claims were
-  removed. Touch remains explicitly not implemented.
+  removed. Touch remained explicitly not implemented at that checkpoint;
+  the implementation entry below supersedes it.
 - **New source-of-truth references:** `NEXT_BUILDER.md` records verified/open/
   blocked state and the exact remaining queue;
   `TOUCH_CONTROLS_IMPLEMENTATION.md` records source-proven F-Zero mappings,
@@ -557,3 +561,71 @@ extraction golden plus all-black internal BMP readback as separate gates.
   the layout editor, NSUserDefaults profile persistence, phone defaults, and
   physical-device multi-touch acceptance remain to be exercised. The private
   gameplay screenshots are local artifacts and are not tracked.
+
+## 2026-08-12 — layouts aligned to the HarkinianPad reference
+
+- **Default geometry:** the tablet and phone default tables were reworked to
+  the accepted HarkinianPad physical layouts: the promoted normalized centers
+  (customizable-touch-controls.patch) plus the grip-first base rail frames,
+  using full-window normalized centers exactly like the reference. The live
+  iPad Simulator overlay's reported frames match the reference fractions for
+  every control (stick 0.164/0.745, ACCEL 0.893/0.693, BOOST 0.826/0.635,
+  BRAKE 0.902/0.905, VIEW 0.948/0.853, LOOK 0.903/0.805, C-left 0.857/0.854,
+  SLIDE L 0.193/0.613, SLIDE R 0.921/0.518, L 0.059/0.518, START 0.845/0.518,
+  D-pad 0.079/0.606; the phone table uses the accepted compact fractions).
+- **Reference styling:** A blue, B green, C buttons amber, L/Z/R neutral dark
+  pills/faces, Start red; the permanent ••• follows the reference slots
+  (tablet upper-right, phone top-center gameplay / bottom-center menu-open).
+- **Z hold-to-latch:** SLIDE L (Z) adopts the reference's shared Z latch —
+  a ~0.5 s hold locks the button with a medium haptic pulse, a later tap
+  releases it, and every cancel path clears it. Haptics now fire only on
+  deliberate actions (latch, editor Done/Reset), gated by the Haptics CVar.
+- **Editor gating:** gameplay emission is disabled per control while the
+  editor is open (layoutEditing), matching the reference, so editor touches
+  cannot leak N64 state.
+- **Phone layout:** on an iPhone 17 Pro Simulator (run separately — one
+  Simulator booted at a time), the compact reference layout rendered over a
+  live race and the ••• sat in the top-center slot clear of the Dynamic Island
+  (safe.left=62). The phone Simulator was shut down before the iPad-only runs.
+- **Regressions:** `gdx_touch_merge_tests` still passes 87/87; the unsigned
+  arm64 iPhoneOS build succeeds.
+- **Boundary:** the Z-latch live capture and the menu-open-while-holding cancel
+  capture could not be recorded on the Simulator (repeated window/safe-area
+  drift made the synthesized clicks miss; the latch logic mirrors the
+  reference and the overlay-removal path clears the unit-tested atomic state).
+
+## 2026-08-12 — live hold-to-cancel, Z-latch, and editor persistence captures
+
+- **Interaction seams:** with one booted iPad Pro 11-inch (M5) Simulator and
+  one F0X process (archive-only boot), AX element clicks (System Events) and
+  CGEvent mouse down/up/hold were calibrated against the app's own `[F0X]
+  touch state` log seam. ACCEL, SLIDE L, and Menu anchor positions were
+  verified by the exact N64 bits they produced before the captures below.
+- **Hold-to-cancel while pressing Menu:** ACCEL held produced repeated
+  `buttons=0x8000`; pressing the ••• button via AX cleared it to
+  `touch state neutral (input released)` at the press instant (18:44:38.263),
+  and the menu then opened. No stuck control. This is the first live capture
+  of the menu-press cancel path on the Simulator.
+- **Z hold-to-latch:** holding SLIDE L ~0.9 s left `buttons=0x2000` latched
+  after the finger was released (19:09:59.666, 19:10:01.673), AX
+  `accessibilityValue = "Locked"`, and the capture shows the blue fill on
+  SLIDE L. A later tap released to neutral (19:10:41.722) with AX value nil.
+- **Cancel clears latch:** with SLIDE L latched at 0x2000, opening the menu
+  produced `touch menu visible -> gameplay overlay hidden` and
+  `touch state neutral (input released)` at the same instant (19:11:48.426).
+- **Editor and profile persistence:** Customize Touch Layout logged
+  `touch layout editor opened` (19:52:13.504); a control override was edited
+  and Done logged `touch layout saved` (19:56:41.556). The NSUserDefaults
+  tablet profile now carries a non-default D-pad group override
+  (`v1 11 0.078500 0.318030 1.000 0` vs the code default y=0.6058), and after
+  relaunch the live overlay applied it (D-pad up arrow frame y=191.24 vs the
+  pre-edit launch's 383.24). The saved profile survives relaunch and drives
+  layout.
+- **Lifecycle:** Simulator Home backgrounded F0X; relaunch re-attached the
+  overlay neutrally (`hidden=0 userInteraction=1`).
+- **Boundary:** Simulator-only; physical-device multi-touch contact stress,
+  controller handoff, interruptions, haptics feel, and long sessions remain
+  open. The libultraship Input Editor pop-out window overlays part of the
+  session and is unrelated to the touch layout profile.
+- **Evidence:** `docs/evidence/touch-ios-live/2026-08-12-live-captures.txt`
+  plus the log line/timestamp references quoted above.

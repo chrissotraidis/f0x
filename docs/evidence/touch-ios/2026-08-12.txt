@@ -43,18 +43,61 @@ through the Simulator window at Point Accurate scale)
   layout positions all controls inside the safe rect (verified via the attach
   log's exact frames).
 
-Not yet live-verified in this session
-------------------------------------
-- The Settings -> Controls -> Touch Controls page rendering (the registry
-  widgets, CVars, and editor callbacks compile and are registered, and the
-  Controls page itself renders, but synthetic clicks could not scroll the
-  embedded ImGui Input Editor page to the widgets; this is a tooling limit,
-  not a product failure).
-- Layout editor move/resize/hide/reset/Done and NSUserDefaults profile
-  persistence round-trip on the device (the profile core is unit-tested).
-- Phone layout (hand-authored defaults exist; no phone Simulator run yet).
+Live-verified later the same day (see docs/evidence/touch-ios-live/2026-08-12-live-captures.txt)
+----------------------------------------------------------------------------------------------
+- The Settings -> Controls -> Touch Controls page renders live with every
+  widget visible: Touch Controls, Auto-hide with Physical Controller, Haptics,
+  Touch Control Opacity, Customize Touch Layout, and Reset Current Layout.
+- The layout editor opens from Customize Touch Layout and exposes every control
+  at full opacity with the Size slider and Hide/Reset/Done chrome.
+- Hold-to-cancel while pressing the menu button: ACCEL held at 0x8000 cleared
+  to neutral exactly when the Menu press landed; the menu then opened. No
+  stuck control.
+- Z (SLIDE L) hold-to-latch: a ~0.9 s hold left buttons=0x2000 latched after
+  release (log lines 19:09:59 and 19:10:01), AX accessibilityValue "Locked",
+  blue fill in the capture; a later tap released to neutral; opening the menu
+  while latched cleared it to neutral at the same instant.
+- Editor persistence: the editor logged "touch layout opened"/"touch layout
+  saved", the NSUserDefaults tablet profile changed from a prior D-pad group
+  override to a new non-default one (v1 11 y=0.318030 vs code default
+  0.6058), and after relaunch the live overlay applied the saved override
+  (D-pad up arrow frame y=191.24 vs the default 383.24 from the pre-edit
+  launch).
+- Simulator Home background + relaunch re-attached the overlay neutrally.
+
+Still open (unchanged boundary)
+-------------------------------
 - Physical iPad/iPhone touch acceptance, true multi-touch contact stress,
   controller handoff, interruptions, haptics, long sessions, thermals.
+
+Follow-up (same day): layouts aligned exactly with the HarkinianPad reference
+-----------------------------------------------------------------------------
+- Default geometries were reworked to the accepted HarkinianPad physical
+  layouts (customizable-touch-controls.patch promoted centers + grip-first
+  design base frames), using full-window normalized centers like the
+  reference. The live overlay's reported frames match the reference fractions
+  exactly on the iPad Pro 11-inch (M5) Simulator:
+    stick (0.164, 0.745), ACCEL/A (0.893, 0.693), BOOST/B (0.826, 0.635),
+    BRAKE/C-down (0.902, 0.905), VIEW/C-right (0.948, 0.853),
+    LOOK/C-up (0.903, 0.805), C-left (0.857, 0.854), SLIDE L/Z (0.193, 0.613),
+    SLIDE R/R (0.921, 0.518), L (0.059, 0.518), START (0.845, 0.518),
+    D-pad group (0.079, 0.606) — the tablet fractions; the phone table uses
+    the reference's accepted compact fractions with the same control mapping.
+- Reference colors applied: A blue, B green, C buttons amber, L/Z/R the
+  neutral dark pill/face, Start red.
+- The permanent ••• button follows the reference slots: tablet upper-right,
+  phone top-center during gameplay and bottom-center while the menu is open.
+- Z hold-to-latch on SLIDE L (the reference's shared Z latch): ~0.5 s hold
+  locks the slide on with a medium haptic pulse; tap again to release; every
+  cancel path (menu open, editor, background, interruption, release) clears
+  it. Haptics now fire only on deliberate actions (latch + editor Done/Reset),
+  gated by gSettings.Touch.Haptics.
+- Editing gates gameplay emission on every control (layoutEditing flag),
+  matching the reference, so touches in the editor cannot leak N64 state.
+- Phone layout verified on an iPhone 17 Pro Simulator (run separately, one
+  Simulator booted at a time): the compact reference layout rendered over a
+  live race and the ••• sat in the top-center slot clear of the Dynamic Island
+  (safe.left=62). That Simulator was shut down before the iPad-only runs.
 
 Boundary
 --------
