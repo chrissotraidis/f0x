@@ -57,7 +57,8 @@ the exact evidence artifact before relying on a path or process ID.
 - Owner confirmation that the exact corrected current bundle no longer flashes.
 - Audible macOS/mobile speakers/headphones and route/interruption behavior.
 - Mobile lifecycle pause/resume/persistence.
-- Full diagnostics/share-log product flow.
+- Full diagnostics/share-log product flow: the macOS Home action is verified;
+  the in-game menu entry and the iOS Share-sheet wiring remain.
 - Correct 60 Hz timing evidence and high-refresh acceptance.
 - Release signing/notarization/re-signable package workflow.
 - HarkinianPad-quality final public README/screenshots/install guide.
@@ -147,11 +148,17 @@ remain separate.
 
 ### E. Diagnostics
 
-Add an accessible Share Diagnostic Log action. Include app/OS/device, renderer
-and Metal device, game-data validation status, extraction/resource mount,
-controller/touch state, scheduler/fibers, lifecycle, audio, save path class,
-timing, and errors. Exclude ROM/assets/save contents, signing material, and
-unnecessary full private paths. Test the shared artifact.
+The macOS Home "Share Diagnostic Log" action is implemented and verified
+(2026-08-13): the privacy-scrubbed text report covers app/OS/device, Metal
+device, window/refresh/interpolation, game-data validation, save, controller/
+touch, scheduler, audio/timing state, and errors; `NSSharingServicePicker`
+presented the artifact; `gdx_diagnostics_tests` passes; the report contains no
+ROM/save contents, signing material, or private paths (see TESTING.md). The
+next slice is the in-game entry and the iOS wiring: trigger the same collector
+from the GdxMenu (and/or the touch overlay) and present
+`UIActivityViewController` on iOS — the share module already compiles into the
+unsigned device build. Consider a live log-tail error ring so the report's
+Errors section carries the last runtime warnings instead of "none collected".
 
 ### F. Timing and high refresh
 

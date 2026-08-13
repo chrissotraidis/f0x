@@ -21,6 +21,7 @@ device. Nothing is uploaded.
 | Saves | A real 32 KiB settings-SRAM write, relaunch, load, and exact reversal are verified on macOS |
 | Audio | Cartridge synthesis produces nonzero PCM; audible speaker/headphone delivery is not verified |
 | Touch controls | Implemented; core Simulator-verified. The UIKit overlay writes direct N64 pad state merged at the port-1 seam, with settings, auto-hide, opacity, haptics, permanent menu access, and an editor. Simulator evidence covers the full control set, menu open/close with overlay hiding, controller auto-hide, and a touch-driven GP flow to a live race; physical-device acceptance remains open |
+| Diagnostics | macOS Share Diagnostic Log implemented and verified: a Home action collects privacy-scrubbed system/runtime state and presents the macOS Share sheet; `gdx_diagnostics_tests` passes. In-game entry and the iOS share-sheet wiring remain open |
 | Physical controller/device | Not verified on iPhone or iPad; this Mac currently has no connected device or signing identity |
 | Timing/high refresh | Not measured or accepted |
 | Expansion Kit | Deferred; current builds are cartridge-only |

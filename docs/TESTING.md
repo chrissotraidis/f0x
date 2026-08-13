@@ -681,3 +681,53 @@ extraction golden plus all-black internal BMP readback as separate gates.
 - **Next gate:** the macOS race acceptance resumes with owner/human play or a
   connected controller; meanwhile the locally actionable queue continues at
   the Share Diagnostic Log gate.
+
+## 2026-08-13 — Share Diagnostic Log implemented and macOS-verified
+
+- **Expectation before editing:** an accessible Share Diagnostic Log action
+  that collects useful system/runtime state (app/OS/device, renderer/Metal
+  device, game-data validation, save class, controller/touch, scheduler,
+  audio, timing, errors) with strict privacy exclusions, writes a text
+  artifact, and presents the standard Share sheet; a deterministic unit test
+  covers the formatter and the privacy scrub.
+- **Implementation (maintained patch, `port/`):** `gdx_diagnostics.h/.c` is the
+  platform-neutral bounded report builder with defense-in-depth redaction
+  (values containing token/password/secret/api-key/private-key markers render
+  `[REDACTED]`); `gdx_diagnostics_share.mm` fills Apple platform/Metal-device
+  fields and presents `NSSharingServicePicker` (macOS; `UIActivityViewController`
+  path compiled for iOS but not yet wired); the F0X Home surface gains a
+  "Share Diagnostic Log" button that collects live Home state (window size,
+  refresh, interpolation target, archive/save presence and sizes, SDL joystick
+  count, touch build class, scheduler backend) and shares the report.
+- **Unit regression:** `gdx_diagnostics_tests` passes all checks: every
+  section/field present, empty source renders "unknown", deterministic output,
+  tiny-buffer truncation stays NUL-terminated, NULL source tolerated, and
+  secret-like values (token, BEGIN PRIVATE KEY, device "secret name") are
+  redacted from the output.
+- **macOS live verification:** rebuilt sealed `F0X.app` (codesign
+  `--verify --deep --strict` passes) launches to F0X Home; keyboard-nav focus
+  (System Events Shift+Tab from the focus ring) activated "Share Diagnostic
+  Log"; log `[diag] shared N-byte diagnostic report`; the macOS Share sheet
+  appeared for `F0X-Diagnostics-2026-08-13-000459.txt` (Text Document, 1 KB);
+  the artifact contains: Apple macOS / Version 26.5.2 / arm64, Fast3D / Metal
+  with Metal device Apple M1, window 1440x838, 60 Hz, interpolation target
+  "Match Display refresh", data-dir class "user Application Support (mutable)"
+  (no absolute private path), archive `fzerox.o2r present (15499571 bytes),
+  validated at setup`, save `fzerox.sav present (32768 bytes)`, 0 SDL
+  joysticks, desktop touch stub, ucontext scheduler, pre-game Home state. No
+  ROM/save contents, signing material, or private paths are in the artifact.
+- **Standing regressions:** `gdx_touch_merge_tests` 87/87; the packaged GP
+  script traversed modes `0 -> 7 -> 10 -> 8 -> 9 -> 1`, reached
+  `packaged_gp_race_capture_interval`, completed all 28 commands, exit 0; the
+  unsigned arm64 iPhoneOS build succeeds with the new sources (including the
+  iOS share-sheet path) and the device bundle passes the ROM-free payload
+  audit (only the engine's own `gdiffuser.o2r` archive; no game data/signing
+  material).
+- **Patch replay:** `patches/gdiffuser-apple-macos.patch` regenerated;
+  reverse-check against the tested tree passes; the five-patch series
+  clean-applies to a pristine pinned `719fd82` clone with the diagnostics and
+  touch files byte-identical to the tested tree.
+- **Boundary:** macOS Home action verified. The in-game menu entry and the iOS
+  Share-sheet wiring (triggering `UIActivityViewController` from the touch
+  overlay/menu) remain the next slice; the collector is platform-neutral and
+  already compiled into the iOS build.

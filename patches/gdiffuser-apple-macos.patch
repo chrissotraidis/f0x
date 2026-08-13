@@ -32,7 +32,7 @@ index 789b053..a0cc2a8 100644
      if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
          return 0;
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..e4ff308 100644
+index cab4365..738c550 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
 @@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
@@ -134,7 +134,13 @@ index cab4365..e4ff308 100644
      gdx_gui.cpp
      gdx_menu.cpp
      gdx_menu_registry.cpp
-@@ -287,6 +333,17 @@ add_executable(G-Diffuser
+@@ -282,11 +328,29 @@ add_executable(G-Diffuser
+     gdx_imgui_nav.cpp
+     gdx_workshop.cpp
+     mio0_wrap.c
++    gdx_diagnostics.c
+     gdx_segment_source.c       # in the exe, not gdiffuser_game: needs symbols from AssetLoader.cpp,
+                                 # rom_buffer.cpp and gen/AssetBindings.c
      "${CMAKE_CURRENT_SOURCE_DIR}/../torch/lib/libmio0/mio0.c"
      $<TARGET_OBJECTS:gdiffuser_game>)
  
@@ -149,10 +155,16 @@ index cab4365..e4ff308 100644
 +    target_sources(G-Diffuser PRIVATE gdx_touch_controls_stub.c)
 +endif()
 +
++# Diagnostics: the report core is platform-neutral; the Apple share-sheet +
++# platform-fill implementation is compiled on macOS and iOS only.
++if(APPLE)
++    target_sources(G-Diffuser PRIVATE gdx_diagnostics_share.mm)
++endif()
++
  if(GDX_EXPANSION_KIT)
      # All four files reference EK-only symbols (gdx_ek_assets_fill, machine_create labels, EK
      # overlay .data), so they must not build in US-only configs.
-@@ -296,6 +353,94 @@ if(GDX_EXPANSION_KIT)
+@@ -296,6 +360,94 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
  
@@ -247,7 +259,7 @@ index cab4365..e4ff308 100644
  target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
  
  if(WIN32)
-@@ -337,30 +482,38 @@ add_custom_command(
+@@ -337,30 +489,38 @@ add_custom_command(
  add_custom_target(gdiffuser_engine_o2r DEPENDS "${GDIFFUSER_ENGINE_O2R}")
  add_dependencies(G-Diffuser gdiffuser_engine_o2r)
  add_custom_command(TARGET G-Diffuser POST_BUILD
@@ -292,7 +304,7 @@ index cab4365..e4ff308 100644
      VERBATIM)
  
  # Keep the project license and every bundled/static dependency notice with binary releases.
-@@ -369,10 +522,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -369,10 +529,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
              "${CMAKE_SOURCE_DIR}/LICENSE"
              "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
@@ -305,7 +317,7 @@ index cab4365..e4ff308 100644
      VERBATIM)
  
  # gdx-extract, the standalone deterministic O2R extractor first boot spawns as a child process.
-@@ -381,48 +534,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -381,48 +541,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
  # clashes with libultraship's spdlog/fmt (docs/investigation/.../W0_TORCH_DEPENDENCIES.md).
  # GDX_DETERMINISTIC=ON => byte-identical archives for identical ROM + recipes. CMP0091=NEW lets
  # Torch's /MT runtime take effect so the exe needs no VC++ redist.
@@ -338,15 +350,14 @@ index cab4365..e4ff308 100644
 -
 -add_custom_target(gdx-extract DEPENDS gdx_extract_ext)
 -add_dependencies(G-Diffuser gdx_extract_ext)
--
++if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
++    include(ExternalProject)
+ 
 -add_custom_command(TARGET G-Diffuser POST_BUILD
 -    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
 -            "${GDX_EXTRACT_EXE}"
 -            "$<TARGET_FILE_DIR:G-Diffuser>/gdx-extract${CMAKE_EXECUTABLE_SUFFIX}"
 -    VERBATIM)
-+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-+    include(ExternalProject)
-+
 +    set(GDX_EXTRACT_SRC_DIR "${CMAKE_SOURCE_DIR}/torch")
 +    set(GDX_EXTRACT_PREFIX  "${CMAKE_BINARY_DIR}/gdx-extract")
 +    set(GDX_EXTRACT_INSTALL "${GDX_EXTRACT_PREFIX}/install")
@@ -395,7 +406,7 @@ index cab4365..e4ff308 100644
  # The EK slice manifest ships beside the recipes so the runtime disk step can pass it to
  # `gdx-extract disk -m`.
  set(GDX_EK_SLICE_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/gen/ek_slice_manifest.txt")
-@@ -449,6 +607,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -449,6 +614,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
              --ek-yaml-dir "${CMAKE_SOURCE_DIR}/fzerox-expansion-kit/assets/yaml/jp"
      VERBATIM)
  
@@ -421,7 +432,7 @@ index cab4365..e4ff308 100644
  target_include_directories(G-Diffuser PRIVATE
      "${CMAKE_CURRENT_SOURCE_DIR}"   # for "resource/ResourceFactories.h"
      "${DECOMP}/include"
-@@ -457,7 +634,16 @@ target_include_directories(G-Diffuser PRIVATE
+@@ -457,7 +641,16 @@ target_include_directories(G-Diffuser PRIVATE
  )
  
  target_link_libraries(G-Diffuser PRIVATE cxd4_rsp)
@@ -439,7 +450,7 @@ index cab4365..e4ff308 100644
  
  if(WIN32)
      # user32: MessageBox; Comdlg32: ROM picker; Comctl32: extraction progress marquee.
-@@ -467,6 +653,9 @@ else()
+@@ -467,6 +660,9 @@ else()
      # (needed on older glibc, harmless on newer).
      find_package(Threads REQUIRED)
      target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -449,7 +460,7 @@ index cab4365..e4ff308 100644
      # Release tarballs carry the dependencies no distribution can be relied on to provide in
      # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
      # which beats a wrapper script because the binary stays directly runnable. No effect on a
-@@ -483,6 +672,8 @@ endif()
+@@ -483,6 +679,8 @@ endif()
  # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
  if(NOT MSVC)
      target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
@@ -458,7 +469,7 @@ index cab4365..e4ff308 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +727,30 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +734,42 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -486,10 +497,22 @@ index cab4365..e4ff308 100644
 +    target_compile_options(gdx_touch_merge_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
 +endif()
 +
++# Diagnostic report regression: compiles gdx_diagnostics.c UNMODIFIED and drives
++# the deterministic formatter/privacy checks the app runs.
++add_executable(gdx_diagnostics_tests
++    tests/diagnostics_tests.c
++    gdx_diagnostics.c)
++target_include_directories(gdx_diagnostics_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
++if(MSVC)
++    target_compile_options(gdx_diagnostics_tests PRIVATE /W3)
++elseif(GDX_PORT_WARN_FLAGS)
++    target_compile_options(gdx_diagnostics_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
++endif()
++
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -764,6 +979,8 @@ if(GDX_BUILD_JP)
+@@ -764,6 +998,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -530,6 +553,380 @@ index dc07873..f7e2c0e 100644
      gSegments[segment] = (unsigned long long)resolved;
      gdx_seg_log("SetAddr", segment, addr, resolved);
      return addr;
+diff --git a/port/gdx_diagnostics.c b/port/gdx_diagnostics.c
+new file mode 100644
+index 0000000..ce83d26
+--- /dev/null
++++ b/port/gdx_diagnostics.c
+@@ -0,0 +1,180 @@
++// port/gdx_diagnostics.c — see gdx_diagnostics.h.
++
++#include "gdx_diagnostics.h"
++
++#include <ctype.h>
++#include <stddef.h>
++#include <stdio.h>
++#include <string.h>
++
++// ── Field helpers ────────────────────────────────────────────────────────────
++
++void gdx_diagnostics_set_field(char* dst, int dstCap, const char* value) {
++    if (dst == NULL || dstCap <= 0) {
++        return;
++    }
++    if (value == NULL) {
++        dst[0] = '\0';
++        return;
++    }
++    snprintf(dst, (size_t) dstCap, "%s", value);
++}
++
++void gdx_diagnostics_append_field(char* dst, int dstCap, const char* value) {
++    if (dst == NULL || dstCap <= 0 || value == NULL) {
++        return;
++    }
++    int used = 0;
++    while (used + 1 < dstCap && dst[used] != '\0') {
++        used++;
++    }
++    if (used + 1 >= dstCap) {
++        return;
++    }
++    snprintf(dst + used, (size_t) (dstCap - used), "%s", value);
++}
++
++// ── Privacy scrub (defense-in-depth) ─────────────────────────────────────────
++
++static const char* const kSensitiveMarkers[] = {
++    "password", "passwd", "token", "secret", "apikey", "api_key",
++    "authorization", "private key", "BEGIN ", "credential",
++};
++
++static int gdx_diag_marker_hit(const char* value) {
++    if (value == NULL) {
++        return 0;
++    }
++    char lower[512];
++    int i = 0;
++    while (value[i] != '\0' && i < (int) sizeof(lower) - 1) {
++        lower[i] = (char) tolower((unsigned char) value[i]);
++        i++;
++    }
++    lower[i] = '\0';
++    for (size_t m = 0; m < sizeof(kSensitiveMarkers) / sizeof(kSensitiveMarkers[0]); m++) {
++        if (strstr(lower, kSensitiveMarkers[m]) != NULL) {
++            return 1;
++        }
++    }
++    return 0;
++}
++
++static const char* gdx_diag_scrub(const char* value) {
++    return gdx_diag_marker_hit(value) ? "[REDACTED]" : value;
++}
++
++// ── Bounded writer ───────────────────────────────────────────────────────────
++
++typedef struct GdxDiagWriter {
++    char* out;
++    int cap;
++    int used;
++} GdxDiagWriter;
++
++static void gdx_diag_write(GdxDiagWriter* w, const char* text) {
++    if (w->used >= w->cap - 1) {
++        return;
++    }
++    const size_t room = (size_t) (w->cap - 1 - w->used);
++    size_t n = strlen(text);
++    if (n > room) {
++        n = room;
++    }
++    memcpy(w->out + w->used, text, n);
++    w->used += (int) n;
++    w->out[w->used] = '\0';
++}
++
++static void gdx_diag_value(GdxDiagWriter* w, const char* label, const char* value) {
++    const char* safe = (value != NULL && value[0] != '\0') ? value : "unknown";
++    char line[GDX_DIAG_MAX_REPORT];
++    snprintf(line, sizeof(line), "  %-12s = %s\n", label, gdx_diag_scrub(safe));
++    gdx_diag_write(w, line);
++}
++
++static void gdx_diag_section(GdxDiagWriter* w, const char* title) {
++    char line[128];
++    snprintf(line, sizeof(line), "\n[%s]\n", title);
++    gdx_diag_write(w, line);
++}
++
++// ── Report builder ───────────────────────────────────────────────────────────
++
++int gdx_diagnostics_build_report(const GdxDiagnosticsSource* src, char* out, int cap) {
++    if (out == NULL || cap <= 0) {
++        return 0;
++    }
++    out[0] = '\0';
++    static const GdxDiagnosticsSource kEmpty;
++    if (src == NULL) {
++        src = &kEmpty;
++    }
++
++    GdxDiagWriter w;
++    w.out = out;
++    w.cap = cap;
++    w.used = 0;
++
++    gdx_diag_write(&w, "F0X diagnostic report\n");
++    gdx_diag_section(&w, "App");
++    gdx_diag_value(&w, "name", src->app);
++    gdx_diag_value(&w, "version", src->version);
++    gdx_diag_value(&w, "build", src->build);
++
++    gdx_diag_section(&w, "System");
++    gdx_diag_value(&w, "platform", src->platform);
++    gdx_diag_value(&w, "os", src->os);
++    gdx_diag_value(&w, "arch", src->arch);
++
++    gdx_diag_section(&w, "Renderer");
++    gdx_diag_value(&w, "backend", src->renderer);
++    gdx_diag_value(&w, "metal-device", src->metalDevice);
++    gdx_diag_value(&w, "window", src->window);
++    gdx_diag_value(&w, "refresh-hz", src->refresh);
++    gdx_diag_value(&w, "interp-target", src->interpTarget);
++
++    gdx_diag_section(&w, "Game Data");
++    gdx_diag_value(&w, "data-dir-class", src->dataDirClass);
++    gdx_diag_value(&w, "archive", src->archive);
++    gdx_diag_value(&w, "save", src->save);
++
++    gdx_diag_section(&w, "Input");
++    gdx_diag_value(&w, "controllers", src->controllers);
++    gdx_diag_value(&w, "touch", src->touch);
++
++    gdx_diag_section(&w, "Scheduler");
++    gdx_diag_value(&w, "state", src->scheduler);
++
++    gdx_diag_section(&w, "Audio");
++    gdx_diag_value(&w, "state", src->audio);
++
++    gdx_diag_section(&w, "Timing");
++    gdx_diag_value(&w, "state", src->timing);
++
++    gdx_diag_section(&w, "Game State");
++    gdx_diag_value(&w, "mode", src->gameMode);
++
++    gdx_diag_section(&w, "Errors");
++    gdx_diag_value(&w, "last", src->errors);
++
++    gdx_diag_section(&w, "Notes");
++    gdx_diag_value(&w, "notes", src->notes);
++
++    return w.used;
++}
++
++// ── Neutral platform fill (Apple provides the real one in the share module) ──
++
++#if !defined(__APPLE__)
++void gdx_diagnostics_fill_platform(GdxDiagnosticsSource* src) {
++    if (src == NULL) {
++        return;
++    }
++    gdx_diagnostics_set_field(src->platform, sizeof(src->platform), "non-Apple host");
++    gdx_diagnostics_set_field(src->os, sizeof(src->os), "unknown");
++    gdx_diagnostics_set_field(src->arch, sizeof(src->arch), "unknown");
++    gdx_diagnostics_set_field(src->renderer, sizeof(src->renderer), "unknown");
++    gdx_diagnostics_set_field(src->metalDevice, sizeof(src->metalDevice), "unavailable");
++}
++#endif
+diff --git a/port/gdx_diagnostics.h b/port/gdx_diagnostics.h
+new file mode 100644
+index 0000000..7a79a9c
+--- /dev/null
++++ b/port/gdx_diagnostics.h
+@@ -0,0 +1,70 @@
++// port/gdx_diagnostics.h — deterministic, privacy-safe diagnostic report core.
++//
++// The report builder is platform-neutral C so the same formatter runs in the
++// app, the share module, and the deterministic gdx_diagnostics_tests unit
++// test. Callers populate a GdxDiagnosticsSource with what the current surface
++// can honestly report; anything left empty renders as "unknown". The builder
++// redacts values that look like secrets as defense-in-depth (the collector
++// itself never receives ROM/save/signing contents).
++
++#ifndef GDX_DIAGNOSTICS_H
++#define GDX_DIAGNOSTICS_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define GDX_DIAG_MAX_REPORT 16384
++
++typedef struct GdxDiagnosticsSource {
++    char app[64];
++    char version[64];
++    char build[64];
++    char platform[64];
++    char os[64];
++    char arch[64];
++    char renderer[128];
++    char metalDevice[128];
++    char window[64];
++    char refresh[64];
++    char interpTarget[64];
++    char dataDirClass[64];
++    char archive[128];
++    char save[128];
++    char controllers[128];
++    char touch[128];
++    char scheduler[128];
++    char audio[128];
++    char timing[128];
++    char gameMode[64];
++    char errors[1024];
++    char notes[512];
++} GdxDiagnosticsSource;
++
++// Builds the report into out (always NUL-terminated, at most cap bytes total).
++// Returns the number of bytes written, excluding the terminator.
++int gdx_diagnostics_build_report(const GdxDiagnosticsSource* src, char* out, int cap);
++
++// Fills platform/OS/arch/renderer fields from host queries. Apple implements
++// the real queries (Metal device name, NSProcessInfo) in the share module; the
++// neutral fallback in gdx_diagnostics.c keeps the unit test self-contained.
++void gdx_diagnostics_fill_platform(GdxDiagnosticsSource* src);
++
++// Appends a line to a source field without overflowing it (helper for callers).
++void gdx_diagnostics_set_field(char* dst, int dstCap, const char* value);
++void gdx_diagnostics_append_field(char* dst, int dstCap, const char* value);
++
++#if defined(__APPLE__)
++// Apple share-sheet action (gdx_diagnostics_share.mm): writes the report to a
++// temp file and presents the standard Share sheet (macOS picker / iOS activity
++// controller). Returns 1 when the file was written and a sheet was presented
++// or the file was revealed; 0 with `err` filled on failure.
++int gdx_diagnostics_share_apple(const char* report, const char* baseName,
++                                char* err, int errCap);
++#endif
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* GDX_DIAGNOSTICS_H */
+diff --git a/port/gdx_diagnostics_share.mm b/port/gdx_diagnostics_share.mm
+new file mode 100644
+index 0000000..d63c301
+--- /dev/null
++++ b/port/gdx_diagnostics_share.mm
+@@ -0,0 +1,106 @@
++// port/gdx_diagnostics_share.mm — Apple platform fill + Share-sheet action.
++//
++// macOS: writes the report to a temp file and presents the standard
++// NSSharingServicePicker (AirDrop/Mail/Messages/...), falling back to
++// "Reveal in Finder" if no window is available to anchor the picker.
++// iOS: writes the report and presents UIActivityViewController (the
++// overlay/menu wiring that triggers it is a later slice; the collector and
++// file artifact are identical).
++
++#import <Foundation/Foundation.h>
++
++#include <sys/utsname.h>
++#include <stdio.h>
++
++#import <Metal/Metal.h>
++
++#if TARGET_OS_OSX
++#import <AppKit/AppKit.h>
++#else
++#import <UIKit/UIKit.h>
++#endif
++
++#include "gdx_diagnostics.h"
++
++extern "C" {
++
++void gdx_diagnostics_fill_platform(GdxDiagnosticsSource* src) {
++    if (src == NULL) {
++        return;
++    }
++    gdx_diagnostics_set_field(src->platform, sizeof(src->platform),
++                              TARGET_OS_OSX ? "Apple macOS" : "Apple iOS/iPadOS");
++    NSString* osVersion = [[NSProcessInfo processInfo] operatingSystemVersionString];
++    gdx_diagnostics_set_field(src->os, sizeof(src->os),
++                              osVersion != nil ? osVersion.UTF8String : "unknown");
++    struct utsname u;
++    if (uname(&u) == 0) {
++        gdx_diagnostics_set_field(src->arch, sizeof(src->arch), u.machine);
++    }
++    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
++    if (device != nil) {
++        gdx_diagnostics_set_field(src->metalDevice, sizeof(src->metalDevice),
++                                  device.name.UTF8String);
++        gdx_diagnostics_set_field(src->renderer, sizeof(src->renderer), "Fast3D / Metal");
++    } else {
++        gdx_diagnostics_set_field(src->metalDevice, sizeof(src->metalDevice), "unavailable");
++        gdx_diagnostics_set_field(src->renderer, sizeof(src->renderer), "Fast3D (no Metal device)");
++    }
++}
++
++static int gdx_diag_set_error(char* err, int errCap, const char* msg) {
++    if (err != NULL && errCap > 0) {
++        snprintf(err, (size_t) errCap, "%s", msg != NULL ? msg : "share failed");
++    }
++    return 0;
++}
++
++int gdx_diagnostics_share_apple(const char* report, const char* baseName,
++                                char* err, int errCap) {
++    if (report == NULL || baseName == NULL) {
++        return gdx_diag_set_error(err, errCap, "null report or name");
++    }
++    NSDateFormatter* formatter = [[NSDateFormatter alloc] init];
++    formatter.dateFormat = @"yyyy-MM-dd-HHmmss";
++    NSString* stamp = [formatter stringFromDate:[NSDate date]];
++    NSString* fileName = [NSString stringWithFormat:@"%@-%@.txt",
++                          [NSString stringWithUTF8String:baseName], stamp];
++    NSString* path = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
++    NSData* data = [NSData dataWithBytes:report length:strlen(report)];
++    NSError* writeError = nil;
++    if (![data writeToFile:path options:NSDataWritingAtomic error:&writeError]) {
++        return gdx_diag_set_error(err, errCap,
++                                  writeError.localizedDescription.UTF8String != nil
++                                      ? writeError.localizedDescription.UTF8String
++                                      : "report write failed");
++    }
++    NSURL* url = [NSURL fileURLWithPath:path];
++#if TARGET_OS_OSX
++    NSSharingServicePicker* picker =
++        [[NSSharingServicePicker alloc] initWithItems:@[ url ]];
++    NSWindow* window = NSApp.keyWindow != nil ? NSApp.keyWindow : NSApp.mainWindow;
++    if (window != nil) {
++        NSRect anchor = NSMakeRect(NSMidX(window.contentView.bounds),
++                                   NSMidY(window.contentView.bounds), 1.0, 1.0);
++        [picker showRelativeToRect:anchor
++                            ofView:window.contentView
++                     preferredEdge:NSMinYEdge];
++        return 1;
++    }
++    [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[ url ]];
++    return 1;
++#else
++    UIWindow* window = UIApplication.sharedApplication.windows.firstObject;
++    UIViewController* root = window.rootViewController;
++    if (root == nil) {
++        return gdx_diag_set_error(err, errCap, "no root view controller for share sheet");
++    }
++    UIActivityViewController* sheet =
++        [[UIActivityViewController alloc] initWithActivityItems:@[ url ]
++                                          applicationActivities:nil];
++    [root presentViewController:sheet animated:YES completion:nil];
++    return 1;
++#endif
++}
++
++} // extern "C"
 diff --git a/port/gdx_dump_launch.cpp b/port/gdx_dump_launch.cpp
 index 3a04fc0..dd762a9 100644
 --- a/port/gdx_dump_launch.cpp
@@ -947,10 +1344,15 @@ index 34478c6..ad4daa9 100644
 +
  } // namespace gdx
 diff --git a/port/gdx_firstboot_gui.cpp b/port/gdx_firstboot_gui.cpp
-index 1ed3da6..e2699cc 100644
+index 1ed3da6..c2b91d1 100644
 --- a/port/gdx_firstboot_gui.cpp
 +++ b/port/gdx_firstboot_gui.cpp
-@@ -17,6 +17,7 @@
+@@ -14,9 +14,12 @@
+ #include "gdx_firstboot.h"       // validators, canonical names, copy/persist helpers, native picker
+ #include "gdx_extract_launch.h"  // async extraction driver (start/poll/reset)
+ #include "gdx_gui.h"             // optional bundled large/mono fonts
++#include "gdx_diagnostics.h"
++#include "gdx_touch_controls.h"
  #include "port_log.h"
  
  #include "ship/Context.h"
@@ -958,16 +1360,129 @@ index 1ed3da6..e2699cc 100644
  #include "ship/window/Window.h"
  #include "ship/window/MouseStateManager.h"
  #include "ship/window/FileDropMgr.h"
-@@ -26,6 +27,8 @@
+@@ -26,6 +29,13 @@
  
  #include <imgui.h>
  
++#if defined(__APPLE__)
++#include <TargetConditionals.h>
++#include <SDL2/SDL.h>
++#endif
++
 +#include <algorithm>
 +#include <cstdlib>
  #include <filesystem>
  #include <string>
  #include <system_error>
-@@ -41,6 +44,12 @@ namespace {
+@@ -35,12 +45,120 @@
+ namespace fs = std::filesystem;
+ 
+ namespace gdx {
++
++#if defined(__APPLE__)
++namespace {
++
++void ShareDiagnosticLog(const std::string& dataDir, Ship::Window* window) {
++    GdxDiagnosticsSource src;
++    memset(&src, 0, sizeof(src));
++    gdx_diagnostics_fill_platform(&src);
++    gdx_diagnostics_set_field(src.app, sizeof(src.app), "F0X");
++    gdx_diagnostics_set_field(src.version, sizeof(src.version), "local build (main HEAD)");
++    gdx_diagnostics_set_field(src.build, sizeof(src.build),
++                              "Debug cartridge-only (GDX_EXPANSION_KIT=OFF)");
++#if TARGET_OS_OSX
++    gdx_diagnostics_set_field(src.dataDirClass, sizeof(src.dataDirClass),
++                              "user Application Support (mutable)");
++#else
++    gdx_diagnostics_set_field(src.dataDirClass, sizeof(src.dataDirClass),
++                              "app Documents (sandbox, mutable)");
++#endif
++
++    std::error_code ec;
++    const fs::path archivePath = fs::path(dataDir) / "fzerox.o2r";
++    const fs::path savePath = fs::path(dataDir) / "saves" / "fzerox.sav";
++    if (fs::exists(archivePath, ec) && !ec) {
++        char buf[160];
++        snprintf(buf, sizeof(buf), "fzerox.o2r present (%llu bytes), validated at setup",
++                 (unsigned long long) fs::file_size(archivePath, ec));
++        gdx_diagnostics_set_field(src.archive, sizeof(src.archive), buf);
++    } else {
++        gdx_diagnostics_set_field(src.archive, sizeof(src.archive),
++                                  "fzerox.o2r missing (game data not installed)");
++    }
++    if (fs::exists(savePath, ec) && !ec) {
++        char buf[128];
++        snprintf(buf, sizeof(buf), "fzerox.sav present (%llu bytes)",
++                 (unsigned long long) fs::file_size(savePath, ec));
++        gdx_diagnostics_set_field(src.save, sizeof(src.save), buf);
++    } else {
++        gdx_diagnostics_set_field(src.save, sizeof(src.save), "fzerox.sav not yet created");
++    }
++
++    if (window != nullptr) {
++        char buf[96];
++        snprintf(buf, sizeof(buf), "%ux%u", window->GetWidth(), window->GetHeight());
++        gdx_diagnostics_set_field(src.window, sizeof(src.window), buf);
++        snprintf(buf, sizeof(buf), "%u Hz (window)", window->GetCurrentRefreshRate());
++        gdx_diagnostics_set_field(src.refresh, sizeof(src.refresh), buf);
++        const int targetMode = CVarGetInteger("gEnhancements.Graphics.InterpTargetMode", 0);
++        const int targetFps = CVarGetInteger("gEnhancements.Graphics.InterpTargetFps", 120);
++        if (targetMode == 0) {
++            gdx_diagnostics_set_field(src.interpTarget, sizeof(src.interpTarget),
++                                      "Match Display refresh (interp)");
++        } else {
++            snprintf(buf, sizeof(buf), "%d Hz capped (interp)", targetFps);
++            gdx_diagnostics_set_field(src.interpTarget, sizeof(src.interpTarget), buf);
++        }
++    }
++
++    if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) == 0) {
++        char buf[96];
++        snprintf(buf, sizeof(buf), "%d SDL joystick(s) enumerated", SDL_NumJoysticks());
++        gdx_diagnostics_set_field(src.controllers, sizeof(src.controllers), buf);
++    } else {
++        gdx_diagnostics_set_field(src.controllers, sizeof(src.controllers),
++                                  "SDL joystick enumeration failed");
++    }
++    if (gdx_touch_controls_available()) {
++        gdx_diagnostics_set_field(src.touch, sizeof(src.touch),
++                                  "UIKit overlay build (F0X touch controls)");
++    } else {
++        gdx_diagnostics_set_field(src.touch, sizeof(src.touch),
++                                  "desktop stub (neutral, no overlay)");
++    }
++#if defined(_WIN32)
++    gdx_diagnostics_set_field(src.scheduler, sizeof(src.scheduler),
++                              "Win32 fibers (cooperative)");
++#else
++    gdx_diagnostics_set_field(src.scheduler, sizeof(src.scheduler),
++                              "ucontext (POSIX) cooperative fibers");
++#endif
++    gdx_diagnostics_set_field(src.audio, sizeof(src.audio),
++                              "not initialized (F0X Home surface)");
++    gdx_diagnostics_set_field(src.timing, sizeof(src.timing),
++                              "pre-game (F0X Home surface)");
++    gdx_diagnostics_set_field(src.gameMode, sizeof(src.gameMode), "pre-game (F0X Home)");
++    gdx_diagnostics_set_field(src.errors, sizeof(src.errors),
++                              "none collected (F0X Home surface)");
++    gdx_diagnostics_set_field(src.notes, sizeof(src.notes),
++                              "Collected from F0X Home; ROM/save contents and private paths are excluded.");
++
++    char report[GDX_DIAG_MAX_REPORT];
++    const int n = gdx_diagnostics_build_report(&src, report, sizeof(report));
++    char err[256] = {0};
++    if (gdx_diagnostics_share_apple(report, "F0X-Diagnostics", err, sizeof(err)) != 1) {
++        gdx_port_logf("[diag] share failed: %s\n", err);
++    } else {
++        gdx_port_logf("[diag] shared %d-byte diagnostic report\n", n);
++    }
++}
++
++} // namespace
++#endif
+ namespace {
+ 
+ // The installed game archive name (matches gdx_extract_launch.cpp's kArchiveName). Kept as a local
  // literal rather than exported: it is the SoH/Starship game-named-archive convention and is stable.
  constexpr const char* kGameArchiveName = "fzerox.o2r";
  
@@ -980,7 +1495,7 @@ index 1ed3da6..e2699cc 100644
  enum class Phase {
      Acquire,       // Waiting for the three inputs to be provided + validated.
      Extracting,    // Async extraction is running; showing live progress.
-@@ -77,13 +86,15 @@ struct Row {
+@@ -77,13 +195,15 @@ struct Row {
  // ── Setup screen state machine ───────────────────────────────────────────────────────────────────
  class SetupScreen {
    public:
@@ -1000,7 +1515,7 @@ index 1ed3da6..e2699cc 100644
          }
      }
  
-@@ -101,6 +112,13 @@ class SetupScreen {
+@@ -101,6 +221,13 @@ class SetupScreen {
              fileDrop->RegisterDropHandler(&SetupScreen::OnFileDroppedThunk);
          }
  
@@ -1014,7 +1529,7 @@ index 1ed3da6..e2699cc 100644
          gdx_port_logf("[setup] entering in-window first-time setup\n");
          while (w->IsRunning()) {
              w->HandleEvents(); // drag-and-drop events dispatch synchronously here (main thread)
-@@ -115,11 +133,29 @@ class SetupScreen {
+@@ -115,11 +242,29 @@ class SetupScreen {
              w->RunGuiOnly();          // clear/bind the game FB, run no gfx task
              w->GetGui()->EndDraw();   // composite + ImGui::Render + present floating windows
              w->EndFrame();
@@ -1044,7 +1559,7 @@ index 1ed3da6..e2699cc 100644
  
          const bool completed = (mPhase == Phase::Done);
          if (completed) {
-@@ -141,8 +177,9 @@ class SetupScreen {
+@@ -141,8 +286,9 @@ class SetupScreen {
          }
          std::string src(path);
          std::string why;
@@ -1056,7 +1571,7 @@ index 1ed3da6..e2699cc 100644
              std::string reason;
              if (r.validate(src, reason)) {
                  if (CopyInputInto(src, mDataDir, r.canonicalName)) {
-@@ -155,7 +192,11 @@ class SetupScreen {
+@@ -155,7 +301,11 @@ class SetupScreen {
                  return;
              }
          }
@@ -1068,7 +1583,7 @@ index 1ed3da6..e2699cc 100644
          gdx_port_logf("[setup] rejected dropped file (matches no expected input): %s\n", src.c_str());
      }
  
-@@ -305,8 +346,8 @@ class SetupScreen {
+@@ -305,8 +455,8 @@ class SetupScreen {
      }
  
      bool AllRowsOk() const {
@@ -1079,7 +1594,7 @@ index 1ed3da6..e2699cc 100644
                  return false;
              }
          }
-@@ -350,6 +391,11 @@ class SetupScreen {
+@@ -350,6 +500,11 @@ class SetupScreen {
          if (!AllRowsOk()) {
              return;
          }
@@ -1091,7 +1606,7 @@ index 1ed3da6..e2699cc 100644
          // A managed-copy-only re-run (original .ndd deleted after a prior setup made the backup)
          // validated against <dataDir>/media, so RowPath(1) would record a nonexistent canonical path
          // in the sidecar and make EnsureManagedDiskCopy warn about a copy that already exists.
-@@ -376,6 +422,7 @@ class SetupScreen {
+@@ -376,6 +531,7 @@ class SetupScreen {
          }
          gdx_port_logf("[setup] user confirmed all inputs; wrote completion marker; starting extraction\n");
          StartExtraction();
@@ -1099,7 +1614,7 @@ index 1ed3da6..e2699cc 100644
      }
  
      void MountArchive() {
-@@ -442,8 +489,14 @@ class SetupScreen {
+@@ -442,8 +598,14 @@ class SetupScreen {
                          GdxExtractResetAsync();
                          mPhase = Phase::ExtractFailed;
                      } else {
@@ -1115,7 +1630,7 @@ index 1ed3da6..e2699cc 100644
                          mPhase = Phase::Done;
                      }
                  }
-@@ -458,14 +511,25 @@ class SetupScreen {
+@@ -458,14 +620,25 @@ class SetupScreen {
      // ── Rendering ────────────────────────────────────────────────────────────────────────────────
      void DrawUI() {
          const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -1143,7 +1658,7 @@ index 1ed3da6..e2699cc 100644
              return;
          }
  
-@@ -473,15 +537,32 @@ class SetupScreen {
+@@ -473,15 +646,32 @@ class SetupScreen {
          if (large != nullptr) {
              ImGui::PushFont(large);
          }
@@ -1180,7 +1695,7 @@ index 1ed3da6..e2699cc 100644
          switch (mPhase) {
              case Phase::Acquire:
              case Phase::Done:
-@@ -495,11 +576,19 @@ class SetupScreen {
+@@ -495,11 +685,19 @@ class SetupScreen {
                  break;
          }
  
@@ -1201,7 +1716,7 @@ index 1ed3da6..e2699cc 100644
              Row& r = mRows[i];
              ImGui::PushID(i);
              ImGui::SeparatorText(r.label);
-@@ -536,11 +625,17 @@ class SetupScreen {
+@@ -536,11 +734,17 @@ class SetupScreen {
              }
  
              if (NativeFilePickerAvailable()) {
@@ -1220,7 +1735,7 @@ index 1ed3da6..e2699cc 100644
              } else {
                  ImGui::TextDisabled("Drag & drop the file onto this window");
              }
-@@ -552,6 +647,7 @@ class SetupScreen {
+@@ -552,6 +756,7 @@ class SetupScreen {
              ImGui::TextColored(ImVec4(0.90f, 0.45f, 0.35f, 1.0f), "%s", mDropError.c_str());
          }
          if (AllRowsOk()) {
@@ -1228,7 +1743,7 @@ index 1ed3da6..e2699cc 100644
              ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.35f, 1.0f), "All three files are verified.");
              ImGui::TextWrapped("Confirm to build fzerox.o2r from your ROM and continue to the game.");
              // The deletable-files statement names each file, so the reader never has to guess which
-@@ -577,8 +673,24 @@ class SetupScreen {
+@@ -577,8 +782,24 @@ class SetupScreen {
              if (ImGui::Button("Build game data and continue", ImVec2(-1.0f, 0.0f))) {
                  ConfirmAndStartExtraction();
              }
@@ -1253,7 +1768,7 @@ index 1ed3da6..e2699cc 100644
          }
      }
  
-@@ -590,6 +702,8 @@ class SetupScreen {
+@@ -590,6 +811,8 @@ class SetupScreen {
              stageLabel = "Validating extracted archive...";
          } else if (mSubStage == 2) {
              stageLabel = "Extracting IPL font data...";
@@ -1262,7 +1777,7 @@ index 1ed3da6..e2699cc 100644
          }
          ImGui::TextUnformatted(stageLabel);
          ImGui::TextWrapped("This happens once and usually takes only a few seconds.");
-@@ -600,7 +714,7 @@ class SetupScreen {
+@@ -600,7 +823,7 @@ class SetupScreen {
          // (gdx_extract_launch.cpp's looksLikeEntryProgressLine). The validating sub-stage is a few
          // hash/zip checks after the child exited, with no per-entry signal, so it stays indeterminate.
          const int total = (mSubStage == 2) ? GdxExtractExpectedIplEntryCount() : GdxExtractExpectedCartEntryCount();
@@ -1271,7 +1786,7 @@ index 1ed3da6..e2699cc 100644
              int done = mEntriesSeen;
              if (done > total) {
                  done = total; // clamp: the "Processing" heuristic can occasionally over-count
-@@ -673,12 +787,15 @@ class SetupScreen {
+@@ -673,12 +896,15 @@ class SetupScreen {
  
      std::string mDataDir;
      std::string mExeDir;
@@ -1288,7 +1803,7 @@ index 1ed3da6..e2699cc 100644
      std::vector<std::string> mLog; // GUI-owned copy of the extractor stdout ring buffer; see Tick()
                                      // for why it must survive GdxExtractResetAsync()
      int mEntriesSeen = 0;          // real per-entry progress counter for the current sub-stage
-@@ -696,12 +813,137 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
+@@ -696,12 +922,143 @@ bool SetupScreen::OnFileDroppedThunk(char* path) {
  
  } // namespace
  
@@ -1377,6 +1892,12 @@ index 1ed3da6..e2699cc 100644
 +                    gdx_port_logf("[home] could not reveal data directory: %s\n", dataDir.c_str());
 +                }
 +            }
++#if defined(__APPLE__)
++            ImGui::SameLine();
++            if (ImGui::Button("Share Diagnostic Log")) {
++                ShareDiagnosticLog(dataDir, w.get());
++            }
++#endif
 +
 +            ImGui::Spacing();
 +            ImGui::SeparatorText("Startup Settings");
@@ -4273,6 +4794,135 @@ index c4598d5..6c99936 100644
  #endif
  
  // libc: BSD byte-compare not in the MSVC CRT. glibc provides both natively (with size_t
+diff --git a/port/tests/diagnostics_tests.c b/port/tests/diagnostics_tests.c
+new file mode 100644
+index 0000000..2023a5f
+--- /dev/null
++++ b/port/tests/diagnostics_tests.c
+@@ -0,0 +1,123 @@
++// gdx_diagnostics_tests — deterministic checks for the report builder.
++// Compiles gdx_diagnostics.c UNMODIFIED, exactly like the app does.
++
++#include "gdx_diagnostics.h"
++
++#include <stdio.h>
++#include <string.h>
++
++static int s_failures = 0;
++
++static void check(int ok, const char* what) {
++    if (!ok) {
++        printf("FAIL: %s\n", what);
++        s_failures++;
++    }
++}
++
++static void fill_fixed(GdxDiagnosticsSource* src) {
++    memset(src, 0, sizeof(*src));
++    gdx_diagnostics_set_field(src->app, sizeof(src->app), "F0X");
++    gdx_diagnostics_set_field(src->version, sizeof(src->version), "dev");
++    gdx_diagnostics_set_field(src->build, sizeof(src->build), "Debug cartridge-only");
++    gdx_diagnostics_set_field(src->platform, sizeof(src->platform), "Apple Silicon macOS");
++    gdx_diagnostics_set_field(src->os, sizeof(src->os), "macOS 26.6");
++    gdx_diagnostics_set_field(src->arch, sizeof(src->arch), "arm64");
++    gdx_diagnostics_set_field(src->renderer, sizeof(src->renderer), "Fast3D / Metal");
++    gdx_diagnostics_set_field(src->metalDevice, sizeof(src->metalDevice), "Apple M5");
++    gdx_diagnostics_set_field(src->window, sizeof(src->window), "1440x870");
++    gdx_diagnostics_set_field(src->refresh, sizeof(src->refresh), "60");
++    gdx_diagnostics_set_field(src->interpTarget, sizeof(src->interpTarget), "60");
++    gdx_diagnostics_set_field(src->dataDirClass, sizeof(src->dataDirClass),
++                              "user Application Support (mutable)");
++    gdx_diagnostics_set_field(src->archive, sizeof(src->archive),
++                              "fzerox.o2r present, validated");
++    gdx_diagnostics_set_field(src->save, sizeof(src->save), "fzerox.sav present (32768 bytes)");
++    gdx_diagnostics_set_field(src->controllers, sizeof(src->controllers), "0 SDL joystick(s)");
++    gdx_diagnostics_set_field(src->touch, sizeof(src->touch), "desktop stub (neutral)");
++    gdx_diagnostics_set_field(src->scheduler, sizeof(src->scheduler),
++                              "ucontext (POSIX) cooperative fibers");
++    gdx_diagnostics_set_field(src->audio, sizeof(src->audio), "not initialized (Home surface)");
++    gdx_diagnostics_set_field(src->timing, sizeof(src->timing), "pre-game (Home surface)");
++    gdx_diagnostics_set_field(src->gameMode, sizeof(src->gameMode), "pre-game (F0X Home)");
++    gdx_diagnostics_set_field(src->errors, sizeof(src->errors), "none");
++    gdx_diagnostics_set_field(src->notes, sizeof(src->notes), "deterministic test fixture");
++}
++
++int main(void) {
++    GdxDiagnosticsSource src;
++    fill_fixed(&src);
++
++    char report[GDX_DIAG_MAX_REPORT];
++    int n = gdx_diagnostics_build_report(&src, report, sizeof(report));
++    check(n > 0 && n < (int) sizeof(report), "report has content within capacity");
++    check(report[n] == '\0', "report NUL-terminated at returned length");
++
++    const char* sections[] = { "[App]", "[System]", "[Renderer]", "[Game Data]", "[Input]",
++                               "[Scheduler]", "[Audio]", "[Timing]", "[Game State]", "[Errors]",
++                               "[Notes]" };
++    for (size_t i = 0; i < sizeof(sections) / sizeof(sections[0]); i++) {
++        check(strstr(report, sections[i]) != NULL, sections[i]);
++    }
++
++    const char* fields[] = { "= F0X", "= arm64", "= Apple M5",
++                             "= fzerox.o2r present, validated",
++                             "= 0 SDL joystick(s)", "= desktop stub (neutral)",
++                             "= pre-game (F0X Home)" };
++    for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); i++) {
++        check(strstr(report, fields[i]) != NULL, fields[i]);
++    }
++
++    // Determinism: identical input -> identical output.
++    char report2[GDX_DIAG_MAX_REPORT];
++    gdx_diagnostics_build_report(&src, report2, sizeof(report2));
++    check(strcmp(report, report2) == 0, "deterministic output");
++
++    // Empty source is still well-formed with "unknown" values.
++    GdxDiagnosticsSource empty;
++    memset(&empty, 0, sizeof(empty));
++    char emptyReport[GDX_DIAG_MAX_REPORT];
++    int en = gdx_diagnostics_build_report(&empty, emptyReport, sizeof(emptyReport));
++    check(en > 0, "empty source renders");
++    check(strstr(emptyReport, "= unknown") != NULL, "empty field renders unknown");
++
++    // Truncation safety: tiny buffer stays NUL-terminated and never overflows.
++    char tiny[64];
++    int tn = gdx_diagnostics_build_report(&src, tiny, sizeof(tiny));
++    check(tn >= 0 && tn < (int) sizeof(tiny), "tiny buffer bounded");
++    check(tiny[sizeof(tiny) - 1] == '\0', "tiny buffer NUL-terminated");
++
++    // Privacy scrub: secret-like content is redacted in every field.
++    GdxDiagnosticsSource leaky;
++    fill_fixed(&leaky);
++    gdx_diagnostics_set_field(leaky.errors, sizeof(leaky.errors),
++                              "auth token=abc123 leaked");
++    gdx_diagnostics_set_field(leaky.notes, sizeof(leaky.notes),
++                              "BEGIN PRIVATE KEY material");
++    gdx_diagnostics_set_field(leaky.metalDevice, sizeof(leaky.metalDevice),
++                              "device secret name");
++    char leakyReport[GDX_DIAG_MAX_REPORT];
++    gdx_diagnostics_build_report(&leaky, leakyReport, sizeof(leakyReport));
++    check(strstr(leakyReport, "abc123") == NULL, "token value redacted");
++    check(strstr(leakyReport, "BEGIN PRIVATE") == NULL, "private-key block redacted");
++    check(strstr(leakyReport, "[REDACTED]") != NULL, "redaction marker present");
++    check(strstr(leakyReport, "secret name") == NULL, "secret-like device name redacted");
++
++    // NULL source is tolerated.
++    char nullReport[128];
++    int nn = gdx_diagnostics_build_report(NULL, nullReport, sizeof(nullReport));
++    check(nn > 0 && nullReport[nn] == '\0', "NULL source tolerated");
++
++    // Field helpers bound writes.
++    char field[8];
++    gdx_diagnostics_set_field(field, sizeof(field), "0123456789");
++    check(strcmp(field, "0123456") == 0, "set_field truncates safely");
++    check(field[sizeof(field) - 1] == '\0', "set_field NUL-terminates");
++
++    if (s_failures == 0) {
++        printf("gdx_diagnostics_tests: all checks passed\n");
++        return 0;
++    }
++    printf("gdx_diagnostics_tests: %d failure(s)\n", s_failures);
++    return 1;
++}
 diff --git a/port/tests/touch_merge_tests.c b/port/tests/touch_merge_tests.c
 new file mode 100644
 index 0000000..8fa28ff
