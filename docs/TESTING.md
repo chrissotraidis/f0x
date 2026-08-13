@@ -794,3 +794,55 @@ extraction golden plus all-black internal BMP readback as separate gates.
 - **Boundary:** Simulator-only; physical iPhone multi-touch acceptance remains
   open. The iPad Pro Simulator was re-booted afterward to restore the standing
   environment.
+
+## 2026-08-13 — crash report audit, iOS launch-audio root cause, and in-flight wiring
+
+- **iPhone 17 Pro Simulator crash (open, under investigation):** a live race
+  session (F0X PID 50153, launched 00:33:23, crashed 00:35:43) died with
+  `EXC_BAD_ACCESS (SIGSEGV)` at `0x1e0` on the main thread inside
+  `N64DisplayListAdapter::ProcessList` ->
+  `std::unordered_map<void const*, bool>::find` (n64_gfx_bridge.cpp:5155,
+  `gConvertedWideIsF3d.find(item.source)`), reached from
+  `ConvertRoot -> gdx_gfx_run -> osSpTaskStartGo -> Sched_SpTaskClearStartGfx`
+  during active race rendering (972 km/h, LAP 2/3). The crashed build is the
+  committed touch/diagnostics state (pre-in-game-menu-wiring); the gfx bridge
+  is untouched by every F0X patch, so this is a latent bridge/heap bug exposed
+  by the Simulator run, not a regression from this turn's edits. The map is
+  written only on the host thread (`gConvertedWideIsF3d[wideSrc] = isF3d` at
+  line 4108, clear at >8192 entries); the failing dereference (a hash node's
+  next pointer reading 0x1e0) points at heap corruption or freed-node reuse
+  rather than an obvious concurrent access. Reproduction was in progress when
+  the turn stopped (same build relaunched on the iPhone 17 Pro Simulator); no
+  conclusion. Next step: reproduce deterministically (guard malloc /
+  MallocStackLogging via `SIMCTL_CHILD_` env), find the write that clobbers the
+  map's heap nodes, add the smallest regression, fix, and re-run.
+- **iOS/iPadOS launch audio — root cause found, fix in the working tree
+  (uncommitted):** the iPhone 17 Pro Simulator launches show
+  `InitAudio`/dedicated-thread logs but NEVER the `SDL Audio initialized`
+  line that macOS shows. Source: `ship/audio/Audio.cpp` compiles the CoreAudio
+  player only on macOS
+  (`__APPLE__ && !__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__`), yet
+  `GetSavedAudioBackend()` returns `COREAUDIO` for every Apple platform when
+  the config has no backend, so on iOS `InitAudioPlayer()` falls through to
+  `NullAudioPlayer` (silent, no device). The F0X port's backend override CVar
+  (`gEnhancements.Audio.Backend`, 0=auto/1=WASAPI/2=SDL) only fires when the
+  CVar is nonzero, so iOS's auto default never reaches the SDL player. Fix in
+  `port/main.cpp` (uncommitted): on iOS builds
+  (`__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__`), resolve the default to
+  SDL before the player is created. Verification (build + Simulator launch
+  showing `SDL Audio initialized` + audible route) still required. The owner
+  also asked the next builder to check how the reference (HarkinianPad /
+  upstream) fixes iOS audio before finalizing.
+- **In-game Share Diagnostic Log wiring (uncommitted, macOS builds clean):**
+  `port/gdx_console_log.{h,cpp}` gained a warn/error tail ring
+  (`GdxConsoleLogErrorTail`); `port/main.cpp` gained
+  `gdx_diagnostics_share_runtime()` (live game mode, race frames, window/
+  refresh/interp, SDL joysticks, touch, archive/save, audio thread, error
+  tail -> privacy-scrubbed report -> `gdx_diagnostics_share_apple`); the
+  Settings -> General menu gained a "Diagnostics" section with a
+  "Share Diagnostic Log" button (Apple builds). The macOS app compiled and
+  seals, but the in-game menu trigger was not yet exercised, and the iOS build
+  was not rebuilt after the wiring. Patch not yet regenerated; nothing
+  committed.
+- **Boundary:** crash and audio are Simulator/host evidence only; physical
+  device audio and touch acceptance remain open.

@@ -1,7 +1,8 @@
 # F0X exact next-builder handoff
 
-Last reconciled: 2026-08-12 at repository `main` commit `22f2772` before this
-documentation checkpoint.
+Last reconciled: 2026-08-13 at repository `main` commit `64725b4` (touch phone
+defaults evidence). Working tree carries uncommitted Apple-side edits (see
+"Uncommitted working-tree state" below).
 
 ## Read order
 
@@ -41,12 +42,19 @@ the exact evidence artifact before relying on a path or process ID.
   in-process extraction → atomic install/hot mount → visible live race process.
 - Archive-only Simulator race without the ROM.
 - Complete unsigned arm64 iPhoneOS app compile and ROM-free payload audit.
+- macOS Share Diagnostic Log Home action (collector + privacy scrub + share
+  sheet + `gdx_diagnostics_tests`), macOS 60 Hz sim/timer/pacing measurement
+  (59.954 race frames/s, race-window p50 16.6 ms / p99 17.9-19.2 ms / 0 spikes
+  on the Apple M1 host), the macOS race-control blocker report, and the
+  phone-defaults re-run on the current build (iPhone 17 Pro Simulator).
 
 ## What is explicitly not finished
 
 - Physical-device touch acceptance (multi-touch stress, controller handoff,
-  interruptions, haptics feel, long sessions, thermals) and a fresh
-  phone-defaults re-run on a phone Simulator for the current build.
+  interruptions, haptics feel, long sessions, thermals).
+- The touch overlay and menu do NOT yet match the HarkinianPad reference
+  visually (owner-reported, IOS-TOUCH-VISUAL-01): side-by-side visual parity
+  is the highest-priority open touch item.
 - Physical iPad/iPhone signing, install, launch, controller, touch, audio,
   lifecycle, performance, thermals, or long-session evidence.
 - A player-completed macOS race; blocked on this host with an exact report in
@@ -56,9 +64,18 @@ the exact evidence artifact before relying on a path or process ID.
   retire/continue loop are captured).
 - Owner confirmation that the exact corrected current bundle no longer flashes.
 - Audible macOS/mobile speakers/headphones and route/interruption behavior.
+  iOS/iPadOS is currently SILENT at launch (IOS-AUDIO-01, root-caused: the
+  Apple auto backend resolves to the macOS-only CoreAudio player, falling to
+  Null on iOS; fix drafted uncommitted).
+- A live iPhone 17 Pro Simulator race crashed in the display-list bridge
+  (IOS-GFX-CRASH-01): `gConvertedWideIsF3d.find()` dereferenced 0x1e0; the
+  crash is under investigation (repro with guard malloc, then smallest
+  regression + fix).
 - Mobile lifecycle pause/resume/persistence.
 - Full diagnostics/share-log product flow: the macOS Home action is verified;
-  the in-game menu entry and the iOS Share-sheet wiring remain.
+  the in-game Settings -> General button + runtime collector + error-tail ring
+  are drafted uncommitted (macOS compiles); the iOS Share-sheet trigger is not
+  yet exercised.
 - Correct 60 Hz timing evidence and high-refresh acceptance.
 - Release signing/notarization/re-signable package workflow.
 - HarkinianPad-quality final public README/screenshots/install guide.
@@ -75,33 +92,74 @@ the exact evidence artifact before relying on a path or process ID.
 - Build products live under ignored `build/` and may be stale after source edits.
 - Process IDs and Simulator bundle/container UUIDs are ephemeral; rediscover them.
 
+## Uncommitted working-tree state (2026-08-13, next bot must reconcile)
+
+`ref/G-Diffuser/port/` carries Apple-side edits NOT yet in the regenerated
+patch and NOT committed to the F0X repo:
+
+- `port/gdx_console_log.{h,cpp}` — warn/error tail ring
+  (`GdxConsoleLogErrorTail`) for the diagnostics report.
+- `port/gdx_diagnostics.h` — `gdx_diagnostics_share_runtime` declaration.
+- `port/main.cpp` — `gdx_diagnostics_share_runtime()` implementation (live
+  in-game collection) AND the iOS audio fix (resolve
+  `gEnhancements.Audio.Backend` auto -> SDL on iOS builds).
+- `port/gdx_menu_registry.cpp` — Settings -> General "Diagnostics" section
+  with the "Share Diagnostic Log" button (Apple builds).
+
+The macOS app compiles and seals with these changes; the iOS Simulator/device
+builds were NOT rebuilt after the wiring, the in-game menu trigger was not
+exercised, the patch is not regenerated, and nothing is committed. Decide
+whether to keep, finish, and commit this slice in the same unit as the audio
+verification.
+
 ## Highest-priority actionable work
 
-The touch system is implemented and Simulator-verified at its core, including
-live captures of the settings page, editor open/save, hold-to-cancel, the
-Z hold-to-latch, cancel-clears-latch, and non-default profile persistence
-across relaunch (see `docs/evidence/touch-ios/2026-08-12.txt` and
-`docs/evidence/touch-ios-live/2026-08-12-live-captures.txt`). The remaining
-touch work is polish and physical acceptance:
-
-1. Phone defaults were re-verified on the current build (2026-08-13): the
-   iPhone 17 Pro Simulator run selected the phone table, rendered every
-   control at its normalized default center (edge pills safe-clamped), kept
-   the ••• in the phone top-center slot clear of the Dynamic Island, and
-   attached over a live race (`docs/evidence/touch-ios-phone/`). A live editor
-   pass exercising Hide/Show and Reset on the tablet profile without leaving a
-   stale override is optional polish.
-2. Re-run the touch-driven GP flow and complete a race on Simulator, then
-   replay the whole matrix on physical iPad/iPhone when a signing-capable Mac
-   with a connected device is available.
-3. Physical touch acceptance remains the only Simulator-independent proof:
-   sustained simultaneous steering + accelerator + brake/boost/attack,
-   four-contact stress, controller handoff, interruptions, haptics feel,
-   long sessions, and thermals.
+1. **Touch/menu visual parity with the HarkinianPad reference (owner
+   priority, IOS-TOUCH-VISUAL-01).** The owner has repeatedly asked to copy
+   the reference controls and menu and reports the F0X result LOOKS different.
+   Do not trust the geometry-fraction tables alone: render F0X's overlay on
+   the iPad and iPhone 17 Pro Simulators, render the reference from the pinned
+   `ref/harkinianpad` (its UIKit overlay + `finishControlLayoutForCompact` +
+   the promoted-center tables and the accepted palette), and diff them
+   side-by-side pixel-by-pixel: button shape (circle vs pill), colors and
+   alpha, sizes, spacing, labels/case, fonts, the stick's look, the ••• menu
+   slot, the Settings -> Controls -> Touch Controls page, and the editor
+   chrome (Size slider, Hide/Show, Reset, Done). Change the F0X overlay's
+   visuals to match exactly, re-run the touch matrix + `gdx_touch_merge_tests`
+   (87) + the macOS/device regressions, capture before/after evidence, and
+   update this doc and README. Physical acceptance stays open.
+2. **Verify and commit the iOS audio fix (IOS-AUDIO-01), comparing the
+   reference.** Build the iOS Simulator app with the working-tree fix, launch
+   on the iPhone 17 Pro Simulator, and confirm the `SDL Audio initialized`
+   line appears and the device opens (audible output on the Simulator host).
+   Before finalizing, check how the pinned reference/upstream selects the iOS
+   audio backend (HarkinianPad's shipwright audio patch / upstream Audio.cpp)
+   and adopt the same approach if it is cleaner than the port-CVar default.
+   Regenerate the patch, run the standing regressions (touch tests, packaged
+   GP route, unsigned iPhoneOS build, payload audit), and commit the coherent
+   unit (audio + diagnostics wiring together, since they share the working
+   tree).
+3. **Finish the in-game/iOS Share Diagnostic Log wiring** (same commit as 2):
+   exercise the Settings -> General button on macOS (menu keyboard nav: F1,
+   Tab/Shift+Tab to focus, Enter; verify the picker + artifact), then the iOS
+   Simulator (menu via the ••• button, then the Diagnostics entry; verify the
+   `UIActivityViewController` presents). Keep the privacy exclusions; test the
+   shared artifact.
+4. **Reproduce and fix IOS-GFX-CRASH-01.** Relaunch the crashed build (or the
+   rebuilt one) on the iPhone 17 Pro Simulator with `SIMCTL_CHILD_MallocGuardEdges=1`,
+   `SIMCTL_CHILD_MallocStackLogging=1`, and `SIMCTL_CHILD_GUARD_MALLOC=1`, let
+   the race run ~3 min, and find the write that clobbers the
+   `gConvertedWideIsF3d` heap nodes (or prove a lifetime/thread bug). Add the
+   smallest falsifiable regression, fix, re-run, and document. The bridge is
+   untouched by the F0X patches, so suspect the converted-wide/asset pipeline
+   or a freed-node reuse in the display-list walk.
+5. Then continue the remaining queue: physical iPad/iPhone acceptance
+   (externally blocked here), representative-course 60 Hz measurement,
+   high refresh, packaging, README, Expansion Kit.
 
 Do not regress the verified core: `gdx_touch_merge_tests` (87 checks), the
-macOS sealed-bundle race route, and the unsigned iPhoneOS build are the
-standing regressions.
+macOS sealed-bundle race route, the unsigned iPhoneOS build, and the
+`gdx_diagnostics_tests` are the standing regressions.
 
 ## Remaining execution queue after touch
 

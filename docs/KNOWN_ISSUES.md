@@ -26,6 +26,35 @@
   cancel paths clear input, but full background/foreground simulation/audio/
   presentation suspension, config/save flush, interruption, memory pressure,
   and resume still need runtime proof.
+- **IOS-AUDIO-01 — iOS/iPadOS launches with the silent Null player (root
+  cause found):** libultraship compiles the CoreAudio player only on macOS
+  (`ship/audio/Audio.cpp`), but its Apple default backend is `COREAUDIO`, so on
+  iOS `InitAudioPlayer()` falls through to `NullAudioPlayer` — no device, no
+  output, and no `SDL Audio initialized` log. The F0X port override
+  (`gEnhancements.Audio.Backend`) only applies when nonzero, so the auto
+  default stays broken on iOS. Fix drafted in `port/main.cpp` (resolve to SDL
+  on iOS before player creation) but NOT yet built, verified, or committed.
+  The next builder must also compare how the reference/upstream selects the
+  iOS audio backend before finalizing.
+- **IOS-GFX-CRASH-01 — Simulator race crash in the display-list bridge
+  (under investigation):** a live iPhone 17 Pro Simulator race crashed with
+  `EXC_BAD_ACCESS` at `0x1e0` in
+  `N64DisplayListAdapter::ProcessList` ->
+  `gConvertedWideIsF3d.find()` (n64_gfx_bridge.cpp:5155) on the main thread.
+  The map is written only on the host thread; the failing dereference suggests
+  heap corruption or freed-node reuse. Reproduction was interrupted; guard-
+  malloc instrumentation and a smallest regression are the next steps. Not
+  caused by this turn's edits (bridge untouched by the F0X patch series).
+- **IOS-TOUCH-VISUAL-01 — the touch overlay and menu do not yet match the
+  HarkinianPad reference visually (owner-reported):** geometry fractions,
+  Z-latch, menu slots, and the palette are implemented per
+  `TOUCH_CONTROLS_IMPLEMENTATION.md`, but the owner reports the controls LOOK
+  different from the reference they asked to copy. The next builder must do a
+  side-by-side visual diff against the pinned HarkinianPad overlay (button
+  shape/pill vs circle, colors, sizes, spacing, labels, fonts, opacity, the
+  ••• slot, the Settings page layout and editor chrome) and close every
+  visible difference before claiming parity. This is the highest-priority
+  open touch item.
 - **IOS-HARDWARE-01 — physical mobile acceptance externally blocked here:** the
   current Mac reports no connected device and zero valid signing identities.
   Simulator and unsigned device-SDK builds do not establish physical rendering,

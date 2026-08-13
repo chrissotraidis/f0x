@@ -50,7 +50,17 @@ CANONICAL CURRENT TRUTH
   visible race are real and evidenced, including one uninterrupted picker-to-race
   process.
 - An unsigned arm64 iPhoneOS app compiles and passes a ROM-free payload audit.
-- Gameplay touch controls and their menu options are not implemented at all.
+- Gameplay touch controls and their menu options ARE implemented and
+  Simulator-verified (phone and tablet) — but the owner reports the controls
+  and menu LOOK different from the HarkinianPad reference they asked to copy,
+  so visual parity work is the highest-priority touch item
+  (IOS-TOUCH-VISUAL-01).
+- iOS/iPadOS launches are currently SILENT: the Apple auto audio backend
+  resolves to the macOS-only CoreAudio player, falling through to the Null
+  player on iOS (IOS-AUDIO-01; fix drafted in the working tree, uncommitted).
+- A live iPhone 17 Pro Simulator race crashed in the display-list bridge
+  (`gConvertedWideIsF3d.find()` at n64_gfx_bridge.cpp:5155, IOS-GFX-CRASH-01);
+  reproduction/instrumentation is the next step.
 - Physical iPad/iPhone signing, install, controller, touch, lifecycle, audible
   audio, performance, and thermal acceptance remain open.
 - A player-completed macOS race remains open.
@@ -78,29 +88,30 @@ NON-NEGOTIABLE BOUNDARIES
 
 HIGHEST-PRIORITY LOCAL WORK
 
-Implement the full F0X touch system exactly from
-docs/TOUCH_CONTROLS_IMPLEMENTATION.md:
+The touch system's behavior is implemented and Simulator-verified; the
+remaining LOCAL gates, in order:
 
-- direct atomic N64 pad state, not keyboard synthesis;
-- merge in input_bridge.c after the one ControlDeck read and before developer
-  overrides;
-- continuous analog -80..80 stick;
-- A=accelerator, B=boost, C-down=brake, Z/R=slides and attacks, Start=pause,
-  C-right=view, C-up=look-back, plus C-left, L, and D-pad coverage;
-- simultaneous steering + accelerator + action;
-- no stuck controls and comprehensive cancel paths;
-- permanent menu access and menu-state hiding;
-- separate hand-authored iPad/iPhone defaults;
-- safe-area-aware move/resize/hide/reset editor with normalized versioned
-  phone/tablet profiles;
-- opacity, haptics, touch toggle, and physical-controller auto-hide settings;
-- macOS-neutral stubs and unchanged physical-controller behavior;
-- deterministic merge/cancel/profile tests, live Simulator interaction, macOS
-  regression, unsigned device build, patch replay, and ROM-free package audit.
+1. TOUCH/MENU VISUAL PARITY (owner priority): render F0X's overlay on the iPad
+   and iPhone 17 Pro Simulators, render the pinned HarkinianPad reference
+   overlay side by side, and close every visible difference (button
+   shape/pill vs circle, colors/alpha, sizes, spacing, labels, fonts, stick
+   look, the ••• slot, the Settings -> Controls -> Touch Controls page, and
+   the editor chrome). Do not trust the geometry tables alone; prove it
+   pixel-by-pixel with before/after captures. Keep the 87-check merge tests
+   green.
+2. IOS AUDIO: build and verify the working-tree fix (auto -> SDL on iOS) on
+   the Simulator, compare how the reference/upstream selects the iOS backend,
+   and commit it with the diagnostics wiring as one unit.
+3. IOS-GFX-CRASH-01: reproduce with guard malloc, find the clobbering write or
+   lifetime/thread bug, add the smallest regression, fix, and re-run.
+4. FINISH the in-game/iOS Share Diagnostic Log (the Settings -> General
+   button, runtime collector, and error-tail ring are drafted uncommitted;
+   exercise the macOS menu trigger and the iOS share sheet).
+5. Then the remaining queue below (physical acceptance, representative-course
+   60 Hz, high refresh, packaging, README, Expansion Kit).
 
 Do this in coherent slices. After each slice, build and test the smallest affected
-artifact before extending it. Do not stop after drawing controls; prove that F-Zero
-X receives the correct N64 state and that menu/editor/lifecycle transitions clear it.
+artifact before extending it, and recheck the touch/menu wiring after every change.
 
 CONTINUATION QUEUE AFTER TOUCH
 
@@ -115,8 +126,9 @@ CONTINUATION QUEUE AFTER TOUCH
 4. Run physical touch-only acceptance on iPad and iPhone, true concurrent contact
    stress, controller handoff, editor ergonomics, safe areas, interruptions, audio,
    saves, thermals, and long sessions.
-5. Implement and test Share Diagnostic Log with useful system/runtime state and
-   strict privacy exclusions.
+5. Finish and test Share Diagnostic Log with useful system/runtime state and
+   strict privacy exclusions (the macOS Home action is verified; the in-game
+   entry and iOS share-sheet wiring are drafted uncommitted).
 6. Prove correct 60 Hz simulation/timer/physics/AI/input/audio/presentation on
    named hardware and tracks.
 7. Only then add Match Display/120 Hz through existing interpolation without
