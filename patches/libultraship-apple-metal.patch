@@ -353,6 +353,155 @@ index cee31eff..ac5261ee 100644
 -}
 \ No newline at end of file
 +}
+diff --git a/src/libultraship/window/gui/InputEditorWindow.cpp b/src/libultraship/window/gui/InputEditorWindow.cpp
+index fc3ea1b5..0db9acaa 100644
+--- a/src/libultraship/window/gui/InputEditorWindow.cpp
++++ b/src/libultraship/window/gui/InputEditorWindow.cpp
+@@ -427,6 +427,24 @@ void InputEditorWindow::DrawButtonLineEditMappingButton(uint8_t port, CONTROLLER
+ 
+ void InputEditorWindow::DrawButtonLine(const char* buttonName, uint8_t port, CONTROLLERBUTTONS_T bitmask,
+                                        ImVec4 color = CHIP_COLOR_N64_GREY) {
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    const auto tableId = StringHelper::Sprintf("buttonMappingRow##%d-%d", port, bitmask);
++    if (ImGui::BeginTable(tableId.c_str(), 2,
++                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
++                              ImGuiTableFlags_PadOuterX)) {
++        ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(66.0f));
++        ImGui::TableSetupColumn("Mappings", ImGuiTableColumnFlags_WidthStretch);
++        ImGui::TableNextRow();
++        ImGui::TableNextColumn();
++        DrawInputChip(buttonName, color);
++        ImGui::TableNextColumn();
++        for (auto id : mBitmaskToMappingIds[port][bitmask]) {
++            DrawButtonLineEditMappingButton(port, bitmask, id);
++        }
++        DrawButtonLineAddMappingButton(port, bitmask);
++        ImGui::EndTable();
++    }
++#else
+     ImGui::NewLine();
+     ImGui::SameLine(SCALE_IMGUI_SIZE(32.0f));
+     DrawInputChip(buttonName, color);
+@@ -435,6 +453,7 @@ void InputEditorWindow::DrawButtonLine(const char* buttonName, uint8_t port, CON
+         DrawButtonLineEditMappingButton(port, bitmask, id);
+     }
+     DrawButtonLineAddMappingButton(port, bitmask);
++#endif
+ }
+ 
+ void InputEditorWindow::DrawStickDirectionLineAddMappingButton(uint8_t port, uint8_t stick, Ship::Direction direction) {
+@@ -598,6 +617,28 @@ void InputEditorWindow::DrawStickDirectionLineEditMappingButton(uint8_t port, ui
+ 
+ void InputEditorWindow::DrawStickDirectionLine(const char* axisDirectionName, uint8_t port, uint8_t stick,
+                                                Ship::Direction direction, ImVec4 color = CHIP_COLOR_N64_GREY) {
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    const auto tableId = StringHelper::Sprintf("stickMappingRow##%d-%d-%d", port, stick, direction);
++    if (ImGui::BeginTable(tableId.c_str(), 2,
++                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
++                              ImGuiTableFlags_PadOuterX)) {
++        ImGui::TableSetupColumn("Direction", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(42.0f));
++        ImGui::TableSetupColumn("Mappings", ImGuiTableColumnFlags_WidthStretch);
++        ImGui::TableNextRow();
++        ImGui::TableNextColumn();
++        ImGui::BeginDisabled();
++        ImGui::PushStyleColor(ImGuiCol_Button, color);
++        ImGui::Button(axisDirectionName, ImVec2(SCALE_IMGUI_SIZE(26.0f), 0));
++        ImGui::PopStyleColor();
++        ImGui::EndDisabled();
++        ImGui::TableNextColumn();
++        for (auto id : mStickDirectionToMappingIds[port][stick][direction]) {
++            DrawStickDirectionLineEditMappingButton(port, stick, direction, id);
++        }
++        DrawStickDirectionLineAddMappingButton(port, stick, direction);
++        ImGui::EndTable();
++    }
++#else
+     ImGui::NewLine();
+     ImGui::SameLine();
+     ImGui::BeginDisabled();
+@@ -610,6 +651,7 @@ void InputEditorWindow::DrawStickDirectionLine(const char* axisDirectionName, ui
+         DrawStickDirectionLineEditMappingButton(port, stick, direction, id);
+     }
+     DrawStickDirectionLineAddMappingButton(port, stick, direction);
++#endif
+ }
+ 
+ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id, ImVec4 color = CHIP_COLOR_N64_GREY) {
+@@ -621,6 +663,24 @@ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id
+         controllerStick = Ship::Context::GetInstance()->GetControlDeck()->GetControllerByPort(port)->GetRightStick();
+     }
+     controllerStick->Process(sX, sY);
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    const auto tableId = StringHelper::Sprintf("stickEditorLayout##%d-%d", port, id);
++    if (ImGui::BeginTable(tableId.c_str(), 2,
++                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
++                              ImGuiTableFlags_PadOuterX)) {
++        ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(116.0f));
++        ImGui::TableSetupColumn("Bindings", ImGuiTableColumnFlags_WidthStretch);
++        ImGui::TableNextRow();
++        ImGui::TableNextColumn();
++        DrawAnalogPreview(StringHelper::Sprintf("##AnalogPreview%d", id).c_str(), ImVec2(sX, sY));
++        ImGui::TableNextColumn();
++        DrawStickDirectionLine(ICON_FA_ARROW_UP, port, stick, Ship::UP, color);
++        DrawStickDirectionLine(ICON_FA_ARROW_DOWN, port, stick, Ship::DOWN, color);
++        DrawStickDirectionLine(ICON_FA_ARROW_LEFT, port, stick, Ship::LEFT, color);
++        DrawStickDirectionLine(ICON_FA_ARROW_RIGHT, port, stick, Ship::RIGHT, color);
++        ImGui::EndTable();
++    }
++#else
+     DrawAnalogPreview(StringHelper::Sprintf("##AnalogPreview%d", id).c_str(), ImVec2(sX, sY));
+ 
+     ImGui::SameLine();
+@@ -630,6 +690,7 @@ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id
+     DrawStickDirectionLine(ICON_FA_ARROW_LEFT, port, stick, Ship::LEFT, color);
+     DrawStickDirectionLine(ICON_FA_ARROW_RIGHT, port, stick, Ship::RIGHT, color);
+     ImGui::EndGroup();
++#endif
+     ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+     if (ImGui::TreeNode(StringHelper::Sprintf("Analog Stick Options##%d", id).c_str())) {
+         ImGui::Text("Sensitivity:");
+@@ -1262,6 +1323,19 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
+         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+ 
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++        const int primaryColumns = ImGui::GetContentRegionAvail().x >= SCALE_IMGUI_SIZE(700.0f) ? 2 : 1;
++        if (ImGui::BeginTable("PrimaryInputSections", primaryColumns,
++                              ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings |
++                                  ImGuiTableFlags_PadOuterX)) {
++            ImGui::TableNextRow();
++            if (primaryColumns > 1) {
++                ImGui::TableNextColumn();
++            } else {
++                ImGui::TableNextRow();
++                ImGui::TableNextColumn();
++            }
++#endif
+         if (ImGui::CollapsingHeader("Buttons", NULL, ImGuiTreeNodeFlags_DefaultOpen)) {
+             DrawButtonLine("A", portIndex, BTN_A, CHIP_COLOR_N64_BLUE);
+             DrawButtonLine("B", portIndex, BTN_B, CHIP_COLOR_N64_GREEN);
+@@ -1279,6 +1353,9 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
+                            CHIP_COLOR_N64_YELLOW);
+         }
+ 
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++            ImGui::TableNextColumn();
++#endif
+         if (ImGui::CollapsingHeader("D-Pad", NULL, ImGuiTreeNodeFlags_DefaultOpen)) {
+             DrawButtonLine(StringHelper::Sprintf("%s", ICON_FA_ARROW_UP).c_str(), portIndex, BTN_DUP);
+             DrawButtonLine(StringHelper::Sprintf("%s", ICON_FA_ARROW_DOWN).c_str(), portIndex, BTN_DDOWN);
+@@ -1290,6 +1367,11 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
+             DrawStickSection(portIndex, Ship::LEFT, 0);
+         }
+ 
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++            ImGui::EndTable();
++        }
++#endif
++
+         if (ImGui::CollapsingHeader("Additional (\"Right\") Stick")) {
+             DrawStickSection(portIndex, Ship::RIGHT, 1, CHIP_COLOR_N64_YELLOW);
+         }
 diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
 index 2fe754be..ad688ce1 100644
 --- a/src/ship/Context.cpp
@@ -371,7 +520,7 @@ index 2fe754be..ad688ce1 100644
  
  #ifdef NON_PORTABLE
 diff --git a/src/ship/audio/Audio.cpp b/src/ship/audio/Audio.cpp
-index 40140b60..48239b6f 100644
+index 40140b60..307178f8 100644
 --- a/src/ship/audio/Audio.cpp
 +++ b/src/ship/audio/Audio.cpp
 @@ -1,6 +1,6 @@
@@ -400,6 +549,15 @@ index 40140b60..48239b6f 100644
      mAvailableAudioBackends->push_back(AudioBackend::COREAUDIO);
  #endif
      mAvailableAudioBackends->push_back(AudioBackend::SDL);
+@@ -97,7 +97,7 @@ AudioBackend Audio::GetSavedAudioBackend() {
+     return AudioBackend::WASAPI;
+ #endif
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     return AudioBackend::COREAUDIO;
+ #endif
+ 
 diff --git a/src/ship/window/gui/Gui.cpp b/src/ship/window/gui/Gui.cpp
 index b2f99bde..41907c02 100644
 --- a/src/ship/window/gui/Gui.cpp

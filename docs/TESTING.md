@@ -846,3 +846,61 @@ extraction golden plus all-black internal BMP readback as separate gates.
   committed.
 - **Boundary:** crash and audio are Simulator/host evidence only; physical
   device audio and touch acceptance remain open.
+
+## 2026-08-13 — touch visual and Input Editor acceptance
+
+- **Reported failure:** the iPad Input Editor inherited a narrow desktop
+  rectangle, packed mappings into a ragged left strip, and was obstructed by
+  the live gameplay touch overlay. The compact gameplay controls also used
+  long F-Zero action labels that collided on phone.
+- **Implementation:** mobile Input Editor presentation now owns the safe
+  viewport; mapping rows use aligned label/mapping tables; iPad lays Buttons
+  beside D-Pad/Analog while iPhone collapses to one column. Compact gameplay
+  controls use concise N64 glyphs with F-Zero semantics retained in AX labels
+  and hints. Phone rails/D-pad were separated, the analog knob made round,
+  the duplicate Settings reset row removed, and both gameplay controls and
+  the permanent ••• affordance are hidden while menu/editor surfaces are
+  active.
+- **Live iPad proof:** iPad Pro 11-inch (M5), one process. The editor occupied
+  the safe viewport; Buttons, D-Pad, Analog Options, Additional Right Stick,
+  Rumble, Gyro, and LEDs were inspected. Primary sections rendered in two
+  balanced columns with aligned rows and no touch-overlay obstruction.
+- **Live iPhone proof:** iPhone 17 Pro, one process. Settings exposed `Open
+  Input Editor` above its description; the editor rendered one responsive
+  column with safe margins and no •••/gameplay controls. Closing returned to
+  Settings; closing Settings restored the full gameplay overlay and AX tree
+  neutrally.
+- **Regression/build proof:** `gdx_touch_merge_tests` 87/87;
+  `gdx_diagnostics_tests` pass; iOS Simulator build succeeds; sealed macOS
+  `F0X.app` rebuild succeeds. `patches/gdiffuser-apple-macos.patch` and
+  `patches/libultraship-apple-metal.patch` reverse-check against the tested
+  trees and clean-apply to detached pinned worktrees; the three new/modified
+  editor sources compare byte-for-byte.
+- **Boundary:** screenshots contain private game imagery and remain local.
+  This is Simulator visual/interaction evidence, not physical-device
+  multi-touch, ergonomics, or haptics acceptance.
+
+## 2026-08-13 — iOS SDL audio and in-game diagnostics acceptance
+
+- **Reference decision:** the pinned HarkinianPad libultraship patch keeps
+  CoreAudio macOS-only and lets the existing default fall through to SDL on
+  iOS. F0X now uses the same library-level rule; the earlier product-CVar
+  workaround was removed.
+- **Rebuilt launch proof:** iPhone 17 Pro Simulator, archive-only boot, one
+  F0X process. The exact rebuilt binary logged `SDL Audio initialized: 2
+  channels, 32000 Hz`, then `dedicated audio thread started`, repeated
+  `Audio_ThreadEntry WOKE`, and a BGM change. This proves a real SDL output
+  device and active synthesis path; it is not physical speaker audibility.
+- **Diagnostics interaction:** Settings search `diagnostic` rendered the live
+  `Share Diagnostic Log` action. Activating it presented the native iOS Share
+  sheet for `F0X-Diagnostics-2026-08-13-022751.txt` (Text Document, 2 KB).
+  The generated report identifies Apple iOS/iPadOS 26.5 arm64, Fast3D/Metal,
+  Apple iOS simulator GPU, 874x402 at 60 Hz, sandbox Documents, archive/save
+  sizes, SDL controllers, UIKit touch policy, ucontext scheduler, active audio
+  producer, timing/game mode, and a bounded warning tail. It contains no
+  absolute private path, ROM/save content, or signing material.
+- **Automated proof:** `gdx_diagnostics_tests` passes; Simulator and sealed
+  macOS builds pass; maintained patch reverse/replay includes the library
+  audio rule byte-for-byte.
+- **Boundary:** physical audible output, audio route/interruption behavior,
+  and physical Share-sheet acceptance remain open.

@@ -1,0 +1,59 @@
+F0X iOS touch visual, Input Editor, audio, and diagnostics acceptance
+Date: 2026-08-13
+
+Scope and privacy
+-----------------
+- One booted Simulator and one F0X process were used at a time.
+- Live screenshots contained authorized game imagery and remain local/untracked.
+- This artifact records only ROM-safe behavioral and build facts.
+- No physical Apple device or valid signing identity was available.
+
+Input Editor and touch visuals
+------------------------------
+- iPad Pro 11-inch (M5), landscape:
+  - Input Editor occupied the safe viewport instead of a stale narrow desktop rectangle.
+  - Buttons rendered beside D-Pad and Analog Stick in balanced primary columns.
+  - Mapping chips were aligned by label/mapping columns.
+  - Analog Options, Additional Right Stick, Rumble, Gyro, and LEDs remained reachable.
+  - Gameplay controls and the permanent menu affordance were absent while editing.
+- iPhone 17 Pro, landscape:
+  - Settings exposed Open Input Editor above its description.
+  - The primary editor layout collapsed to one column with safe margins.
+  - Gameplay controls and the permanent menu affordance were absent while editing.
+  - Closing the editor returned to Settings; closing Settings restored the neutral gameplay overlay.
+- Compact gameplay controls use concise N64 glyphs while AX labels/hints preserve F-Zero action semantics.
+- Phone rails and D-pad no longer collide; the analog knob is round; the duplicate Settings reset row is gone.
+
+Audio and diagnostics
+---------------------
+- Pinned HarkinianPad reference decision was adopted at the libultraship layer:
+  CoreAudio remains macOS-only and iOS defaults to SDL.
+- Rebuilt iPhone 17 Pro Simulator launch logged:
+  SDL Audio initialized: 2 channels, 32000 Hz
+  dedicated audio thread started (DesiredBuffered=4096)
+  live Audio_ThreadEntry wakeups and BGM synthesis
+- Settings search for diagnostic exposed Share Diagnostic Log.
+- Activating the action presented UIActivityViewController for a 2 KB text report.
+- The report contained platform/OS/arch, Fast3D/Metal device, window/refresh,
+  data classifications and sizes, controller/touch state, scheduler, active audio producer,
+  timing/game mode, and a bounded warning tail.
+- Audit found no absolute private path, ROM/save content, or signing material.
+
+Automated and build proof
+-------------------------
+- gdx_touch_merge_tests: 87 sub-checks, 0 failures.
+- gdx_diagnostics_tests: all checks passed.
+- iOS Simulator Debug build: succeeded.
+- macOS sealed F0X.app rebuild: succeeded.
+- Unsigned arm64 iPhoneOS Debug build: succeeded.
+- iPhoneOS F0X executable: Mach-O 64-bit arm64.
+- Device bundle prohibited payload count: 0.
+- patches/gdiffuser-apple-macos.patch reverse-checks against the tested source.
+- patches/libultraship-apple-metal.patch reverse-checks against the tested source.
+- Both patches clean-applied to detached pinned worktrees; the editor and audio sources compared byte-for-byte.
+
+Boundary
+--------
+Simulator evidence does not establish physical multi-touch, ergonomics, haptics feel,
+speaker/headphone audibility, route/interruption behavior, signing, installation, thermals,
+or long-session physical-device acceptance.

@@ -1,15 +1,3 @@
-diff --git a/decomp b/decomp
---- a/decomp
-+++ b/decomp
-@@ -1 +1 @@
--Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809
-+Subproject commit f7fd0fd0242f8dfb5f357f604bb73b6a4e990809-dirty
-diff --git a/libultraship b/libultraship
---- a/libultraship
-+++ b/libultraship
-@@ -1 +1 @@
--Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71
-+Subproject commit a4919b181e637193f2b8ae975e31505abbf99e71-dirty
 diff --git a/port/AssetLoader.cpp b/port/AssetLoader.cpp
 index 789b053..a0cc2a8 100644
 --- a/port/AssetLoader.cpp
@@ -32,7 +20,7 @@ index 789b053..a0cc2a8 100644
      if ((key == nullptr) || (out == nullptr) || (outSize == 0)) {
          return 0;
 diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
-index cab4365..738c550 100644
+index cab4365..b4a3140 100644
 --- a/port/CMakeLists.txt
 +++ b/port/CMakeLists.txt
 @@ -5,6 +5,10 @@ if(NOT DEFINED PROJECT_NAME)
@@ -134,7 +122,15 @@ index cab4365..738c550 100644
      gdx_gui.cpp
      gdx_menu.cpp
      gdx_menu_registry.cpp
-@@ -282,11 +328,29 @@ add_executable(G-Diffuser
+@@ -274,6 +320,7 @@ add_executable(G-Diffuser
+     disk_savefile.cpp
+     gdx_ghost_io.c
+     gdx_ghost_window.cpp
++    gdx_input_editor_window.cpp
+     gdx_input_viewer.cpp
+     gdx_fps_overlay.cpp
+     gdx_perf.cpp
+@@ -282,11 +329,29 @@ add_executable(G-Diffuser
      gdx_imgui_nav.cpp
      gdx_workshop.cpp
      mio0_wrap.c
@@ -164,7 +160,7 @@ index cab4365..738c550 100644
  if(GDX_EXPANSION_KIT)
      # All four files reference EK-only symbols (gdx_ek_assets_fill, machine_create labels, EK
      # overlay .data), so they must not build in US-only configs.
-@@ -296,6 +360,94 @@ if(GDX_EXPANSION_KIT)
+@@ -296,6 +361,94 @@ if(GDX_EXPANSION_KIT)
      target_compile_definitions(G-Diffuser PRIVATE EXPANSION_KIT=1)
  endif()
  
@@ -259,7 +255,7 @@ index cab4365..738c550 100644
  target_compile_definitions(G-Diffuser PRIVATE ${GDX_DEV_TOOLS_DEFS} ${GDX_JP_INPUT_DEFS})
  
  if(WIN32)
-@@ -337,30 +489,38 @@ add_custom_command(
+@@ -337,30 +490,38 @@ add_custom_command(
  add_custom_target(gdiffuser_engine_o2r DEPENDS "${GDIFFUSER_ENGINE_O2R}")
  add_dependencies(G-Diffuser gdiffuser_engine_o2r)
  add_custom_command(TARGET G-Diffuser POST_BUILD
@@ -304,7 +300,7 @@ index cab4365..738c550 100644
      VERBATIM)
  
  # Keep the project license and every bundled/static dependency notice with binary releases.
-@@ -369,10 +529,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -369,10 +530,10 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
              "${CMAKE_SOURCE_DIR}/LICENSE"
              "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
@@ -317,7 +313,7 @@ index cab4365..738c550 100644
      VERBATIM)
  
  # gdx-extract, the standalone deterministic O2R extractor first boot spawns as a child process.
-@@ -381,48 +541,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -381,48 +542,53 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
  # clashes with libultraship's spdlog/fmt (docs/investigation/.../W0_TORCH_DEPENDENCIES.md).
  # GDX_DETERMINISTIC=ON => byte-identical archives for identical ROM + recipes. CMP0091=NEW lets
  # Torch's /MT runtime take effect so the exe needs no VC++ redist.
@@ -406,7 +402,7 @@ index cab4365..738c550 100644
  # The EK slice manifest ships beside the recipes so the runtime disk step can pass it to
  # `gdx-extract disk -m`.
  set(GDX_EK_SLICE_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/gen/ek_slice_manifest.txt")
-@@ -449,6 +614,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
+@@ -449,6 +615,25 @@ add_custom_command(TARGET G-Diffuser POST_BUILD
              --ek-yaml-dir "${CMAKE_SOURCE_DIR}/fzerox-expansion-kit/assets/yaml/jp"
      VERBATIM)
  
@@ -432,7 +428,7 @@ index cab4365..738c550 100644
  target_include_directories(G-Diffuser PRIVATE
      "${CMAKE_CURRENT_SOURCE_DIR}"   # for "resource/ResourceFactories.h"
      "${DECOMP}/include"
-@@ -457,7 +641,16 @@ target_include_directories(G-Diffuser PRIVATE
+@@ -457,7 +642,16 @@ target_include_directories(G-Diffuser PRIVATE
  )
  
  target_link_libraries(G-Diffuser PRIVATE cxd4_rsp)
@@ -450,7 +446,7 @@ index cab4365..738c550 100644
  
  if(WIN32)
      # user32: MessageBox; Comdlg32: ROM picker; Comctl32: extraction progress marquee.
-@@ -467,6 +660,9 @@ else()
+@@ -467,6 +661,9 @@ else()
      # (needed on older glibc, harmless on newer).
      find_package(Threads REQUIRED)
      target_link_libraries(G-Diffuser PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
@@ -460,7 +456,7 @@ index cab4365..738c550 100644
      # Release tarballs carry the dependencies no distribution can be relied on to provide in
      # lib/ beside the executable (tools/package_linux.sh). $ORIGIN resolves them at load time,
      # which beats a wrapper script because the binary stays directly runnable. No effect on a
-@@ -483,6 +679,8 @@ endif()
+@@ -483,6 +680,8 @@ endif()
  # host pointers and resolves host ranges by bit-pattern — all strict-aliasing-sensitive.
  if(NOT MSVC)
      target_compile_options(G-Diffuser PRIVATE -fno-strict-aliasing -fwrapv)
@@ -469,7 +465,7 @@ index cab4365..738c550 100644
      # Linux audio fix: the decomp's sinf/cosf were exported from .dynsym and interposed the ones
      # libSDL3's resampler imports -> silent/garbled audio. The version script localizes them so
      # libSDL3 gets glibc's. Full writeup in port/gdx_hide_libm.map.
-@@ -536,6 +734,42 @@ elseif(GDX_PORT_WARN_FLAGS)
+@@ -536,6 +735,42 @@ elseif(GDX_PORT_WARN_FLAGS)
      target_compile_options(gdx_vi_fallback_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
  endif()
  
@@ -512,7 +508,15 @@ index cab4365..738c550 100644
  # Wide-Gfx packing test: compiles only the real decomp gbi.h with the game's defines, so the
  # gSP*/gDP* macros under test are exactly the ones the game emits. Verifies w1 holds a full
  # 64-bit host pointer and a bridge-style reader recovers it. See tests/gfx_pack_tests.c.
-@@ -764,6 +998,8 @@ if(GDX_BUILD_JP)
+@@ -706,6 +941,7 @@ if(GDX_BUILD_JP)
+         disk_savefile.cpp
+         gdx_ghost_io.c
+         gdx_ghost_window.cpp
++        gdx_input_editor_window.cpp
+         gdx_input_viewer.cpp
+         gdx_fps_overlay.cpp
+         gdx_perf.cpp
+@@ -764,6 +1000,8 @@ if(GDX_BUILD_JP)
      endif()
      if(NOT MSVC)
          target_compile_options(G-Diffuser-JP PRIVATE -fno-strict-aliasing -fwrapv)
@@ -521,6 +525,82 @@ index cab4365..738c550 100644
          target_link_options(G-Diffuser-JP PRIVATE
              "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/gdx_hide_libm.map")
      endif()
+diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
+new file mode 100644
+index 0000000..f6ab8d2
+--- /dev/null
++++ b/port/F0X-Info.plist.in
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++    <key>CFBundleDevelopmentRegion</key>
++    <string>en</string>
++    <key>CFBundleExecutable</key>
++    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
++    <key>CFBundleIdentifier</key>
++    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
++    <key>CFBundleInfoDictionaryVersion</key>
++    <string>6.0</string>
++    <key>CFBundleName</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
++    <key>CFBundlePackageType</key>
++    <string>APPL</string>
++    <key>CFBundleShortVersionString</key>
++    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
++    <key>CFBundleVersion</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
++    <key>LSMinimumSystemVersion</key>
++    <string>13.0</string>
++    <key>NSHighResolutionCapable</key>
++    <true/>
++</dict>
++</plist>
+diff --git a/port/F0X-iOS-Info.plist.in b/port/F0X-iOS-Info.plist.in
+new file mode 100644
+index 0000000..6c57885
+--- /dev/null
++++ b/port/F0X-iOS-Info.plist.in
+@@ -0,0 +1,38 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++    <key>CFBundleDevelopmentRegion</key>
++    <string>en</string>
++    <key>CFBundleExecutable</key>
++    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
++    <key>CFBundleIdentifier</key>
++    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
++    <key>CFBundleInfoDictionaryVersion</key>
++    <string>6.0</string>
++    <key>CFBundleName</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
++    <key>CFBundlePackageType</key>
++    <string>APPL</string>
++    <key>CFBundleShortVersionString</key>
++    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
++    <key>CFBundleVersion</key>
++    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
++    <key>UIApplicationSupportsIndirectInputEvents</key>
++    <true/>
++    <key>UIRequiresFullScreen</key>
++    <true/>
++    <key>UILaunchScreen</key>
++    <dict/>
++    <key>UISupportedInterfaceOrientations</key>
++    <array>
++        <string>UIInterfaceOrientationLandscapeLeft</string>
++        <string>UIInterfaceOrientationLandscapeRight</string>
++    </array>
++    <key>UISupportedInterfaceOrientations~ipad</key>
++    <array>
++        <string>UIInterfaceOrientationLandscapeLeft</string>
++        <string>UIInterfaceOrientationLandscapeRight</string>
++    </array>
++</dict>
++</plist>
 diff --git a/port/decomp_port.c b/port/decomp_port.c
 index dc07873..f7e2c0e 100644
 --- a/port/decomp_port.c
@@ -553,6 +633,112 @@ index dc07873..f7e2c0e 100644
      gSegments[segment] = (unsigned long long)resolved;
      gdx_seg_log("SetAddr", segment, addr, resolved);
      return addr;
+diff --git a/port/gdx_audio_effects_source.c b/port/gdx_audio_effects_source.c
+new file mode 100644
+index 0000000..bf857f4
+--- /dev/null
++++ b/port/gdx_audio_effects_source.c
+@@ -0,0 +1,6 @@
++/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/effects.c. */
++#ifdef EXPANSION_KIT
++#include "../decomp/src/audio/disk/lib/effects.c"
++#else
++#include "../decomp/src/audio/rom/lib/effects.c"
++#endif
+diff --git a/port/gdx_audio_thread_source.c b/port/gdx_audio_thread_source.c
+new file mode 100644
+index 0000000..2438a4d
+--- /dev/null
++++ b/port/gdx_audio_thread_source.c
+@@ -0,0 +1,6 @@
++/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/thread.c. */
++#ifdef EXPANSION_KIT
++#include "../decomp/src/audio/disk/lib/thread.c"
++#else
++#include "../decomp/src/audio/rom/lib/thread.c"
++#endif
+diff --git a/port/gdx_console_log.cpp b/port/gdx_console_log.cpp
+index 0f7a027..d75da3b 100644
+--- a/port/gdx_console_log.cpp
++++ b/port/gdx_console_log.cpp
+@@ -11,6 +11,7 @@
+ #include "gdx_console_log.h"
+ 
+ #include <cstddef>
++#include <cstdio>
+ #include <deque>
+ #include <mutex>
+ #include <string>
+@@ -48,6 +49,17 @@ size_t sWindowLines = 0;
+ 
+ constexpr size_t kPendingCap = 1024; // lines held while no Console window exists yet
+ constexpr size_t kWindowCap = 2000;  // lines held by the window itself
++constexpr size_t kErrorTailCap = 16; // warn/error lines kept for the diagnostics report
++
++struct ErrorTail {
++    std::mutex mutex;
++    std::deque<std::string> lines;
++};
++
++ErrorTail& ErrorTailQueue() {
++    static ErrorTail* queue = new ErrorTail(); // never destroyed (see TheQueue note)
++    return *queue;
++}
+ 
+ void Push(const char* text, size_t length, spdlog::level::level_enum level) {
+     while (length > 0 && (text[length - 1] == '\n' || text[length - 1] == '\r')) {
+@@ -69,6 +81,15 @@ void Push(const char* text, size_t length, spdlog::level::level_enum level) {
+         queue.pending.pop_front();
+     }
+     queue.pending.push_back({ std::string(text, length), level });
++
++    if (level >= spdlog::level::warn) {
++        ErrorTail& tail = ErrorTailQueue();
++        std::lock_guard<std::mutex> lock(tail.mutex);
++        tail.lines.push_back(std::string(text, length));
++        if (tail.lines.size() > kErrorTailCap) {
++            tail.lines.pop_front();
++        }
++    }
+ }
+ 
+ class ConsoleSink final : public spdlog::sinks::base_sink<std::mutex> {
+@@ -136,3 +157,23 @@ void GdxConsoleLogDrain() {
+         ++sWindowLines;
+     }
+ }
++
++extern "C" void GdxConsoleLogErrorTail(char* out, int cap) {
++    if (out == nullptr || cap <= 0) {
++        return;
++    }
++    out[0] = '\0';
++    ErrorTail& tail = ErrorTailQueue();
++    std::lock_guard<std::mutex> lock(tail.mutex);
++    int used = 0;
++    for (const std::string& line : tail.lines) {
++        const int need = snprintf(out + used, (size_t) (cap - used), "%s\n", line.c_str());
++        if (need < 0 || used + need >= cap - 1) {
++            break; // truncate; the report is already bounded
++        }
++        used += need;
++    }
++    if (used > 0 && out[used - 1] == '\n') {
++        out[used - 1] = '\0';
++    }
++}
+diff --git a/port/gdx_console_log.h b/port/gdx_console_log.h
+index 30c68d3..58d95cf 100644
+--- a/port/gdx_console_log.h
++++ b/port/gdx_console_log.h
+@@ -6,3 +6,7 @@ void GdxConsoleLogInstall();
+ 
+ // Hands buffered lines to the Console window. ImGui thread only, once per frame.
+ void GdxConsoleLogDrain();
++
++// Copies the last N warning/error log lines into out (always NUL-terminated)
++// for the diagnostics report. Thread-safe; call from any thread.
++extern "C" void GdxConsoleLogErrorTail(char* out, int cap);
 diff --git a/port/gdx_diagnostics.c b/port/gdx_diagnostics.c
 new file mode 100644
 index 0000000..ce83d26
@@ -741,10 +927,10 @@ index 0000000..ce83d26
 +#endif
 diff --git a/port/gdx_diagnostics.h b/port/gdx_diagnostics.h
 new file mode 100644
-index 0000000..7a79a9c
+index 0000000..1a1eb51
 --- /dev/null
 +++ b/port/gdx_diagnostics.h
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,76 @@
 +// port/gdx_diagnostics.h — deterministic, privacy-safe diagnostic report core.
 +//
 +// The report builder is platform-neutral C so the same formatter runs in the
@@ -808,6 +994,12 @@ index 0000000..7a79a9c
 +// or the file was revealed; 0 with `err` filled on failure.
 +int gdx_diagnostics_share_apple(const char* report, const char* baseName,
 +                                char* err, int errCap);
++
++// Collects live in-game state (game mode, race frames, window/refresh/interp,
++// SDL joysticks, touch, archive/save, audio, error tail) and presents the
++// Share sheet with the privacy-scrubbed report. Implemented in main.cpp.
++// Returns 1 when a report was shared; 0 with `err` filled on failure.
++int gdx_diagnostics_share_runtime(char* err, int errCap);
 +#endif
 +
 +#ifdef __cplusplus
@@ -927,6 +1119,18 @@ index 0000000..d63c301
 +}
 +
 +} // extern "C"
+diff --git a/port/gdx_discord_stub.cpp b/port/gdx_discord_stub.cpp
+new file mode 100644
+index 0000000..2968a71
+--- /dev/null
++++ b/port/gdx_discord_stub.cpp
+@@ -0,0 +1,6 @@
++/* Discord desktop IPC is unavailable on iOS. Keep main-loop call sites platform-neutral. */
++extern "C" void gdx_discord_tick(void) {
++}
++
++extern "C" void gdx_discord_shutdown(void) {
++}
 diff --git a/port/gdx_dump_launch.cpp b/port/gdx_dump_launch.cpp
 index 3a04fc0..dd762a9 100644
 --- a/port/gdx_dump_launch.cpp
@@ -1995,6 +2199,179 @@ index 7255291..8c5aeb4 100644
 +F0XHomeAction GdxF0XHomeRun(const std::string& dataDir);
  
  } // namespace gdx
+diff --git a/port/gdx_firstboot_picker.mm b/port/gdx_firstboot_picker.mm
+new file mode 100644
+index 0000000..7ec09fa
+--- /dev/null
++++ b/port/gdx_firstboot_picker.mm
+@@ -0,0 +1,62 @@
++// Native macOS file-picker bridge for the in-window first-launch setup.
++
++#import <AppKit/AppKit.h>
++#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
++
++#include <string>
++
++namespace {
++
++std::string pickFile(NSString* title, NSArray<UTType*>* contentTypes) {
++    @autoreleasepool {
++        NSOpenPanel* panel = [NSOpenPanel openPanel];
++        panel.title = title;
++        panel.message = @"Choose a local game-data file. F0X copies it into its Application Support folder.";
++        panel.canChooseFiles = YES;
++        panel.canChooseDirectories = NO;
++        panel.allowsMultipleSelection = NO;
++        panel.allowedContentTypes = contentTypes;
++        if ([panel runModal] != NSModalResponseOK || panel.URL == nil) {
++            return {};
++        }
++        return panel.URL.path.UTF8String;
++    }
++}
++
++} // namespace
++
++namespace gdx {
++
++std::string GdxPickRomFileMacOS() {
++    return pickFile(@"Select your F-Zero X ROM (US rev0)", @[
++        [UTType typeWithFilenameExtension:@"z64"],
++        [UTType typeWithFilenameExtension:@"n64"],
++        [UTType typeWithFilenameExtension:@"v64"],
++    ]);
++}
++
++std::string GdxPickDiskFileMacOS() {
++    return pickFile(@"Select your F-Zero X Expansion Kit disk", @[
++        [UTType typeWithFilenameExtension:@"ndd"],
++    ]);
++}
++
++std::string GdxPickIplFileMacOS() {
++    return pickFile(@"Select your 64DD IPL ROM", @[
++        [UTType typeWithFilenameExtension:@"n64"],
++        [UTType typeWithFilenameExtension:@"z64"],
++    ]);
++}
++
++bool GdxRevealDataDirectoryMacOS(const std::string& path) {
++    @autoreleasepool {
++        if (path.empty()) {
++            return false;
++        }
++        NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]
++                               isDirectory:YES];
++        return url != nil && [[NSWorkspace sharedWorkspace] openURL:url];
++    }
++}
++
++} // namespace gdx
+diff --git a/port/gdx_firstboot_picker_ios.mm b/port/gdx_firstboot_picker_ios.mm
+new file mode 100644
+index 0000000..02f1e38
+--- /dev/null
++++ b/port/gdx_firstboot_picker_ios.mm
+@@ -0,0 +1,99 @@
++// Native iOS/iPadOS document-picker bridge for the first-launch setup.
++
++#import <UIKit/UIKit.h>
++#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
++
++#include <string>
++
++@interface GdxDocumentPickerDelegate : NSObject <UIDocumentPickerDelegate>
++@property(nonatomic, copy) NSURL* selectedURL;
++@property(nonatomic) BOOL finished;
++@end
++
++@implementation GdxDocumentPickerDelegate
++- (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
++    self.selectedURL = urls.firstObject;
++    self.finished = YES;
++}
++
++- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller {
++    self.finished = YES;
++}
++@end
++
++namespace {
++
++UIViewController* presentingViewController() {
++    UIWindow* window = nil;
++    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
++        if (scene.activationState == UISceneActivationStateForegroundActive &&
++            [scene isKindOfClass:UIWindowScene.class]) {
++            for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
++                if (candidate.isKeyWindow) {
++                    window = candidate;
++                    break;
++                }
++            }
++        }
++        if (window != nil) {
++            break;
++        }
++    }
++    UIViewController* controller = window.rootViewController;
++    while (controller.presentedViewController != nil) {
++        controller = controller.presentedViewController;
++    }
++    return controller;
++}
++
++std::string pickFile(NSArray<UTType*>* contentTypes) {
++    @autoreleasepool {
++        UIViewController* presenter = presentingViewController();
++        if (presenter == nil) {
++            return {};
++        }
++
++        GdxDocumentPickerDelegate* delegate = [[GdxDocumentPickerDelegate alloc] init];
++        UIDocumentPickerViewController* picker =
++            [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:NO];
++        picker.allowsMultipleSelection = NO;
++        picker.delegate = delegate;
++        [presenter presentViewController:picker animated:YES completion:nil];
++
++        while (!delegate.finished && UIApplication.sharedApplication.applicationState == UIApplicationStateActive) {
++            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
++                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
++        }
++
++        NSURL* url = delegate.selectedURL;
++        if (url == nil || ![url startAccessingSecurityScopedResource]) {
++            return {};
++        }
++        // Browse() validates and copies this path immediately. Keep its security scope alive for
++        // the remainder of this short setup process so the C++ copy remains authorized.
++        return url.fileSystemRepresentation;
++    }
++}
++
++UTType* typeForExtension(NSString* extension) {
++    UTType* type = [UTType typeWithFilenameExtension:extension];
++    return type != nil ? type : UTTypeData;
++}
++
++} // namespace
++
++namespace gdx {
++
++std::string GdxPickRomFileIOS() {
++    return pickFile(@[ typeForExtension(@"z64"), typeForExtension(@"n64"), typeForExtension(@"v64") ]);
++}
++
++std::string GdxPickDiskFileIOS() {
++    return pickFile(@[ typeForExtension(@"ndd") ]);
++}
++
++std::string GdxPickIplFileIOS() {
++    return pickFile(@[ typeForExtension(@"n64"), typeForExtension(@"z64") ]);
++}
++
++} // namespace gdx
 diff --git a/port/gdx_frame_pacer.c b/port/gdx_frame_pacer.c
 index d80931c..849e312 100644
 --- a/port/gdx_frame_pacer.c
@@ -2080,6 +2457,73 @@ index b4af69a..e870c2b 100644
      if (sFontStandard == nullptr) {
          sFontStandard = fallback;
      }
+diff --git a/port/gdx_input_editor_window.cpp b/port/gdx_input_editor_window.cpp
+new file mode 100644
+index 0000000..c683982
+--- /dev/null
++++ b/port/gdx_input_editor_window.cpp
+@@ -0,0 +1,41 @@
++#include "gdx_input_editor_window.h"
++
++#include <algorithm>
++
++#include <imgui.h>
++
++void GdxInputEditorWindow::Draw() {
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    if (!IsVisible()) {
++        return;
++    }
++
++    ImGuiViewport* viewport = ImGui::GetMainViewport();
++    if (viewport != nullptr) {
++        // The SDL/ImGui viewport already represents the UIKit drawable's safe
++        // content. A small visual gutter keeps the close affordance and scroll
++        // bar away from the device edge while using the width required by the
++        // editor's mapping rows on both iPhone and iPad landscape.
++        const float gutter = std::max(8.0f, ImGui::GetFontSize() * 0.75f);
++        const ImVec2 size(std::max(320.0f, viewport->WorkSize.x - gutter * 2.0f),
++                          std::max(240.0f, viewport->WorkSize.y - gutter * 2.0f));
++        ImGui::SetNextWindowPos(viewport->WorkPos + ImVec2(gutter, gutter), ImGuiCond_Always);
++        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
++        ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
++    }
++
++    // These values are scoped to this window and all of its sections. They
++    // preserve the existing desktop density while giving mobile controls a
++    // comfortable touch target and readable separation throughout.
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
++                        ImVec2(ImGui::GetFontSize() * 0.75f, ImGui::GetFontSize() * 0.75f));
++    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
++                        ImVec2(ImGui::GetFontSize() * 0.55f, ImGui::GetFontSize() * 0.38f));
++    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
++                        ImVec2(ImGui::GetFontSize() * 0.55f, ImGui::GetFontSize() * 0.45f));
++    LUS::InputEditorWindow::Draw();
++    ImGui::PopStyleVar(3);
++#else
++    LUS::InputEditorWindow::Draw();
++#endif
++}
+diff --git a/port/gdx_input_editor_window.h b/port/gdx_input_editor_window.h
+new file mode 100644
+index 0000000..48545c1
+--- /dev/null
++++ b/port/gdx_input_editor_window.h
+@@ -0,0 +1,14 @@
++#pragma once
++
++#include "libultraship/window/gui/InputEditorWindow.h"
++
++// F0X product wrapper around libultraship's binding editor. Desktop keeps the
++// upstream floating-window behavior; iOS/iPadOS gets a viewport-sized editor so
++// the same rows, popups, stick settings, rumble, gyro, and LED sections remain
++// usable instead of inheriting a stale narrow desktop window rectangle.
++class GdxInputEditorWindow final : public LUS::InputEditorWindow {
++  public:
++    using LUS::InputEditorWindow::InputEditorWindow;
++
++    void Draw() override;
++};
 diff --git a/port/gdx_input_script.c b/port/gdx_input_script.c
 index cef7cfb..1b79c48 100644
 --- a/port/gdx_input_script.c
@@ -2165,7 +2609,7 @@ index cef7cfb..1b79c48 100644
                  gdx_port_logf("[autotest] %s\n", cmd->text);
                  s_ip++;
 diff --git a/port/gdx_menu.cpp b/port/gdx_menu.cpp
-index e6d2ef7..ac0ca70 100644
+index e6d2ef7..7184f9c 100644
 --- a/port/gdx_menu.cpp
 +++ b/port/gdx_menu.cpp
 @@ -198,14 +198,16 @@ void GdxModifiedMarker(bool changed) {
@@ -2204,11 +2648,46 @@ index e6d2ef7..ac0ca70 100644
      // WORKSHOP. TexturePacks on lets the Tier-B shim (n64_gfx_bridge.cpp) rewrite a common-asset
      // load to a mounted pack's "textures/pack/<key>" resource.
      CVarRegisterInteger("gEnhancements.Workshop.TexturePacks", 0);
+@@ -1587,16 +1599,24 @@ void GdxMenu::DrawToolWindowPage(const char* name, const char* description) {
+         return;
+     }
+ 
+-    ImGui::TextWrapped("%s", description);
+     const bool poppedOut = window->IsVisible();
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    // The mobile editor is a dedicated full-viewport surface. Calling it "Pop
++    // out" makes it sound like a desktop window operation and leaves the real
++    // action below the fold on short iPhone landscape screens.
++    std::string buttonLabel = poppedOut ? std::string("Close ") + name + "##" + name
++                                        : std::string("Open ") + name + "##" + name;
++#else
+     std::string buttonLabel = poppedOut ? std::string("Return to menu##") + name
+                                         : std::string("Pop out ") + name + "##" + name;
++#endif
+     if (ImGui::Button(buttonLabel.c_str())) {
+         window->ToggleVisibility();
+     }
++    ImGui::TextWrapped("%s", description);
+     ImGui::Separator();
+     if (window->IsVisible()) {
+-        ImGui::TextDisabled("%s is open in a separate window.", name);
++        ImGui::TextDisabled("%s is open.", name);
+     } else {
+         window->DrawElement();
+     }
 diff --git a/port/gdx_menu_registry.cpp b/port/gdx_menu_registry.cpp
-index 6a59d4d..023cf87 100644
+index 6a59d4d..bb7aaec 100644
 --- a/port/gdx_menu_registry.cpp
 +++ b/port/gdx_menu_registry.cpp
-@@ -58,6 +58,13 @@ using namespace gdxmenu;
+@@ -47,6 +47,7 @@
+ #include "fast/Fast3dWindow.h"  // Fast::Fast3dWindow::SetTextureFilter + Fast::FilteringMode
+ 
+ #include "libultraship/bridge/consolevariablebridge.h"
++#include "port_log.h"
+ 
+ #include <cstdint>
+ #include <string>
+@@ -58,6 +59,16 @@ using namespace gdxmenu;
  // including the bridge header (this TU needs nothing else from it); the signature matches exactly.
  // Drives DISABLE_FOR_RACE_IN_PROGRESS.
  extern "C" int gdx_input_in_gameplay(void);
@@ -2219,10 +2698,13 @@ index 6a59d4d..023cf87 100644
 +extern "C" void gdx_touch_controls_begin_layout_editor(void);
 +extern "C" void gdx_touch_controls_reset_current_layout(void);
 +extern "C" void gdx_touch_controls_set_haptics_enabled(int enabled);
++#if defined(__APPLE__)
++extern "C" int gdx_diagnostics_share_runtime(char* err, int errCap);
++#endif
  
  // From port/n64_gfx_bridge.cpp: frame-interpolation telemetry for the "subframes last tick" line.
  extern "C" int gdx_gfx_interp_last_subframes(void);
-@@ -151,7 +158,8 @@ void GdxMenu::RegisterMenu() {
+@@ -151,7 +162,8 @@ void GdxMenu::RegisterMenu() {
                      "graphics internal resolution msaa texture filter vsync fullscreen z fighting");
      AddSidebarEntry("Settings", "Audio", 2, "audio lle hle filter low pass volume reverb latency buffer");
      AddSidebarEntry("Settings", "Controls", 1,
@@ -2232,7 +2714,33 @@ index 6a59d4d..023cf87 100644
      AddSidebarEntry("Settings", "Input Viewer", 2, "input viewer overlay analog stick buttons speedrun");
  
      AddSidebarEntry("Enhancements", "Visuals", 2,
-@@ -558,9 +566,99 @@ void GdxMenu::RegisterMenu() {
+@@ -224,6 +236,25 @@ void GdxMenu::RegisterMenu() {
+                   .CustomFunction([this](WidgetInfo&) { DrawAboutMenu(); })
+                   .SearchTerms("about version credits licenses expansion kit legal"));
+ 
++#if defined(__APPLE__)
++    AddWidget("Settings", "General", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Diagnostics", .type = GdxUI::WIDGET_SEPARATOR_TEXT });
++
++    AddWidget("Settings", "General", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Share Diagnostic Log", .type = GdxUI::WIDGET_BUTTON }
++                  .Options(UIWidgets::ButtonOptions().Tooltip(
++                      "Collects app/OS/device, renderer, game-data, input, scheduler, audio and "
++                      "timing state into a privacy-scrubbed text report and opens the Share sheet "
++                      "to send it."))
++                  .Callback([](WidgetInfo&) {
++                      char err[256] = {0};
++                      if (gdx_diagnostics_share_runtime(err, sizeof(err)) != 1) {
++                          gdx_port_logf("[diag] in-game share failed: %s\n", err);
++                      }
++                  })
++                  .SearchTerms("diagnostics share log report troubleshooting"));
++#endif
++
+     // ═════════════════════════════════════════════════════════════════════════════════════════
+     // SETTINGS -> Graphics
+     //
+@@ -558,9 +589,88 @@ void GdxMenu::RegisterMenu() {
  
      // ═════════════════════════════════════════════════════════════════════════════════════════
      // SETTINGS -> Controls
@@ -2319,17 +2827,6 @@ index 6a59d4d..023cf87 100644
 +                  })
 +                  .Callback([](WidgetInfo&) { gdx_touch_controls_begin_layout_editor(); })
 +                  .SearchTerms("editor move resize hide show customize layout"));
-+
-+    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
-+              WidgetInfo{ .name = "Reset Current Layout", .type = GdxUI::WIDGET_BUTTON }
-+                  .Options(UIWidgets::ButtonOptions().Tooltip(
-+                      "Removes the saved phone/tablet layout profile and rebuilds the current "
-+                      "device class from the built-in defaults."))
-+                  .PreFunc([](WidgetInfo& info) {
-+                      info.isHidden = !gdx_touch_controls_available();
-+                  })
-+                  .Callback([](WidgetInfo&) { gdx_touch_controls_reset_current_layout(); })
-+                  .SearchTerms("restore defaults reset profile"));
 +
      AddWidget("Settings", "Controls", SECTION_COLUMN_1,
                WidgetInfo{ .name = "Input Editor", .type = GdxUI::WIDGET_CUSTOM }
@@ -2542,10 +3039,10 @@ index 0000000..0d620f3
 +#endif // GDX_TOUCH_CONTROLS_H
 diff --git a/port/gdx_touch_controls_ios.mm b/port/gdx_touch_controls_ios.mm
 new file mode 100644
-index 0000000..4ef2a26
+index 0000000..025eadb
 --- /dev/null
 +++ b/port/gdx_touch_controls_ios.mm
-@@ -0,0 +1,1435 @@
+@@ -0,0 +1,1510 @@
 +// port/gdx_touch_controls_ios.mm — iOS/iPadOS UIKit touch-controls overlay.
 +//
 +// F0X-specific adaptation of the proven HarkinianPad product patterns
@@ -2826,6 +3323,7 @@ index 0000000..4ef2a26
 +    self.layer.cornerRadius = MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds)) * 0.5;
 +    const CGFloat knobSize = MIN(CGRectGetWidth(self.bounds), CGRectGetHeight(self.bounds)) * 0.43;
 +    self.knob.bounds = CGRectMake(0.0, 0.0, knobSize, knobSize);
++    self.knob.layer.cornerRadius = knobSize * 0.5;
 +    if (!_pressed) {
 +        self.knob.center = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
 +    }
@@ -2937,10 +3435,15 @@ index 0000000..4ef2a26
 +    { GDX_TOUCH_CTL_LOOK,     0.8669f, 0.3983f, 40.0f, 0.0f },  // C-up
 +    { GDX_TOUCH_CTL_CLEFT,    0.8239f, 0.4855f, 40.0f, 0.0f },  // C-left
 +    { GDX_TOUCH_CTL_SLIDE_L,  0.2425f, 0.4991f, 52.0f, 0.0f },  // Z
-+    { GDX_TOUCH_CTL_SLIDE_R,  0.9451f, 0.1443f, 76.0f, 44.0f }, // R pill
-+    { GDX_TOUCH_CTL_L,        0.0549f, 0.1443f, 76.0f, 44.0f }, // L pill
-+    { GDX_TOUCH_CTL_START,    0.8670f, 0.1443f, 44.0f, 0.0f },  // Start
-+    { GDX_TOUCH_CTL_DPAD,     0.0732f, 0.3980f, 44.0f, 0.0f },  // D-pad
++    // These four centers are the normalized result of HarkinianPad's compact
++    // safe-area rail math on the accepted iPhone 17 Pro landscape canvas
++    // (874 x 402 points, 62-point side insets). Keeping the entire controls,
++    // rather than only their centers, inside that rail prevents the R/Start
++    // collision and the clipped D-pad seen in IOS-TOUCH-VISUAL-01.
++    { GDX_TOUCH_CTL_SLIDE_R,  0.8741f, 0.1443f, 76.0f, 44.0f }, // R pill
++    { GDX_TOUCH_CTL_L,        0.1259f, 0.1443f, 76.0f, 44.0f }, // L pill
++    { GDX_TOUCH_CTL_START,    0.7963f, 0.1443f, 44.0f, 0.0f },  // Start
++    { GDX_TOUCH_CTL_DPAD,     0.1442f, 0.3980f, 44.0f, 0.0f },  // D-pad
 +};
 +
 +static const float kDpadRadius = 48.0f; // tablet center-to-button distance
@@ -3001,20 +3504,45 @@ index 0000000..4ef2a26
 +        _layoutNeedsProfileLoad = YES;
 +
 +        self.stick = [[GdxTouchStick alloc] initWithKey:@"0"];
-+        self.btnAccel = [[GdxTouchButton alloc] initWithLabel:@"ACCEL" bit:GDX_TOUCH_BTN_A key:@"1" pill:NO];
-+        self.btnBoost = [[GdxTouchButton alloc] initWithLabel:@"BOOST" bit:GDX_TOUCH_BTN_B key:@"2" pill:NO];
-+        self.btnBrake = [[GdxTouchButton alloc] initWithLabel:@"BRAKE" bit:GDX_TOUCH_BTN_CDOWN key:@"3" pill:NO];
-+        self.btnSlideL = [[GdxTouchButton alloc] initWithLabel:@"SLIDE L" bit:GDX_TOUCH_BTN_Z key:@"4" pill:YES];
-+        self.btnSlideR = [[GdxTouchButton alloc] initWithLabel:@"SLIDE R" bit:GDX_TOUCH_BTN_R key:@"5" pill:YES];
-+        self.btnStart = [[GdxTouchButton alloc] initWithLabel:@"START" bit:GDX_TOUCH_BTN_START key:@"6" pill:NO];
-+        self.btnView = [[GdxTouchButton alloc] initWithLabel:@"VIEW" bit:GDX_TOUCH_BTN_CRIGHT key:@"7" pill:NO];
-+        self.btnLook = [[GdxTouchButton alloc] initWithLabel:@"LOOK" bit:GDX_TOUCH_BTN_CUP key:@"8" pill:NO];
++        // Match the accepted HarkinianPad controller's concise N64-facing
++        // artwork. F-Zero-specific action names stay in accessibility below,
++        // where they remain descriptive without crowding 40–52 point faces.
++        self.btnAccel = [[GdxTouchButton alloc] initWithLabel:@"A" bit:GDX_TOUCH_BTN_A key:@"1" pill:NO];
++        self.btnBoost = [[GdxTouchButton alloc] initWithLabel:@"B" bit:GDX_TOUCH_BTN_B key:@"2" pill:NO];
++        self.btnBrake = [[GdxTouchButton alloc] initWithLabel:@"▼" bit:GDX_TOUCH_BTN_CDOWN key:@"3" pill:NO];
++        self.btnSlideL = [[GdxTouchButton alloc] initWithLabel:@"Z" bit:GDX_TOUCH_BTN_Z key:@"4" pill:NO];
++        self.btnSlideR = [[GdxTouchButton alloc] initWithLabel:@"R" bit:GDX_TOUCH_BTN_R key:@"5" pill:YES];
++        self.btnStart = [[GdxTouchButton alloc] initWithLabel:@"▶" bit:GDX_TOUCH_BTN_START key:@"6" pill:NO];
++        self.btnView = [[GdxTouchButton alloc] initWithLabel:@"▶" bit:GDX_TOUCH_BTN_CRIGHT key:@"7" pill:NO];
++        self.btnLook = [[GdxTouchButton alloc] initWithLabel:@"▲" bit:GDX_TOUCH_BTN_CUP key:@"8" pill:NO];
 +        self.btnCLeft = [[GdxTouchButton alloc] initWithLabel:@"C◀" bit:GDX_TOUCH_BTN_CLEFT key:@"9" pill:NO];
 +        self.btnL = [[GdxTouchButton alloc] initWithLabel:@"L" bit:GDX_TOUCH_BTN_L key:@"10" pill:YES];
 +        self.dUp = [[GdxTouchButton alloc] initWithLabel:@"▲" bit:GDX_TOUCH_BTN_DUP key:@"11" pill:NO];
 +        self.dDown = [[GdxTouchButton alloc] initWithLabel:@"▼" bit:GDX_TOUCH_BTN_DDOWN key:@"11" pill:NO];
 +        self.dLeft = [[GdxTouchButton alloc] initWithLabel:@"◀" bit:GDX_TOUCH_BTN_DLEFT key:@"11" pill:NO];
 +        self.dRight = [[GdxTouchButton alloc] initWithLabel:@"▶" bit:GDX_TOUCH_BTN_DRIGHT key:@"11" pill:NO];
++
++        self.btnAccel.accessibilityLabel = @"Accelerator";
++        self.btnAccel.accessibilityHint = @"N64 A; hold to accelerate";
++        self.btnBoost.accessibilityLabel = @"Boost";
++        self.btnBoost.accessibilityHint = @"N64 B; boost and menu cancel";
++        self.btnBrake.accessibilityLabel = @"Brake";
++        self.btnBrake.accessibilityHint = @"N64 C Down; hold to brake";
++        self.btnSlideL.accessibilityLabel = @"Slide Left";
++        self.btnSlideL.accessibilityHint = @"N64 Z; hold to slide or latch, tap for attacks";
++        self.btnSlideR.accessibilityLabel = @"Slide Right";
++        self.btnSlideR.accessibilityHint = @"N64 R; hold to slide, tap for attacks";
++        self.btnStart.accessibilityLabel = @"Start";
++        self.btnView.accessibilityLabel = @"View";
++        self.btnView.accessibilityHint = @"N64 C Right; change camera";
++        self.btnLook.accessibilityLabel = @"Look Back";
++        self.btnLook.accessibilityHint = @"N64 C Up; hold to look back";
++        self.btnCLeft.accessibilityLabel = @"C Left";
++        self.btnL.accessibilityLabel = @"L";
++        self.dUp.accessibilityLabel = @"D-pad Up";
++        self.dDown.accessibilityLabel = @"D-pad Down";
++        self.dLeft.accessibilityLabel = @"D-pad Left";
++        self.dRight.accessibilityLabel = @"D-pad Right";
 +
 +        [self.btnAccel setIdleColor:[UIColor colorWithRed:0.08 green:0.35 blue:0.88 alpha:0.58]
 +                       pressedColor:[UIColor colorWithRed:0.14 green:0.48 blue:1.00 alpha:0.88]];
@@ -3168,7 +3696,6 @@ index 0000000..4ef2a26
 +- (void)applyLayout {
 +    [self loadProfileIfNeeded];
 +    const BOOL compact = [self isCompact];
-+    const UIEdgeInsets safe = self.safeAreaInsets;
 +    const CGFloat width = CGRectGetWidth(self.bounds);
 +    const CGFloat height = CGRectGetHeight(self.bounds);
 +
@@ -3176,6 +3703,16 @@ index 0000000..4ef2a26
 +    const GdxBaseSpec* bases = compact ? kPhoneSpecs : kTabletSpecs;
 +    const int baseCount = compact ? (int)(sizeof(kPhoneSpecs) / sizeof(kPhoneSpecs[0]))
 +                                  : (int)(sizeof(kTabletSpecs) / sizeof(kTabletSpecs[0]));
++
++    const CGFloat labelSize = compact ? 15.0f : 18.0f;
++    for (UIView* control in self.editableControls) {
++        if ([control isKindOfClass:GdxTouchButton.class]) {
++            ((GdxTouchButton*)control).label.font =
++                [UIFont systemFontOfSize:labelSize weight:UIFontWeightSemibold];
++        }
++    }
++    self.btnStart.label.font =
++        [UIFont systemFontOfSize:labelSize weight:UIFontWeightBold];
 +
 +    for (int i = 0; i < baseCount; i++) {
 +        const GdxTouchControlSpec* spec = nullptr;
@@ -3220,6 +3757,12 @@ index 0000000..4ef2a26
 +    const CGFloat radius = (compact ? kDpadRadiusPhone : kDpadRadius) *
 +                           (compact ? size / 44.0f : size / 52.0f);
 +    const CGFloat buttonSize = size;
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGFloat extent = radius + buttonSize * 0.5f + 4.0f;
++    center.x = std::max(safe.left + extent,
++                        std::min(center.x, CGRectGetWidth(self.bounds) - safe.right - extent));
++    center.y = std::max(safe.top + extent,
++                        std::min(center.y, CGRectGetHeight(self.bounds) - safe.bottom - extent));
 +    NSArray<GdxTouchButton*>* group = @[ self.dUp, self.dDown, self.dLeft, self.dRight ];
 +    const CGPoint offsets[4] = {
 +        CGPointMake(0.0, -radius),
@@ -3487,8 +4030,8 @@ index 0000000..4ef2a26
 +        for (GdxTouchButton* button in @[ self.dUp, self.dDown, self.dLeft, self.dRight ]) {
 +            button.center =
 +                CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
-+            [self clampControlToSafeBounds:button];
 +        }
++        [self clampDpadGroupToSafeBounds];
 +        [gesture setTranslation:CGPointZero inView:self];
 +        [self recordGroupCenter];
 +    } else {
@@ -3497,6 +4040,33 @@ index 0000000..4ef2a26
 +        [gesture setTranslation:CGPointZero inView:self];
 +        [self clampControlToSafeBounds:control];
 +        [self recordCenter:control];
++    }
++}
++
++- (void)clampDpadGroupToSafeBounds {
++    NSArray<GdxTouchButton*>* group = @[ self.dUp, self.dDown, self.dLeft, self.dRight ];
++    CGRect bounds = CGRectNull;
++    for (GdxTouchButton* button in group) {
++        bounds = CGRectIsNull(bounds) ? button.frame : CGRectUnion(bounds, button.frame);
++    }
++    const UIEdgeInsets safe = self.safeAreaInsets;
++    const CGRect allowed = UIEdgeInsetsInsetRect(self.bounds,
++        UIEdgeInsetsMake(safe.top + 4.0, safe.left + 4.0,
++                         safe.bottom + 4.0, safe.right + 4.0));
++    CGFloat dx = 0.0;
++    CGFloat dy = 0.0;
++    if (CGRectGetMinX(bounds) < CGRectGetMinX(allowed)) {
++        dx = CGRectGetMinX(allowed) - CGRectGetMinX(bounds);
++    } else if (CGRectGetMaxX(bounds) > CGRectGetMaxX(allowed)) {
++        dx = CGRectGetMaxX(allowed) - CGRectGetMaxX(bounds);
++    }
++    if (CGRectGetMinY(bounds) < CGRectGetMinY(allowed)) {
++        dy = CGRectGetMinY(allowed) - CGRectGetMinY(bounds);
++    } else if (CGRectGetMaxY(bounds) > CGRectGetMaxY(allowed)) {
++        dy = CGRectGetMaxY(allowed) - CGRectGetMaxY(bounds);
++    }
++    for (GdxTouchButton* button in group) {
++        button.center = CGPointMake(button.center.x + dx, button.center.y + dy);
 +    }
 +}
 +
@@ -3699,25 +4269,22 @@ index 0000000..4ef2a26
 +    const CGFloat size = compact ? 44.0 : 38.0;
 +    const BOOL editing = sOverlay != nil && sOverlay.layoutEditing;
 +
-+    if (editing) {
++    if (editing || sMenuVisible) {
++        // Settings and every full-screen tool surface (including the popped-
++        // out Input Editor) own the whole interaction plane. The permanent
++        // gameplay menu affordance must not float over those controls.
 +        sMenuButton.hidden = YES;
 +        return;
 +    }
 +    sMenuButton.hidden = NO;
 +    if (compact) {
-+        // Phone: the HarkinianPad accepted slot — top-center during gameplay
-+        // (clear of the Dynamic Island, which sits at a landscape corner) and
-+        // bottom-center while the menu is open so it never covers the menu tabs.
-+        const CGFloat y =
-+            sMenuVisible ? height - safe.bottom - size - 8.0 : safe.top + 8.0;
-+        sMenuButton.frame =
-+            sMenuVisible
-+                ? CGRectMake(width * 0.5 - size * 0.5, y, size, size)
-+                : CGRectMake(width * 0.5 - size * 0.5, y, size, size);
++        // Phone: top-center during gameplay, clear of the Dynamic Island
++        // (which sits at a landscape corner).
++        const CGFloat y = safe.top + 8.0;
++        sMenuButton.frame = CGRectMake(width * 0.5 - size * 0.5, y, size, size);
 +        sMenuButton.autoresizingMask =
 +            UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin |
-+            (sMenuVisible ? UIViewAutoresizingFlexibleTopMargin
-+                          : UIViewAutoresizingFlexibleBottomMargin);
++            UIViewAutoresizingFlexibleBottomMargin;
 +    } else {
 +        // Tablet: upper-right safe area, clear of the menu content.
 +        sMenuButton.frame =
@@ -3770,6 +4337,11 @@ index 0000000..4ef2a26
 +            gdx_log_overlay_geometry(sOverlay);
 +            [sOverlay setTouchOpacity:sOpacity];
 +            [sOverlay beginLayoutEditing];
++            // HarkinianPad hides the permanent menu affordance for the entire
++            // editor session. gdx_install_menu_button() ran before the editor
++            // request was consumed, so hide it synchronously here rather than
++            // waiting for a later host tick to observe layoutEditing.
++            sMenuButton.hidden = YES;
 +            [window bringSubviewToFront:sOverlay];
 +            return;
 +        }
@@ -4349,10 +4921,28 @@ index 5900586..4b47908 100644
      // harnesses drive PORT 1 only; giving them a port argument would change their file formats.
      gdx_autoinput_apply(&buttons[0], &stick_x[0], &stick_y[0]);
 diff --git a/port/main.cpp b/port/main.cpp
-index 118ee0d..db667cb 100644
+index 118ee0d..f659cd0 100644
 --- a/port/main.cpp
 +++ b/port/main.cpp
-@@ -73,6 +73,11 @@ extern "C" void gdx_disk_save_tick(void);
+@@ -23,7 +23,7 @@
+ #include "gdx_gui.h"
+ #include "gdx_menu.h"
+ #include "libultraship/window/gui/GfxDebuggerWindow.h"
+-#include "libultraship/window/gui/InputEditorWindow.h"
++#include "gdx_input_editor_window.h"
+ #include "gdx_ghost_window.h"
+ #include "gdx_input_viewer.h"
+ #include "gdx_console_log.h"
+@@ -37,6 +37,8 @@
+ #include "gdx_extract_launch.h"
+ #include "gdx_audio_thread.h"
+ #include "gdx_frame_pacer.h"
++#include "gdx_diagnostics.h"
++#include "gdx_touch_controls.h"
+ #include "n64_gfx_bridge.h"
+ #include <SDL2/SDL.h>
+ 
+@@ -73,6 +75,11 @@ extern "C" void gdx_disk_save_tick(void);
  extern "C" void gdx_disk_save_flush(void);
  extern "C" void gdx_discord_tick(void);
  extern "C" void gdx_discord_shutdown(void);
@@ -4364,7 +4954,7 @@ index 118ee0d..db667cb 100644
  extern "C" void gdx_pcm_capture_init(void);
  extern "C" int  gdx_pcm_capture_finished(void);
  extern "C" void gdx_pcm_capture_shutdown(void);
-@@ -143,6 +148,29 @@ static double gdx_host_now_seconds(void) {
+@@ -143,6 +150,182 @@ static double gdx_host_now_seconds(void) {
      using namespace std::chrono;
      return duration<double>(steady_clock::now() - gGdxHostClockEpoch).count();
  }
@@ -4376,6 +4966,13 @@ index 118ee0d..db667cb 100644
 +static bool sRaceTimeProbeEnabled = false;
 +static uint64_t sRaceTimeProbeHostCount = 0;
 +
++// Decompiled game globals sampled by the race-time probe and the in-game
++// diagnostics collector. C++ linkage matches the gdiffuser_game objects the
++// port links (the decomp sources compile into that target as C++).
++extern s32 sRaceFrameCount;
++extern u32 gGameFrameCount;
++extern s32 gGameMode;
++
 +static void gdx_race_time_probe_tick(void) {
 +    if (!sRaceTimeProbeEnabled) {
 +        return;
@@ -4384,17 +4981,163 @@ index 118ee0d..db667cb 100644
 +    if ((sRaceTimeProbeHostCount & 0x3F) != 0) {
 +        return;
 +    }
-+    extern s32 sRaceFrameCount;
-+    extern u32 gGameFrameCount;
-+    extern s32 gGameMode;
 +    gdx_port_logf("[race-time-probe] host_s=%.3f mode=%d raceframes=%d gameframes=%u\n",
 +                  gdx_host_now_seconds(), (int) (gGameMode & 0x1F), (int) sRaceFrameCount,
 +                  (unsigned) gGameFrameCount);
 +}
++
++// In-game Share Diagnostic Log action: collects the live runtime state (game
++// mode, race frame counters, window/refresh/interpolation, SDL joysticks,
++// touch build, archive/save presence, audio thread, error tail) into the
++// privacy-scrubbed report and presents the platform Share sheet. Apple-only:
++// the report builder is neutral, the presentation is the share module.
++#if defined(__APPLE__)
++#include <TargetConditionals.h>
++
++extern "C" int gdx_diagnostics_share_runtime(char* err, int errCap) {
++    GdxDiagnosticsSource src;
++    memset(&src, 0, sizeof(src));
++    gdx_diagnostics_fill_platform(&src);
++    gdx_diagnostics_set_field(src.app, sizeof(src.app), "F0X (in-game menu)");
++    gdx_diagnostics_set_field(src.version, sizeof(src.version), "local build (main HEAD)");
++    gdx_diagnostics_set_field(src.build, sizeof(src.build),
++                              "Debug cartridge-only (GDX_EXPANSION_KIT=OFF)");
++#if TARGET_OS_OSX
++    gdx_diagnostics_set_field(src.dataDirClass, sizeof(src.dataDirClass),
++                              "user Application Support (mutable)");
++#else
++    gdx_diagnostics_set_field(src.dataDirClass, sizeof(src.dataDirClass),
++                              "app Documents (sandbox, mutable)");
++#endif
++
++    auto diagCtx = Ship::Context::GetInstance();
++    auto diagWindow = (diagCtx != nullptr) ? diagCtx->GetWindow() : nullptr;
++    if (diagWindow != nullptr) {
++        char buf[96];
++        snprintf(buf, sizeof(buf), "%ux%u", diagWindow->GetWidth(), diagWindow->GetHeight());
++        gdx_diagnostics_set_field(src.window, sizeof(src.window), buf);
++        snprintf(buf, sizeof(buf), "%u Hz (window)", diagWindow->GetCurrentRefreshRate());
++        gdx_diagnostics_set_field(src.refresh, sizeof(src.refresh), buf);
++        const int targetMode = CVarGetInteger("gEnhancements.Graphics.InterpTargetMode", 0);
++        const int targetFps = CVarGetInteger("gEnhancements.Graphics.InterpTargetFps", 120);
++        if (targetMode == 0) {
++            gdx_diagnostics_set_field(src.interpTarget, sizeof(src.interpTarget),
++                                      "Match Display refresh (interp)");
++        } else {
++            snprintf(buf, sizeof(buf), "%d Hz capped (interp)", targetFps);
++            gdx_diagnostics_set_field(src.interpTarget, sizeof(src.interpTarget), buf);
++        }
++    }
++
++    std::error_code diagEc;
++    const std::filesystem::path diagArchive = std::filesystem::current_path(diagEc) / "fzerox.o2r";
++    const std::filesystem::path diagSave =
++        std::filesystem::current_path(diagEc) / "saves" / "fzerox.sav";
++    if (std::filesystem::exists(diagArchive, diagEc) && !diagEc) {
++        char buf[160];
++        snprintf(buf, sizeof(buf), "fzerox.o2r present (%llu bytes)",
++                 (unsigned long long) std::filesystem::file_size(diagArchive, diagEc));
++        gdx_diagnostics_set_field(src.archive, sizeof(src.archive), buf);
++    } else {
++        gdx_diagnostics_set_field(src.archive, sizeof(src.archive),
++                                  "fzerox.o2r missing (game data not installed)");
++    }
++    if (std::filesystem::exists(diagSave, diagEc) && !diagEc) {
++        char buf[128];
++        snprintf(buf, sizeof(buf), "fzerox.sav present (%llu bytes)",
++                 (unsigned long long) std::filesystem::file_size(diagSave, diagEc));
++        gdx_diagnostics_set_field(src.save, sizeof(src.save), buf);
++    } else {
++        gdx_diagnostics_set_field(src.save, sizeof(src.save), "fzerox.sav not yet created");
++    }
++
++    if (SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) == 0) {
++        const int joysticks = SDL_NumJoysticks();
++        char buf[256];
++        int used = snprintf(buf, sizeof(buf), "%d SDL joystick(s)", joysticks);
++        for (int i = 0; i < joysticks && i < 3 && used > 0 && used < (int) sizeof(buf); i++) {
++            const char* name = SDL_JoystickNameForIndex(i);
++            const int need = snprintf(buf + used, (size_t) (sizeof(buf) - used),
++                                      i == 0 ? ": %s" : ", %s", name != nullptr ? name : "?");
++            if (need < 0 || used + need >= (int) sizeof(buf)) {
++                break;
++            }
++            used += need;
++        }
++        gdx_diagnostics_set_field(src.controllers, sizeof(src.controllers), buf);
++    } else {
++        gdx_diagnostics_set_field(src.controllers, sizeof(src.controllers),
++                                  "SDL joystick enumeration failed");
++    }
++    if (gdx_touch_controls_available()) {
++        char buf[160];
++        snprintf(buf, sizeof(buf), "UIKit overlay build; enabled=%d autoHideWithController=%d",
++                 CVarGetInteger("gSettings.Touch.Enabled", 1),
++                 CVarGetInteger("gSettings.Touch.AutoHideWithController", 1));
++        gdx_diagnostics_set_field(src.touch, sizeof(src.touch), buf);
++    } else {
++        gdx_diagnostics_set_field(src.touch, sizeof(src.touch),
++                                  "desktop stub (neutral, no overlay)");
++    }
++#if defined(_WIN32)
++    gdx_diagnostics_set_field(src.scheduler, sizeof(src.scheduler),
++                              "Win32 fibers (cooperative)");
++#else
++    gdx_diagnostics_set_field(src.scheduler, sizeof(src.scheduler),
++                              "ucontext (POSIX) cooperative fibers");
++#endif
++    {
++        char buf[160];
++        snprintf(buf, sizeof(buf), "dedicated producer thread: %s",
++                 gdx_audio_thread_active() ? "active" : "legacy fiber path");
++        gdx_diagnostics_set_field(src.audio, sizeof(src.audio), buf);
++    }
++    {
++        char buf[160];
++        if (gGdxSimHzMeasured > 0.0) {
++            snprintf(buf, sizeof(buf), "race frames=%d game frames=%u sim_hz=%.1f",
++                     (int) sRaceFrameCount, (unsigned) gGameFrameCount, gGdxSimHzMeasured);
++        } else {
++            snprintf(buf, sizeof(buf), "race frames=%d game frames=%u",
++                     (int) sRaceFrameCount, (unsigned) gGameFrameCount);
++        }
++        gdx_diagnostics_set_field(src.timing, sizeof(src.timing), buf);
++    }
++    {
++        char buf[64];
++        snprintf(buf, sizeof(buf), "game mode %d (0x%x)", (int) (gGameMode & 0x1F),
++                 (int) (gGameMode & 0x1F));
++        gdx_diagnostics_set_field(src.gameMode, sizeof(src.gameMode), buf);
++    }
++    {
++        char tail[512];
++        GdxConsoleLogErrorTail(tail, sizeof(tail));
++        if (tail[0] == '\0') {
++            gdx_diagnostics_set_field(src.errors, sizeof(src.errors),
++                                      "no warnings/errors in the recent log tail");
++        } else {
++            gdx_diagnostics_set_field(src.errors, sizeof(src.errors), tail);
++        }
++    }
++    gdx_diagnostics_set_field(src.notes, sizeof(src.notes),
++                              "Collected in-game; ROM/save contents, signing material and private paths are excluded.");
++
++    char report[GDX_DIAG_MAX_REPORT];
++    const int n = gdx_diagnostics_build_report(&src, report, sizeof(report));
++    if (gdx_diagnostics_share_apple(report, "F0X-Diagnostics", err, errCap) != 1) {
++        if (err != nullptr && err[0] == '\0' && errCap > 0) {
++            snprintf(err, (size_t) errCap, "share sheet unavailable");
++        }
++        return 0;
++    }
++    gdx_port_logf("[diag] shared %d-byte runtime diagnostic report\n", n);
++    return 1;
++}
++#endif
  // Hold the host thread until `deadlineSeconds` (same base as gdx_host_now_seconds). No-op if the
  // presents already spent the tick budget (VSync-on case). Keeps the SIM locked to 60 Hz when the
  // sub-frame loop finished early (VSync-off case) — this is interpolation's logic pacer.
-@@ -467,6 +495,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
+@@ -467,6 +650,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
      return 1;
  }
  
@@ -4464,7 +5207,7 @@ index 118ee0d..db667cb 100644
  // Deliberately no single-port variant: looping one over four ports would silently break the
  // wheel buffer and input-lag deque described above.
  
-@@ -498,6 +589,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
+@@ -498,6 +744,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
          ec.clear();
      }
  
@@ -4478,7 +5221,7 @@ index 118ee0d..db667cb 100644
      for (std::filesystem::path dir = start; !dir.empty(); dir = dir.parent_path()) {
          roots.push_back(dir);
          roots.push_back(dir / "assets" / "extracted");
-@@ -662,7 +760,7 @@ int main(int argc, char** argv) {
+@@ -662,7 +915,7 @@ int main(int argc, char** argv) {
      }
  
      logStep("CreateUninitializedInstance");
@@ -4487,7 +5230,7 @@ index 118ee0d..db667cb 100644
                                                            "gdiffuser.cfg.json");
      if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
  
-@@ -702,7 +800,15 @@ int main(int argc, char** argv) {
+@@ -702,7 +955,15 @@ int main(int argc, char** argv) {
      logStep("ControlDeck::Init");     controlDeck->Init(&sGdxControllerBits);
  
      // ResourceManager MUST init before the window is constructed/inited.
@@ -4504,7 +5247,16 @@ index 118ee0d..db667cb 100644
      for (const auto& archivePath : archivePaths) {
          gdx_port_logf("[G-Diffuser] archive: %s\n", archivePath.c_str());
      }
-@@ -919,6 +1025,34 @@ int main(int argc, char** argv) {
+@@ -826,7 +1087,7 @@ int main(int argc, char** argv) {
+         // port target (cvars.cmake is include()d only inside libultraship/src).
+         pgui->AddGuiWindow(std::make_shared<LUS::GfxDebuggerWindow>("gGfxDebuggerEnabled", "Gfx Debugger"));
+         pgui->AddGuiWindow(
+-            std::make_shared<LUS::InputEditorWindow>("gControllerConfigurationEnabled", "Input Editor"));
++            std::make_shared<GdxInputEditorWindow>("gControllerConfigurationEnabled", "Input Editor"));
+         pgui->AddGuiWindow(
+             std::make_shared<GdxGhostWindow>("gEnhancements.Practice.GhostBrowserOpen", "Ghost Browser"));
+         pgui->AddGuiWindow(std::make_shared<GdxInputViewer>());
+@@ -919,6 +1180,34 @@ int main(int argc, char** argv) {
          firstBoot.status = gdx::FirstBootStatus::SetupComplete;
      }
  
@@ -4539,7 +5291,7 @@ index 118ee0d..db667cb 100644
      // Safe this early: the thread internally waits for gAudioContextInitialized (set once decomp's
      // Audio_Init runs, well after bootproc() below) before producing anything.
      logStep("gdx_audio_thread_start()");
-@@ -1076,6 +1210,12 @@ int main(int argc, char** argv) {
+@@ -1076,6 +1365,12 @@ int main(int argc, char** argv) {
      // FrameInterpolation is on.
      gdx_gfx_interp_set_now_fn(&gdx_host_now_seconds);
  
@@ -4552,7 +5304,7 @@ index 118ee0d..db667cb 100644
      logStep("entering frame loop");
      auto w = ctx->GetWindow();
      while (w != nullptr && w->IsRunning()) {
-@@ -1090,6 +1230,29 @@ int main(int argc, char** argv) {
+@@ -1090,6 +1385,38 @@ int main(int argc, char** argv) {
          // and the window manager crashes.
          w->HandleEvents();
          gdx::PerfPhaseEnd(gdx::PerfEvents);
@@ -4570,6 +5322,15 @@ index 118ee0d..db667cb 100644
 +                if (menu != nullptr) {
 +                    menuVisible = menu->IsVisible();
 +                }
++                // A popped-out Input Editor is another full-screen mobile
++                // interaction surface. Treat it like the menu so gameplay
++                // controls cannot render over bindings or emit N64 input while
++                // the user edits them. Embedded mode is already covered by the
++                // visible menu above.
++                auto inputEditor = gui->GetGuiWindow("Input Editor");
++                if (inputEditor != nullptr && inputEditor->IsVisible()) {
++                    menuVisible = true;
++                }
 +            }
 +            const int touchEnabled = CVarGetInteger("gSettings.Touch.Enabled", 1);
 +            const float touchOpacity = CVarGetFloat("gSettings.Touch.Opacity", 0.55f);
@@ -4582,7 +5343,7 @@ index 118ee0d..db667cb 100644
          gdx::PerfPhaseBegin(gdx::PerfInput);
          gdx_controller_poll();
          // Must publish the editor fixed-aspect state before this frame's gfx task runs below:
-@@ -1232,6 +1395,23 @@ int main(int argc, char** argv) {
+@@ -1232,6 +1559,23 @@ int main(int argc, char** argv) {
          gdx_gfx_interp_tick_config(interpOn ? 1 : 0, interpTickStart, kGdxInterpTickSeconds,
                                     interpMaxSubframes);
  
@@ -4606,7 +5367,7 @@ index 118ee0d..db667cb 100644
          // The game frame ACTUALLY runs here, not in gdx_dispatch() below. gdx_vi_tick posts the VI
          // retrace message, which wakes the Main scheduler thread and dispatches the game fiber
          // inline (osSendMesg -> osStartThread -> __osDispatchThread, because __osRunningThread is
-@@ -1250,14 +1430,6 @@ int main(int argc, char** argv) {
+@@ -1250,14 +1594,6 @@ int main(int argc, char** argv) {
          if (!interpOn) {
              // Default path: one tick, one Run, one present, paced by the frame pacer. Nothing on
              // this branch touches the interpolation machinery.
@@ -4621,7 +5382,7 @@ index 118ee0d..db667cb 100644
              gdx::PerfPhaseBegin(gdx::PerfDispatch);
              gdx_dispatch();  // run the decomp's game threads cooperatively until they block again
              gdx::PerfPhaseEnd(gdx::PerfDispatch);
-@@ -1269,6 +1441,7 @@ int main(int argc, char** argv) {
+@@ -1269,6 +1605,7 @@ int main(int argc, char** argv) {
              // staleness notes), so this is the only window where a sample reflects this frame's
              // post-update truth.
              gdx_discord_tick();
@@ -4629,7 +5390,7 @@ index 118ee0d..db667cb 100644
              gdx::PerfPhaseEnd(gdx::PerfTicks);
              gdx::PerfPhaseBegin(gdx::PerfPresent);
              // Presents the VI framebuffer's pixels when no GFX task rendered this frame (boot logo
-@@ -1296,6 +1469,7 @@ int main(int argc, char** argv) {
+@@ -1296,6 +1633,7 @@ int main(int argc, char** argv) {
              gdx::PerfPhaseBegin(gdx::PerfTicks);
              gdx_disk_save_tick();
              gdx_discord_tick(); // post-dispatch sample; see the non-interp branch's note
@@ -4637,7 +5398,7 @@ index 118ee0d..db667cb 100644
              gdx::PerfPhaseEnd(gdx::PerfTicks);
              gdx::PerfPhaseBegin(gdx::PerfPresent);
              if (gdx_gfx_interp_presented_last_tick() == 0) {
-@@ -1441,5 +1615,7 @@ int main(int argc, char** argv) {
+@@ -1441,5 +1779,7 @@ int main(int argc, char** argv) {
      // the file and folds the SHA, so it must not race a still-running audio thread calling feed().
      gdx_audio_thread_stop();
      gdx_pcm_capture_shutdown();
@@ -5314,9 +6075,3 @@ index f5f427a..2f4ebca 100644
 +  "source_sha256": "7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a",
    "total_entries": 3610
  }
-diff --git a/torch b/torch
---- a/torch
-+++ b/torch
-@@ -1 +1 @@
--Subproject commit c1bdc6fde97fbaa4495c9e859f635290840a12d3
-+Subproject commit c1bdc6fde97fbaa4495c9e859f635290840a12d3-dirty

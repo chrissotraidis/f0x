@@ -43,8 +43,14 @@ core on 2026-08-12 (evidence: `docs/evidence/touch-ios/2026-08-12.txt`).
   (`F0X.TouchLayout.tablet-v1`, D-pad y=0.318030 vs code default 0.6058)
   survives relaunch and drives the live overlay. See
   `docs/evidence/touch-ios-live/2026-08-12-live-captures.txt`.
-- Physical-device multi-touch acceptance and a fresh phone-defaults re-run on
-  a phone Simulator remain open.
+- On 2026-08-13, live iPad and iPhone Simulator acceptance closed the visual
+  formatting gate. Compact N64 glyphs carry semantic accessibility labels;
+  the phone rails/D-pad are separated and safe-clamped; the stick knob is
+  round; the duplicate Settings reset row is gone. The libultraship Input
+  Editor now fills the safe viewport, aligns mapping rows, uses two primary
+  columns on iPad and one on iPhone, keeps all lower device sections, and
+  suppresses gameplay controls plus ••• until closed. Physical-device
+  multi-touch acceptance remains open.
 
 Claim touch as Simulator-verified only for the control set and game flow above;
 physical acceptance remains open.
