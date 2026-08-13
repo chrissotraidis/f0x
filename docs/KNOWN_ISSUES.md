@@ -34,15 +34,19 @@
   producer active, and live BGM synthesis. This closes the silent Null-player
   root cause without an F0X-only override. Speaker/headphone audibility,
   route changes, interruptions, and physical hardware remain unverified.
-- **IOS-GFX-CRASH-01 — Simulator race crash in the display-list bridge
-  (under investigation):** a live iPhone 17 Pro Simulator race crashed with
-  `EXC_BAD_ACCESS` at `0x1e0` in
-  `N64DisplayListAdapter::ProcessList` ->
-  `gConvertedWideIsF3d.find()` (n64_gfx_bridge.cpp:5155) on the main thread.
-  The map is written only on the host thread; the failing dereference suggests
-  heap corruption or freed-node reuse. Reproduction was interrupted; guard-
-  malloc instrumentation and a smallest regression are the next steps. Not
-  caused by this turn's edits (bridge untouched by the F0X patch series).
+- **IOS-GFX-CRASH-01 — resolved in Simulator; physical long-session proof
+  remains under IOS-HARDWARE-01:** the failing design kept converted display-
+  list dialect metadata in a second pointer-keyed `unordered_map`, independent
+  of the cache entry that owns, rebuilds, and evicts the converted vector. The
+  iPhone 17 Pro Simulator crash occurred in that side map's `find()` at address
+  `0x1e0`. Dialect now lives in the same `GfxWideCache::Entry`; each queued list
+  carries the cache result by value, and the side map is gone. A focused test
+  covers stamp rebuilds, 513-entry stale eviction, and post-eviction rebuild.
+  The rebuilt app completed a 5:16 scripted race/retire/next-course soak under
+  `MallocGuardEdges`, `MallocPreScribble`, and `MallocScribble`, more than twice
+  the old ~2:20 failure window, with no crash report. `MallocStackLogging` is
+  not valid for this runtime: its unwinder independently faults while walking
+  the custom `ucontext` fiber stack, before the target display-list path.
 - **IOS-TOUCH-VISUAL-01 — resolved in Simulator; physical acceptance remains
   under IOS-HARDWARE-01:** live iPad and iPhone 17 Pro acceptance on
   2026-08-13 replaced the long/colliding action labels with compact N64 glyphs

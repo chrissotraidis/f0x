@@ -1,0 +1,39 @@
+IOS-GFX-CRASH-01 — Simulator cache-lifetime verification
+Date: 2026-08-13
+Device: iPhone 17 Pro Simulator, arm64, iOS 26.5
+
+Source regression
+-----------------
+- gdx_gfx_convert_tests: ALL PASS
+- Covers dialect metadata across stamp rebuilds, 513 cached lists, stale
+  eviction after 601 frames, and post-eviction rebuild.
+- Source diff check: pass.
+
+Runtime soak
+------------
+- Exact rebuilt Debug-iphonesimulator F0X.app installed after the source fix.
+- One F0X process, archive-only launch.
+- GDX_INPUT_SCRIPT=scripts/macos-wallhug-probe.gdx
+- MallocGuardEdges=1
+- MallocPreScribble=1
+- MallocScribble=1
+- Observed duration before intentional termination: 5:16.
+- Final app log markers:
+  wallhug_probe_segment_done
+  wallhug_probe_saw_next_course
+  wallhug_probe_saw_machine_settings
+  wallhug_probe_saw_race_again
+- New F0X crash reports during the run: 0.
+
+Negative instrumentation finding
+--------------------------------
+MallocStackLogging is incompatible with this runtime's custom ucontext fiber
+stack. It causes an independent pre-target fault in thread_stack_pcs while a
+fiber-originated console log allocates a C++ string. It was therefore excluded
+from the valid graphics soak; guard edges and allocation scribbling remained
+enabled.
+
+Claim boundary
+--------------
+This resolves the reproducible Simulator crash and does not establish physical
+iPhone/iPad long-session, thermal, memory-pressure, or interruption acceptance.

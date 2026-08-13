@@ -1,8 +1,8 @@
 # F0X exact next-builder handoff
 
-Last reconciled: 2026-08-13 from repository `main` commit `47c9727`, with the
-verified touch/Input Editor/audio/diagnostics unit recorded in the maintained
-patches and this handoff.
+Last reconciled: 2026-08-13 from repository `main` commit `8672a1b`, with the
+verified touch/Input Editor/audio/diagnostics unit committed and the subsequent
+IOS-GFX-CRASH-01 fix recorded in the maintained patch and this handoff.
 
 ## Read order
 
@@ -65,10 +65,8 @@ the exact evidence artifact before relying on a path or process ID.
 - Owner confirmation that the exact corrected current bundle no longer flashes.
 - Audible macOS/mobile speakers/headphones and route/interruption behavior on
   physical hardware. The Simulator SDL device now opens and synthesis runs.
-- A live iPhone 17 Pro Simulator race crashed in the display-list bridge
-  (IOS-GFX-CRASH-01): `gConvertedWideIsF3d.find()` dereferenced 0x1e0; the
-  crash is under investigation (repro with guard malloc, then smallest
-  regression + fix).
+- Physical-device long-session confirmation of the Simulator-resolved
+  IOS-GFX-CRASH-01 display-list cache fix.
 - Mobile lifecycle pause/resume/persistence.
 - Correct 60 Hz timing evidence and high-refresh acceptance.
 - Release signing/notarization/re-signable package workflow.
@@ -89,7 +87,8 @@ the exact evidence artifact before relying on a path or process ID.
 ## Maintained Apple source state (2026-08-13)
 
 The tested ignored checkout contains the following Apple-side implementation,
-all represented by the regenerated maintained patches:
+all represented by the regenerated maintained patches, plus the display-list
+cache lifetime fix described below:
 
 - `port/gdx_console_log.{h,cpp}` — warn/error tail ring
   (`GdxConsoleLogErrorTail`) for the diagnostics report.
@@ -109,17 +108,20 @@ prohibited files.
 
 ## Highest-priority actionable work
 
-1. **Reproduce and fix IOS-GFX-CRASH-01.** Relaunch the rebuilt app on the
-   iPhone 17 Pro Simulator with `SIMCTL_CHILD_MallocGuardEdges=1`,
-   `SIMCTL_CHILD_MallocStackLogging=1`, and `SIMCTL_CHILD_GUARD_MALLOC=1`, let
-   the race run ~3 min, and find the write that clobbers the
-   `gConvertedWideIsF3d` heap nodes (or prove a lifetime/thread bug). Add the
-   smallest falsifiable regression, fix, re-run, and document. The bridge is
-   untouched by the F0X patches, so suspect the converted-wide/asset pipeline
-   or a freed-node reuse in the display-list walk.
-2. Then continue the remaining queue: physical iPad/iPhone acceptance
-   (externally blocked here), representative-course 60 Hz measurement,
-   high refresh, packaging, README, Expansion Kit.
+1. Continue the locally actionable queue: representative-course 60 Hz
+   measurement, high-refresh behavior, packaging, README, and Expansion Kit.
+2. Resume physical iPad/iPhone acceptance when a device and signing identity
+   are available; this remains externally blocked on this host.
+
+IOS-GFX-CRASH-01 is Simulator-resolved. Converted-wide dialect metadata now
+lives inside `GfxWideCache::Entry` and is copied into each queued list, instead
+of using the independently allocated `gConvertedWideIsF3d` side map that
+failed in `find()`. `gdx_gfx_convert_tests` covers stamp rebuild, 513-entry
+stale eviction, and post-eviction rebuild. The rebuilt iPhone 17 Pro Simulator
+survived 5:16 of the scripted wall-hug race/transition route under guard edges
+and allocation scribbling with no crash report. Do not enable
+`MallocStackLogging`: its stack unwinder independently faults on the custom
+`ucontext` fiber stack before this graphics path executes.
 
 Do not regress the verified core: `gdx_touch_merge_tests` (87 checks), the
 macOS sealed-bundle race route, the unsigned iPhoneOS build, and the

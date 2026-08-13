@@ -904,3 +904,32 @@ extraction golden plus all-black internal BMP readback as separate gates.
   audio rule byte-for-byte.
 - **Boundary:** physical audible output, audio route/interruption behavior,
   and physical Share-sheet acceptance remain open.
+
+## 2026-08-13 — IOS-GFX-CRASH-01 cache-lifetime regression and guarded soak
+
+- **Original failure:** the iPhone 17 Pro Simulator crashed after roughly 2:20
+  of live race execution with `EXC_BAD_ACCESS` at `0x1e0` in
+  `N64DisplayListAdapter::ProcessList`, specifically the lookup in the global
+  `gConvertedWideIsF3d` side map.
+- **Falsifiable regression:** `gdx_gfx_convert_tests` now requires dialect
+  metadata to follow the converted cache entry across two stamp rebuilds,
+  population beyond the 512-entry high-water mark, 601 stale frames, eviction
+  of all 513 entries, and a post-eviction rebuild. The test would not compile
+  against the previous API and passes on the repaired implementation.
+- **Implementation:** `GfxWideCache::Entry` owns `isF3d`; the cache returns the
+  vector and dialect together, and `N64DisplayListAdapter::QueueItem` copies
+  the dialect for its own work item. The independent pointer-keyed map and its
+  allocation/lifetime boundary were removed.
+- **Guarded runtime proof:** rebuilt iPhone 17 Pro Simulator app, archive-only,
+  scripted `macos-wallhug-probe.gdx` route, one F0X process, allocator
+  `MallocGuardEdges=1`, `MallocPreScribble=1`, and `MallocScribble=1`. It ran
+  for 5:16, logged race completion of the probe segment and transitions through
+  next course, machine settings, and race again, and was then terminated
+  intentionally. No new F0X crash report was created.
+- **Instrumentation boundary:** enabling `MallocStackLogging` creates a
+  different immediate crash in `thread_stack_pcs` while its unwinder walks the
+  custom `ucontext` fiber stack during a console-log allocation. That report
+  never reaches the target graphics path, so stack logging is excluded from
+  the valid soak rather than misreported as an IOS-GFX-CRASH-01 recurrence.
+- **Boundary:** this closes the reproducible Simulator failure. Physical-device
+  long-session, memory pressure, thermal, and interruption proof remain open.

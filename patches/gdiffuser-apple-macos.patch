@@ -525,82 +525,6 @@ index cab4365..b4a3140 100644
          target_link_options(G-Diffuser-JP PRIVATE
              "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/gdx_hide_libm.map")
      endif()
-diff --git a/port/F0X-Info.plist.in b/port/F0X-Info.plist.in
-new file mode 100644
-index 0000000..f6ab8d2
---- /dev/null
-+++ b/port/F0X-Info.plist.in
-@@ -0,0 +1,26 @@
-+<?xml version="1.0" encoding="UTF-8"?>
-+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-+<plist version="1.0">
-+<dict>
-+    <key>CFBundleDevelopmentRegion</key>
-+    <string>en</string>
-+    <key>CFBundleExecutable</key>
-+    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
-+    <key>CFBundleIdentifier</key>
-+    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
-+    <key>CFBundleInfoDictionaryVersion</key>
-+    <string>6.0</string>
-+    <key>CFBundleName</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
-+    <key>CFBundlePackageType</key>
-+    <string>APPL</string>
-+    <key>CFBundleShortVersionString</key>
-+    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
-+    <key>CFBundleVersion</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
-+    <key>LSMinimumSystemVersion</key>
-+    <string>13.0</string>
-+    <key>NSHighResolutionCapable</key>
-+    <true/>
-+</dict>
-+</plist>
-diff --git a/port/F0X-iOS-Info.plist.in b/port/F0X-iOS-Info.plist.in
-new file mode 100644
-index 0000000..6c57885
---- /dev/null
-+++ b/port/F0X-iOS-Info.plist.in
-@@ -0,0 +1,38 @@
-+<?xml version="1.0" encoding="UTF-8"?>
-+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-+<plist version="1.0">
-+<dict>
-+    <key>CFBundleDevelopmentRegion</key>
-+    <string>en</string>
-+    <key>CFBundleExecutable</key>
-+    <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
-+    <key>CFBundleIdentifier</key>
-+    <string>@MACOSX_BUNDLE_GUI_IDENTIFIER@</string>
-+    <key>CFBundleInfoDictionaryVersion</key>
-+    <string>6.0</string>
-+    <key>CFBundleName</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_NAME@</string>
-+    <key>CFBundlePackageType</key>
-+    <string>APPL</string>
-+    <key>CFBundleShortVersionString</key>
-+    <string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>
-+    <key>CFBundleVersion</key>
-+    <string>@MACOSX_BUNDLE_BUNDLE_VERSION@</string>
-+    <key>UIApplicationSupportsIndirectInputEvents</key>
-+    <true/>
-+    <key>UIRequiresFullScreen</key>
-+    <true/>
-+    <key>UILaunchScreen</key>
-+    <dict/>
-+    <key>UISupportedInterfaceOrientations</key>
-+    <array>
-+        <string>UIInterfaceOrientationLandscapeLeft</string>
-+        <string>UIInterfaceOrientationLandscapeRight</string>
-+    </array>
-+    <key>UISupportedInterfaceOrientations~ipad</key>
-+    <array>
-+        <string>UIInterfaceOrientationLandscapeLeft</string>
-+        <string>UIInterfaceOrientationLandscapeRight</string>
-+    </array>
-+</dict>
-+</plist>
 diff --git a/port/decomp_port.c b/port/decomp_port.c
 index dc07873..f7e2c0e 100644
 --- a/port/decomp_port.c
@@ -633,30 +557,6 @@ index dc07873..f7e2c0e 100644
      gSegments[segment] = (unsigned long long)resolved;
      gdx_seg_log("SetAddr", segment, addr, resolved);
      return addr;
-diff --git a/port/gdx_audio_effects_source.c b/port/gdx_audio_effects_source.c
-new file mode 100644
-index 0000000..bf857f4
---- /dev/null
-+++ b/port/gdx_audio_effects_source.c
-@@ -0,0 +1,6 @@
-+/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/effects.c. */
-+#ifdef EXPANSION_KIT
-+#include "../decomp/src/audio/disk/lib/effects.c"
-+#else
-+#include "../decomp/src/audio/rom/lib/effects.c"
-+#endif
-diff --git a/port/gdx_audio_thread_source.c b/port/gdx_audio_thread_source.c
-new file mode 100644
-index 0000000..2438a4d
---- /dev/null
-+++ b/port/gdx_audio_thread_source.c
-@@ -0,0 +1,6 @@
-+/* Unique Xcode object basename for decomp/src/audio/{rom,disk}/lib/thread.c. */
-+#ifdef EXPANSION_KIT
-+#include "../decomp/src/audio/disk/lib/thread.c"
-+#else
-+#include "../decomp/src/audio/rom/lib/thread.c"
-+#endif
 diff --git a/port/gdx_console_log.cpp b/port/gdx_console_log.cpp
 index 0f7a027..d75da3b 100644
 --- a/port/gdx_console_log.cpp
@@ -1119,18 +1019,6 @@ index 0000000..d63c301
 +}
 +
 +} // extern "C"
-diff --git a/port/gdx_discord_stub.cpp b/port/gdx_discord_stub.cpp
-new file mode 100644
-index 0000000..2968a71
---- /dev/null
-+++ b/port/gdx_discord_stub.cpp
-@@ -0,0 +1,6 @@
-+/* Discord desktop IPC is unavailable on iOS. Keep main-loop call sites platform-neutral. */
-+extern "C" void gdx_discord_tick(void) {
-+}
-+
-+extern "C" void gdx_discord_shutdown(void) {
-+}
 diff --git a/port/gdx_dump_launch.cpp b/port/gdx_dump_launch.cpp
 index 3a04fc0..dd762a9 100644
 --- a/port/gdx_dump_launch.cpp
@@ -2199,179 +2087,6 @@ index 7255291..8c5aeb4 100644
 +F0XHomeAction GdxF0XHomeRun(const std::string& dataDir);
  
  } // namespace gdx
-diff --git a/port/gdx_firstboot_picker.mm b/port/gdx_firstboot_picker.mm
-new file mode 100644
-index 0000000..7ec09fa
---- /dev/null
-+++ b/port/gdx_firstboot_picker.mm
-@@ -0,0 +1,62 @@
-+// Native macOS file-picker bridge for the in-window first-launch setup.
-+
-+#import <AppKit/AppKit.h>
-+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
-+
-+#include <string>
-+
-+namespace {
-+
-+std::string pickFile(NSString* title, NSArray<UTType*>* contentTypes) {
-+    @autoreleasepool {
-+        NSOpenPanel* panel = [NSOpenPanel openPanel];
-+        panel.title = title;
-+        panel.message = @"Choose a local game-data file. F0X copies it into its Application Support folder.";
-+        panel.canChooseFiles = YES;
-+        panel.canChooseDirectories = NO;
-+        panel.allowsMultipleSelection = NO;
-+        panel.allowedContentTypes = contentTypes;
-+        if ([panel runModal] != NSModalResponseOK || panel.URL == nil) {
-+            return {};
-+        }
-+        return panel.URL.path.UTF8String;
-+    }
-+}
-+
-+} // namespace
-+
-+namespace gdx {
-+
-+std::string GdxPickRomFileMacOS() {
-+    return pickFile(@"Select your F-Zero X ROM (US rev0)", @[
-+        [UTType typeWithFilenameExtension:@"z64"],
-+        [UTType typeWithFilenameExtension:@"n64"],
-+        [UTType typeWithFilenameExtension:@"v64"],
-+    ]);
-+}
-+
-+std::string GdxPickDiskFileMacOS() {
-+    return pickFile(@"Select your F-Zero X Expansion Kit disk", @[
-+        [UTType typeWithFilenameExtension:@"ndd"],
-+    ]);
-+}
-+
-+std::string GdxPickIplFileMacOS() {
-+    return pickFile(@"Select your 64DD IPL ROM", @[
-+        [UTType typeWithFilenameExtension:@"n64"],
-+        [UTType typeWithFilenameExtension:@"z64"],
-+    ]);
-+}
-+
-+bool GdxRevealDataDirectoryMacOS(const std::string& path) {
-+    @autoreleasepool {
-+        if (path.empty()) {
-+            return false;
-+        }
-+        NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]
-+                               isDirectory:YES];
-+        return url != nil && [[NSWorkspace sharedWorkspace] openURL:url];
-+    }
-+}
-+
-+} // namespace gdx
-diff --git a/port/gdx_firstboot_picker_ios.mm b/port/gdx_firstboot_picker_ios.mm
-new file mode 100644
-index 0000000..02f1e38
---- /dev/null
-+++ b/port/gdx_firstboot_picker_ios.mm
-@@ -0,0 +1,99 @@
-+// Native iOS/iPadOS document-picker bridge for the first-launch setup.
-+
-+#import <UIKit/UIKit.h>
-+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
-+
-+#include <string>
-+
-+@interface GdxDocumentPickerDelegate : NSObject <UIDocumentPickerDelegate>
-+@property(nonatomic, copy) NSURL* selectedURL;
-+@property(nonatomic) BOOL finished;
-+@end
-+
-+@implementation GdxDocumentPickerDelegate
-+- (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
-+    self.selectedURL = urls.firstObject;
-+    self.finished = YES;
-+}
-+
-+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller {
-+    self.finished = YES;
-+}
-+@end
-+
-+namespace {
-+
-+UIViewController* presentingViewController() {
-+    UIWindow* window = nil;
-+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-+        if (scene.activationState == UISceneActivationStateForegroundActive &&
-+            [scene isKindOfClass:UIWindowScene.class]) {
-+            for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
-+                if (candidate.isKeyWindow) {
-+                    window = candidate;
-+                    break;
-+                }
-+            }
-+        }
-+        if (window != nil) {
-+            break;
-+        }
-+    }
-+    UIViewController* controller = window.rootViewController;
-+    while (controller.presentedViewController != nil) {
-+        controller = controller.presentedViewController;
-+    }
-+    return controller;
-+}
-+
-+std::string pickFile(NSArray<UTType*>* contentTypes) {
-+    @autoreleasepool {
-+        UIViewController* presenter = presentingViewController();
-+        if (presenter == nil) {
-+            return {};
-+        }
-+
-+        GdxDocumentPickerDelegate* delegate = [[GdxDocumentPickerDelegate alloc] init];
-+        UIDocumentPickerViewController* picker =
-+            [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:contentTypes asCopy:NO];
-+        picker.allowsMultipleSelection = NO;
-+        picker.delegate = delegate;
-+        [presenter presentViewController:picker animated:YES completion:nil];
-+
-+        while (!delegate.finished && UIApplication.sharedApplication.applicationState == UIApplicationStateActive) {
-+            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
-+                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
-+        }
-+
-+        NSURL* url = delegate.selectedURL;
-+        if (url == nil || ![url startAccessingSecurityScopedResource]) {
-+            return {};
-+        }
-+        // Browse() validates and copies this path immediately. Keep its security scope alive for
-+        // the remainder of this short setup process so the C++ copy remains authorized.
-+        return url.fileSystemRepresentation;
-+    }
-+}
-+
-+UTType* typeForExtension(NSString* extension) {
-+    UTType* type = [UTType typeWithFilenameExtension:extension];
-+    return type != nil ? type : UTTypeData;
-+}
-+
-+} // namespace
-+
-+namespace gdx {
-+
-+std::string GdxPickRomFileIOS() {
-+    return pickFile(@[ typeForExtension(@"z64"), typeForExtension(@"n64"), typeForExtension(@"v64") ]);
-+}
-+
-+std::string GdxPickDiskFileIOS() {
-+    return pickFile(@[ typeForExtension(@"ndd") ]);
-+}
-+
-+std::string GdxPickIplFileIOS() {
-+    return pickFile(@[ typeForExtension(@"n64"), typeForExtension(@"z64") ]);
-+}
-+
-+} // namespace gdx
 diff --git a/port/gdx_frame_pacer.c b/port/gdx_frame_pacer.c
 index d80931c..849e312 100644
 --- a/port/gdx_frame_pacer.c
@@ -2457,73 +2172,6 @@ index b4af69a..e870c2b 100644
      if (sFontStandard == nullptr) {
          sFontStandard = fallback;
      }
-diff --git a/port/gdx_input_editor_window.cpp b/port/gdx_input_editor_window.cpp
-new file mode 100644
-index 0000000..c683982
---- /dev/null
-+++ b/port/gdx_input_editor_window.cpp
-@@ -0,0 +1,41 @@
-+#include "gdx_input_editor_window.h"
-+
-+#include <algorithm>
-+
-+#include <imgui.h>
-+
-+void GdxInputEditorWindow::Draw() {
-+#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-+    if (!IsVisible()) {
-+        return;
-+    }
-+
-+    ImGuiViewport* viewport = ImGui::GetMainViewport();
-+    if (viewport != nullptr) {
-+        // The SDL/ImGui viewport already represents the UIKit drawable's safe
-+        // content. A small visual gutter keeps the close affordance and scroll
-+        // bar away from the device edge while using the width required by the
-+        // editor's mapping rows on both iPhone and iPad landscape.
-+        const float gutter = std::max(8.0f, ImGui::GetFontSize() * 0.75f);
-+        const ImVec2 size(std::max(320.0f, viewport->WorkSize.x - gutter * 2.0f),
-+                          std::max(240.0f, viewport->WorkSize.y - gutter * 2.0f));
-+        ImGui::SetNextWindowPos(viewport->WorkPos + ImVec2(gutter, gutter), ImGuiCond_Always);
-+        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-+        ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-+    }
-+
-+    // These values are scoped to this window and all of its sections. They
-+    // preserve the existing desktop density while giving mobile controls a
-+    // comfortable touch target and readable separation throughout.
-+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
-+                        ImVec2(ImGui::GetFontSize() * 0.75f, ImGui::GetFontSize() * 0.75f));
-+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-+                        ImVec2(ImGui::GetFontSize() * 0.55f, ImGui::GetFontSize() * 0.38f));
-+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
-+                        ImVec2(ImGui::GetFontSize() * 0.55f, ImGui::GetFontSize() * 0.45f));
-+    LUS::InputEditorWindow::Draw();
-+    ImGui::PopStyleVar(3);
-+#else
-+    LUS::InputEditorWindow::Draw();
-+#endif
-+}
-diff --git a/port/gdx_input_editor_window.h b/port/gdx_input_editor_window.h
-new file mode 100644
-index 0000000..48545c1
---- /dev/null
-+++ b/port/gdx_input_editor_window.h
-@@ -0,0 +1,14 @@
-+#pragma once
-+
-+#include "libultraship/window/gui/InputEditorWindow.h"
-+
-+// F0X product wrapper around libultraship's binding editor. Desktop keeps the
-+// upstream floating-window behavior; iOS/iPadOS gets a viewport-sized editor so
-+// the same rows, popups, stick settings, rumble, gyro, and LED sections remain
-+// usable instead of inheriting a stale narrow desktop window rectangle.
-+class GdxInputEditorWindow final : public LUS::InputEditorWindow {
-+  public:
-+    using LUS::InputEditorWindow::InputEditorWindow;
-+
-+    void Draw() override;
-+};
 diff --git a/port/gdx_input_script.c b/port/gdx_input_script.c
 index cef7cfb..1b79c48 100644
 --- a/port/gdx_input_script.c
@@ -5407,7 +5055,7 @@ index 118ee0d..f659cd0 100644
      return 0;
  }
 diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
-index 8c63a17..7eaf81f 100644
+index 8c63a17..3036ba8 100644
 --- a/port/n64_gfx_bridge.cpp
 +++ b/port/n64_gfx_bridge.cpp
 @@ -11,6 +11,12 @@
@@ -5431,7 +5079,20 @@ index 8c63a17..7eaf81f 100644
  // Workshop texture packs (port/gdx_workshop.cpp).
  extern "C" int gdx_workshop_texture_packs_enabled(void);
  extern "C" const char* GdxWorkshopLookupOverridePath(const char* key);
-@@ -1798,6 +1805,38 @@ static void ResetWindowsMemoryRegionCache() {
+@@ -1268,12 +1275,6 @@ gdx::GfxWideCache gWideCache;
+ // Runtime kill switch: GDX_G2_CONVERT=0 restores the pure narrow path without a rebuild.
+ bool gG2ConvertEnabled = true;
+ bool gG2ConvertInit = false;
+-// Dialect of each converted wide buffer, keyed by its exact data pointer. The converted buffer
+-// loses its source segment's dialect tag and the opcode-scan fallback misclassifies F3DEX2 setup
+-// DLs containing 0xB8 before 0xDF, so ProcessList must consult this rather than re-derive from
+-// the wide stream. Recorded before enqueue, so a live buffer's value is always current.
+-std::unordered_map<const void*, bool> gConvertedWideIsF3d;
+-
+ /* Segment-9 fallback probe, strip later: G2ResolvePhysical variant of GdxSeg9FallbackDiag below,
+  * adapted to its `uintptr_t* out_host` signature. GDX_LOG-gated, first 24 misses per process.
+  * Declared here so it is visible at G2ResolvePhysical's call site, which precedes
+@@ -1798,6 +1799,38 @@ static void ResetWindowsMemoryRegionCache() {
          sWindowsMemoryRegions.reserve(64);
      }
  }
@@ -5470,7 +5131,7 @@ index 8c63a17..7eaf81f 100644
  #else
  // ---------------------------------------------------------------------------------------------
  // POSIX memory-probe backend: a snapshot of /proc/self/maps with miss-triggered refresh.
-@@ -1914,6 +1953,65 @@ void GetMainModuleRange(uintptr_t& moduleBegin, uintptr_t& moduleEnd) {
+@@ -1914,6 +1947,65 @@ void GetMainModuleRange(uintptr_t& moduleBegin, uintptr_t& moduleEnd) {
  
      moduleBegin = reinterpret_cast<uintptr_t>(module);
      moduleEnd = moduleBegin + ntHeaders->OptionalHeader.SizeOfImage;
@@ -5536,7 +5197,7 @@ index 8c63a17..7eaf81f 100644
  #else
      // Mirror "module base + SizeOfImage": take the contiguous run of /proc/self/maps entries whose
      // pathname is the main executable, using begin-of-first .. end-of-last. dladdr on a local
-@@ -2005,6 +2103,13 @@ size_t ReadableCommandLimit(const void* source, size_t stride = kN64GfxStride) {
+@@ -2005,6 +2097,13 @@ size_t ReadableCommandLimit(const void* source, size_t stride = kN64GfxStride) {
          return 0;
      }
  
@@ -5550,7 +5211,7 @@ index 8c63a17..7eaf81f 100644
      return static_cast<size_t>((region.end - address) / stride);
  #else
      const uintptr_t addr = reinterpret_cast<uintptr_t>(source);
-@@ -2030,6 +2135,12 @@ size_t ReadableByteLimit(uintptr_t address) {
+@@ -2030,6 +2129,12 @@ size_t ReadableByteLimit(uintptr_t address) {
          return 0;
      }
  
@@ -5563,7 +5224,7 @@ index 8c63a17..7eaf81f 100644
      return static_cast<size_t>(region.end - address);
  #else
      MapsRegion r;
-@@ -2050,6 +2161,9 @@ bool IsReadableAddress(uintptr_t address) {
+@@ -2050,6 +2155,9 @@ bool IsReadableAddress(uintptr_t address) {
          return false;
      }
      return region.readable;
@@ -5573,7 +5234,87 @@ index 8c63a17..7eaf81f 100644
  #else
      MapsRegion r;
      if (!PosixRegionFor(address, r)) {
-@@ -5682,6 +5796,13 @@ class N64DisplayListAdapter {
+@@ -2843,6 +2951,8 @@ class N64DisplayListAdapter {
+         const N64Gfx* source;
+         size_t limit;
+         ConvertedList* listPtr;
++        bool convertedDialectKnown;
++        bool convertedIsF3d;
+     };
+ 
+     N64DisplayListAdapter(const void* root, size_t rootSizeBytes, bool isBig, ConversionStats* stats = nullptr)
+@@ -2856,7 +2966,9 @@ class N64DisplayListAdapter {
+     uintptr_t EnqueueList(const N64Gfx* source, size_t explicitLimit) {
+         // Lazy conversion boundary: a narrow N64-format source becomes a cached wide buffer so
+         // ProcessList takes the resolver-free fast path. No-op for already-wide sources.
+-        source = GetOrBuildConvertedWide(source, explicitLimit);
++        bool convertedDialectKnown = false;
++        bool convertedIsF3d = false;
++        source = GetOrBuildConvertedWide(source, explicitLimit, convertedDialectKnown, convertedIsF3d);
+ 
+         auto cached = mLists.find(source);
+         if (cached != mLists.end()) return reinterpret_cast<uintptr_t>(cached->second->commands.data());
+@@ -2869,7 +2981,7 @@ class N64DisplayListAdapter {
+         const size_t limit = EffectiveLimit(source, explicitLimit);
+         listPtr->commands.reserve(limit + 1);
+ 
+-        mWorkQueue.push_back({source, limit, listPtr});
++        mWorkQueue.push_back({source, limit, listPtr, convertedDialectKnown, convertedIsF3d});
+ 
+         return reinterpret_cast<uintptr_t>(listPtr->commands.data());
+     }
+@@ -3918,7 +4030,10 @@ class N64DisplayListAdapter {
+     // the wide command count. Returns `source` and leaves ioLimit alone when conversion is
+     // disabled, the source is already wide, or its extent is unknown -- the caller then falls back
+     // to the narrow machinery.
+-    const N64Gfx* GetOrBuildConvertedWide(const N64Gfx* source, size_t& ioLimit) {
++    const N64Gfx* GetOrBuildConvertedWide(const N64Gfx* source, size_t& ioLimit,
++                                          bool& outDialectKnown, bool& outIsF3d) {
++        outDialectKnown = false;
++        outIsF3d = false;
+         EnsureG2ConvertInit();
+         if (!gG2ConvertEnabled || source == nullptr) {
+             return source;
+@@ -3949,8 +4064,9 @@ class N64DisplayListAdapter {
+             : (IsF3DAssetPointer(reinterpret_cast<uintptr_t>(source)) ||
+                DisplayListUsesF3D(source, narrowLimit, stride, isBig));
+ 
+-        const std::vector<gdx::WideGfx>& wide =
+-            gWideCache.GetOrBuild(source, narrowLimit, isBig, isF3d, G2StampFor(source));
++        const gdx::GfxWideCache::Result cached =
++            gWideCache.GetOrBuildWithDialect(source, narrowLimit, isBig, isF3d, G2StampFor(source));
++        const std::vector<gdx::WideGfx>& wide = *cached.commands;
+         if (wide.empty()) {
+             return source;
+         }
+@@ -3985,13 +4101,8 @@ class N64DisplayListAdapter {
+                               isBig ? 1 : 0, isF3d ? 1 : 0);
+             }
+         }
+-        // Clearing is safe because the dialect is re-recorded below before any ProcessList read of
+-        // this exact buffer, and a rebuilt buffer's old address is never read again. Bounds the
+-        // map's growth from in-place rebuilds that relocate a cached list's storage.
+-        if (gConvertedWideIsF3d.size() > 8192) {
+-            gConvertedWideIsF3d.clear();
+-        }
+-        gConvertedWideIsF3d[wideSrc] = isF3d;
++        outDialectKnown = true;
++        outIsF3d = cached.isF3d;
+         ioLimit = wide.size();
+         return wideSrc;
+     }
+@@ -5038,9 +5149,8 @@ class N64DisplayListAdapter {
+         // the exact F3DEX2/F3D misclassification the tag table exists to prevent.
+         const GdxSegmentUcode sourceDialect =
+             GdxAssetPointerDialect(reinterpret_cast<uintptr_t>(item.source));
+-        const auto convertedDialect = gConvertedWideIsF3d.find(item.source);
+         const bool isF3DSource =
+-            (convertedDialect != gConvertedWideIsF3d.end()) ? convertedDialect->second
++            item.convertedDialectKnown                  ? item.convertedIsF3d
+             : (sourceDialect == GdxSegmentUcode::F3D)    ? true
+             : (sourceDialect == GdxSegmentUcode::F3DEX2) ? false
+             : (IsF3DAssetPointer(reinterpret_cast<uintptr_t>(item.source)) ||
+@@ -5682,6 +5792,13 @@ class N64DisplayListAdapter {
                                                !IsVenueBuildingTextureRange(translated))
                                                   ? gdx_lookup_asset_segment_o2r_key(in.w1)
                                                   : nullptr;
@@ -5587,6 +5328,89 @@ index 8c63a17..7eaf81f 100644
                          const char* texCensusPath = "rawcopy"; /* [tex-census] delivery classification */
                          /* Texture-pack override. `translated` is the unified source pointer for
                             BOTH delivery paths, so one lookup here covers common assets (fonts,
+diff --git a/port/n64_gfx_convert.cpp b/port/n64_gfx_convert.cpp
+index a0f7dcf..400809b 100644
+--- a/port/n64_gfx_convert.cpp
++++ b/port/n64_gfx_convert.cpp
+@@ -111,24 +111,32 @@ std::vector<WideGfx> ConvertList(const void* src, size_t max_commands, bool is_b
+ 
+ const std::vector<WideGfx>& GfxWideCache::GetOrBuild(const void* src, size_t max_commands,
+                                                      bool is_big, bool is_f3d, uint64_t stamp) {
++    return *GetOrBuildWithDialect(src, max_commands, is_big, is_f3d, stamp).commands;
++}
++
++GfxWideCache::Result GfxWideCache::GetOrBuildWithDialect(const void* src, size_t max_commands,
++                                                         bool is_big, bool is_f3d, uint64_t stamp) {
+     auto it = mCache.find(src);
+     if (it != mCache.end()) {
+         it->second.lastUseFrame = mCurrentFrame;
+         if (it->second.stamp == stamp) {
+-            return it->second.cmds;
++            return { &it->second.cmds, it->second.isF3d };
+         }
+-        // Rebuild IN PLACE so the entry's address stays stable for callers holding it.
++        // Rebuild the mapped vector. The vector object's address stays stable, while data() may
++        // change; dialect metadata is updated atomically with this cache entry.
+         it->second.cmds = ConvertList(src, max_commands, is_big, is_f3d, mCtx);
++        it->second.isF3d = is_f3d;
+         it->second.stamp = stamp;
+-        return it->second.cmds;
++        return { &it->second.cmds, it->second.isF3d };
+     }
+ 
+     Entry entry;
+     entry.cmds = ConvertList(src, max_commands, is_big, is_f3d, mCtx);
++    entry.isF3d = is_f3d;
+     entry.stamp = stamp;
+     entry.lastUseFrame = mCurrentFrame;
+     auto inserted = mCache.emplace(src, std::move(entry));
+-    return inserted.first->second.cmds;
++    return { &inserted.first->second.cmds, inserted.first->second.isF3d };
+ }
+ 
+ void GfxWideCache::Invalidate(const void* src) {
+diff --git a/port/n64_gfx_convert.h b/port/n64_gfx_convert.h
+index 8116402..b2e3491 100644
+--- a/port/n64_gfx_convert.h
++++ b/port/n64_gfx_convert.h
+@@ -65,16 +65,27 @@ std::vector<WideGfx> ConvertList(const void* src, size_t max_commands, bool is_b
+                                  bool is_f3d, const ConvertContext& ctx);
+ 
+ // Cross-frame cache keyed by narrow source address, with a caller-driven invalidation stamp.
+-// Reference stability of std::unordered_map mapped values is what guarantees the returned buffer
+-// address stays valid — and identical for the same source — until it is invalidated or evicted.
++// References to the mapped vector object stay valid until invalidation or eviction. A stamp
++// rebuild can replace that vector's storage, so consumers must not retain data() across rebuilds.
+ class GfxWideCache {
+   public:
++    struct Result {
++        const std::vector<WideGfx>* commands = nullptr;
++        bool isF3d = false;
++    };
++
+     void SetContext(const ConvertContext& ctx) { mCtx = ctx; }
+     const ConvertContext& Context() const { return mCtx; }
+ 
+     // Rebuilds when no entry exists or the stored stamp differs from `stamp`.
+     const std::vector<WideGfx>& GetOrBuild(const void* src, size_t max_commands, bool is_big,
+                                            bool is_f3d, uint64_t stamp);
++    // Same cache operation with the source dialect returned alongside the
++    // buffer. Keeping both values in one entry prevents callers from building
++    // a second pointer-keyed side table whose lifetime can outlive an evicted
++    // or reallocated vector.
++    Result GetOrBuildWithDialect(const void* src, size_t max_commands, bool is_big,
++                                 bool is_f3d, uint64_t stamp);
+ 
+     // Drop a single source (e.g. its backing memory was reloaded).
+     void Invalidate(const void* src);
+@@ -94,6 +105,7 @@ class GfxWideCache {
+   private:
+     struct Entry {
+         std::vector<WideGfx> cmds;
++        bool isF3d = false;
+         uint64_t stamp = 0;
+         uint64_t lastUseFrame = 0;
+     };
 diff --git a/port/shims.c b/port/shims.c
 index c4598d5..6c99936 100644
 --- a/port/shims.c
@@ -5732,6 +5556,76 @@ index 0000000..2023a5f
 +    printf("gdx_diagnostics_tests: %d failure(s)\n", s_failures);
 +    return 1;
 +}
+diff --git a/port/tests/gfx_convert_tests.cpp b/port/tests/gfx_convert_tests.cpp
+index b06123f..b95e91b 100644
+--- a/port/tests/gfx_convert_tests.cpp
++++ b/port/tests/gfx_convert_tests.cpp
+@@ -245,6 +245,18 @@ static void TestCache() {
+     check_sz("cache still one entry after restamp", cache.CachedCount(), 1);
+     check_u32("rebuilt content matches", third[0].w0, MakeW0(OP_VTX_EX2, 0x001020));
+ 
++    // Regression for IOS-GFX-CRASH-01: dialect metadata must be owned by the
++    // same cache entry as the vector. Rebuilds can reallocate vector storage;
++    // a separate pointer-keyed unordered_map left stale heap nodes behind and
++    // crashed in ProcessList::find under the Simulator allocator.
++    GfxWideCache::Result f3d = cache.GetOrBuildWithDialect(src.data(), 2, false, true, /*stamp=*/3);
++    check_bool("restamp updates dialect in the cache entry", f3d.isF3d, true);
++    const WideGfx* rebuiltData = f3d.commands->data();
++    GfxWideCache::Result f3dex2 = cache.GetOrBuildWithDialect(src.data(), 2, false, false, /*stamp=*/4);
++    check_bool("second restamp updates dialect", f3dex2.isF3d, false);
++    check_bool("dialect result always names current vector", f3dex2.commands->data() != nullptr, true);
++    (void)rebuiltData; // address may or may not move; metadata correctness cannot depend on it.
++
+     cache.Invalidate(src.data());
+     check_bool("Invalidate drops entry", cache.Contains(src.data()), false);
+     check_sz("cache empty after invalidate", cache.CachedCount(), 0);
+@@ -255,6 +267,38 @@ static void TestCache() {
+     check_sz("Clear empties cache", cache.CachedCount(), 0);
+ }
+ 
++static void TestCacheDialectEviction() {
++    ConvertContext ctx;
++    GfxWideCache cache;
++    cache.SetContext(ctx);
++
++    // Populate beyond the cache's high-water mark with independently owned command lists.
++    // This forces the production eviction path after the entries become stale.
++    std::vector<std::vector<uint8_t>> sources(513);
++    bool dialectsMatch = true;
++    for (size_t i = 0; i < sources.size(); ++i) {
++        PushLE(sources[i], MakeW0(OP_ENDDL, 0), 0);
++        GfxWideCache::Result result = cache.GetOrBuildWithDialect(
++            sources[i].data(), 1, false, (i & 1u) != 0, /*stamp=*/1);
++        dialectsMatch = dialectsMatch && result.isF3d == ((i & 1u) != 0);
++    }
++    check_bool("all populated entries keep their dialect", dialectsMatch, true);
++    check_sz("eviction fixture exceeds high-water mark", cache.CachedCount(), sources.size());
++
++    size_t evicted = 0;
++    for (size_t frame = 0; frame <= 600; ++frame) {
++        evicted += cache.BeginFrame();
++    }
++    check_sz("stale sweep evicts every cache entry", evicted, sources.size());
++    check_sz("cache empty after stale sweep", cache.CachedCount(), 0);
++
++    GfxWideCache::Result rebuilt = cache.GetOrBuildWithDialect(
++        sources[0].data(), 1, false, true, /*stamp=*/2);
++    check_bool("post-eviction rebuild restores dialect", rebuilt.isF3d, true);
++    check_bool("post-eviction rebuild restores commands", rebuilt.commands != nullptr &&
++                                                           !rebuilt.commands->empty(), true);
++}
++
+ int main() {
+     printf("== Phase G2 binary-DL converter tests ==\n");
+     TestLayout();
+@@ -264,6 +308,7 @@ int main() {
+     TestSubDlPolicy();
+     TestTermination();
+     TestCache();
++    TestCacheDialectEviction();
+ 
+     if (g_failures == 0) {
+         printf("\nALL PASS\n");
 diff --git a/port/tests/touch_merge_tests.c b/port/tests/touch_merge_tests.c
 new file mode 100644
 index 0000000..8fa28ff
