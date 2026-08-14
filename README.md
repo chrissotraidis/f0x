@@ -18,8 +18,19 @@
   <img alt="Apple Silicon" src="https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple">
   <img alt="iOS and iPadOS 16 or newer" src="https://img.shields.io/badge/iOS%20%2F%20iPadOS-16%2B-0A84FF?logo=apple">
   <img alt="Metal renderer" src="https://img.shields.io/badge/renderer-Metal-5E5CE6">
-  <img alt="Development preview" src="https://img.shields.io/badge/status-development%20preview-FF9F0A">
+  <a href="docs/STATUS.md"><img alt="Physical iPad in testing" src="https://img.shields.io/badge/physical%20iPad-in%20testing-30D158"></a>
+  <a href="docs/BUILDING.md"><img alt="Native source port" src="https://img.shields.io/badge/build-native%20source%20port-007AFF"></a>
+  <a href="#install-status"><img alt="Development preview" src="https://img.shields.io/badge/status-development%20preview-FF9F0A"></a>
   <img alt="Game data not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
+</p>
+
+<p align="center">
+  <a href="#get-started">Build</a> ·
+  <a href="#supported-game-data">Game data</a> ·
+  <a href="#touch-controls">Touch controls</a> ·
+  <a href="docs/STATUS.md">Status</a> ·
+  <a href="docs/KNOWN_ISSUES.md">Known issues</a> ·
+  <a href="docs/TESTING.md">Evidence</a>
 </p>
 
 F0X packages the native decompiled F-Zero X game logic from
@@ -39,13 +50,17 @@ extraction happen locally, and nothing is uploaded.
 |---|---|---|
 | Public `.ipa` | **Not available yet** | No downloadable developer-preview build has been published. |
 | App Store / TestFlight | **Not announced** | F0X has no store listing or public TestFlight. |
-| Local iPhone/iPad build | **Compiles; hardware acceptance pending** | Build with Xcode and your own Apple development team. This Mac has no connected device or signing identity, so a physical install has not been claimed. |
+| Local iPhone/iPad build | **Signed development build verified locally** | Build with Xcode and your own Apple development team. An arm64 build has been signed, installed in place, and launched on a physical iPad; this is not a public distribution or complete hardware acceptance claim. |
 | iPhone/iPad Simulator | **Available for development** | The native arm64 app imports local game data, renders through Metal, and has completed touch/UI/race stability verification. Simulator evidence is not physical-device acceptance. |
 | Apple Silicon macOS | **Available for development** | The native `F0X.app` builds, seals locally, imports game data, persists saves, and renders a live Metal race. |
 
 F0X is close to a public developer preview, but it is not being presented as a
-finished release. Physical iPhone/iPad touch, audio, lifecycle, thermals,
-controller, and long-session testing remain open. See the exact
+finished release. Physical iPad installation, launch, ROM/archive/save
+preservation, sustained audio transport, and the owner-accepted tablet control
+layout are verified locally. The cartridge sound-font mapping error behind the
+wrong menu sounds and early-ending music is corrected in the installed build;
+full-route listening, lifecycle/interruptions, thermals, controller behavior,
+and long-session gameplay remain open. See the exact
 [evidence ledger](docs/STATUS.md) rather than inferring completion from a build
 or Simulator screenshot.
 
@@ -137,7 +152,9 @@ simulating keyboard events. It writes atomic N64 pad state directly into port
 - **Settings:** use **Settings → Controls → Touch Controls** for visibility,
   controller auto-hide, haptics, opacity, and reset controls.
 - **Customize:** move, resize, show, or hide controls in independent phone and
-  tablet layouts; saved layouts survive relaunch.
+  tablet layouts; saved layouts survive relaunch. The owner-accepted physical
+  iPad layout is now the tablet default; iPhone defaults remain independent for
+  a later phone ergonomics pass.
 - **Input Editor:** the mobile-safe editor uses two balanced columns on iPad
   and one on iPhone, with every stick, rumble, gyro, and LED section reachable.
 
@@ -164,19 +181,22 @@ Physical multi-touch ergonomics and haptic feel remain unverified.
 | Area | Current evidence-backed result |
 |---|---|
 | Native runtime | Decompiled F-Zero X logic runs as host arm64 code; this is not an emulator frontend |
-| Rendering | libultraship/Fast3D renders through Metal on Apple Silicon macOS and iOS Simulator |
+| Rendering | libultraship/Fast3D renders through Metal on Apple Silicon macOS, iOS Simulator, and the attached physical iPad |
 | Game setup | Native picker, local validation, in-process extraction, atomic install, hot mount, and archive-only relaunch |
 | Touch | Full control set, phone/tablet layouts, customization, persistence, safe cancellation, menu access, and controller auto-hide |
 | Input Editor | Responsive iPhone/iPad layout with aligned mappings and unobstructed controls |
 | Saves | Exact 32 KiB settings-SRAM write, relaunch, load, and reversal verified on macOS |
-| Audio | Nonzero cartridge synthesis on macOS; SDL output device and active BGM synthesis verified in Simulator |
+| Audio | Retail cartridge synthesis, corrected cartridge instrument mapping, 59.94 Hz mobile pacing, and SDL 32 kHz stereo transport verified in Simulator and deployed to the physical iPad; the owner reports the major audio faults are fixed, while complete title/menu/countdown/race listening remains the release gate |
+| Course previews | The six rotating course maps use the host-compatible packed 0.25 model scale; the deterministic course-select route renders and exits cleanly, with final visual acceptance on iPad pending |
 | Diagnostics | Privacy-scrubbed runtime report and native Share sheet verified on macOS and iPhone Simulator |
 | Stability | Converted display-list cache regression plus a 5:16 guarded Simulator race/transition soak with no crash |
 | Packaging | Sealed local macOS bundle plus deterministic, ROM-free unsigned arm64 iPhoneOS IPA workflow |
 
-Still open: physical-device acceptance, audible route/interruption matrices,
-high-refresh and Low Power Mode behavior, release signing/notarization, a
-human-completed macOS race on this host, and Expansion Kit support.
+Still open: complete owner acceptance of audible fidelity and the corrected
+course-preview framing, physical multi-touch/gameplay behavior,
+route/interruption matrices, high-refresh and Low Power Mode behavior, release
+signing/notarization, a human-completed macOS race on this host, and Expansion
+Kit support.
 
 ## Reproducible and ROM-free
 
@@ -203,9 +223,10 @@ are recorded in [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 
 There is no public F0X IPA yet. The unsigned arm64 iPhoneOS app compiles and
 passes a ROM-free payload audit, and `scripts/package-ios.sh` creates a
-deterministic re-signable proof artifact. Physical installation and acceptance
-have not been completed. A future downloadable build must be independently
-audited and described honestly before a release link appears here. See the
+deterministic re-signable proof artifact. A development-signed build has been
+installed and tested in place on a physical iPad, but that local build is not a
+public distribution. A future downloadable IPA must be independently audited
+and described honestly before a release link appears here. See the
 [build and package guide](docs/BUILDING.md#unsigned-re-signable-ipa).
 </details>
 
@@ -219,10 +240,13 @@ download, distribute, or upload game data.
 <details>
 <summary><strong>Does audio work?</strong></summary>
 
-The synthesis path produces nonzero PCM on macOS. On iPhone Simulator, SDL
-opens a 2-channel 32 kHz output device while the dedicated producer and BGM
-synthesis run. Speaker, headphones, Bluetooth, route changes, and interruption
-recovery remain physical-hardware tests.
+The corrected cartridge path produces continuous title-to-menu PCM in both LLE
+and HLE and is installed on the physical iPad. The key defect was a PORT-only
+sound-font parser reading the instrument table four bytes late, so every request
+selected the next instrument; correcting `+8` to the N64 header's `+4` restored
+the intended menu music/effects. The owner reports the major faults are fixed.
+Complete title/menu/countdown/race listening plus headphones, Bluetooth, route
+changes, and interruption recovery remain physical-hardware tests.
 </details>
 
 <details>

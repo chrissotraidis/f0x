@@ -18,7 +18,9 @@
   Simulator (2026-08-13): phone table selected, every control at its
   normalized default center with edge pills safe-clamped, ••• in the phone
   top-center slot clear of the Dynamic Island, overlay attached over a live
-  race. Open: true multi-touch contact stress, controller handoff,
+  race. The owner-accepted physical iPad normalized profile is now the tablet
+  default; `kPhoneSpecs` is deliberately unchanged until a later physical
+  iPhone ergonomics pass. Open: true multi-touch contact stress, controller handoff,
   interruptions, haptics feel, and long sessions require physical
   iPad/iPhone acceptance. SDL finger-to-ImGui mouse translation is unchanged.
 - **IOS-LIFECYCLE-01 — Simulator lifecycle is verified; physical acceptance
@@ -33,14 +35,44 @@
   settling, and visibly returned to Metal output. Physical interruptions,
   route changes, memory pressure, OS termination, save-at-interruption,
   Low Power Mode, and thermal behavior remain under IOS-HARDWARE-01.
-- **IOS-AUDIO-01 — launch backend resolved in Simulator; physical audible
-  route remains under IOS-HARDWARE-01:** libultraship now excludes iOS from
-  the Apple CoreAudio default and falls through to SDL, matching the pinned
-  HarkinianPad `libultraship-ios.patch`. A rebuilt iPhone 17 Pro Simulator
-  launch logged `SDL Audio initialized: 2 channels, 32000 Hz`, the dedicated
-  producer active, and live BGM synthesis. This closes the silent Null-player
-  root cause without an F0X-only override. Speaker/headphone audibility,
-  route changes, interruptions, and physical hardware remain unverified.
+- **IOS-AUDIO-01 — two concrete faults fixed; physical audibility remains
+  unaccepted:** libultraship excludes iOS from the Apple CoreAudio default and
+  uses SDL at two channels and 32000 Hz. On the attached physical iPad, owner
+  comparison against an emulator found title/menu music transitions at the
+  wrong times, incorrect or mistimed menu effects, countdown effects ahead of
+  the visible event, race desynchronization, crackle, and buzzing. The result
+  was judged essentially unplayable. Two deeper defects are now measured: both
+  audio executors used Expansion Kit `HILOGAIN` opcode 14 instead of retail
+  cartridge opcode 24, and the frame-coupled iOS host loop free-ran at roughly
+  three times its intended VI cadence while SDL discarded about two-thirds of
+  complete buffers. The ABI now follows the selected build, non-authentic
+  repeated-PCM substitution is removed, and Apple mobile uses the existing
+  absolute 59.94 Hz clock by default. On the same iPad Simulator, the clock A/B
+  changed SDL from 2658 drops at 4200 buffers to zero drops/errors through 3300;
+  every sampled task completed in LLE with zero fallback. A later parity audit
+  also restored the cartridge's original `Audio_GuitarSeqStart()` boot call
+  instead of starting only the SE player early in `Audio_Init()`. The rebuilt
+  GP route completed 5100/5100 LLE tasks and SDL submissions with zero fallback,
+  drops, or queue errors. Physical PCM telemetry then exposed a separate title-
+  demo state defect: after the attract race returned, the sequence channel was
+  muted while the cached BGM ID still said `BGM_TITLE`, so the title reload did
+  not restart it. The selector now invalidates that cache only on title-demo
+  return. A stricter Simulator run completed title -> demo -> title -> next demo
+  through 6900 buffers; the zero count stayed at its startup baseline with zero
+  drops/errors. A separate deterministic raw-PCM test then proved the menu track
+  always became silent at 15.085 seconds before SDL/CoreAudio. The PORT-only
+  cartridge font converter started its instrument-offset array at byte `+8`
+  instead of the N64 header's byte `+4`, shifting every requested instrument by
+  one. Title/select therefore played the next samples in the bank, producing
+  wrong effects and a one-shot select sample that ended early. The single table-
+  base correction removed all detected silence from 21.67-second LLE and HLE
+  title-to-menu captures. The corrected signed build was then installed in
+  place on the physical iPad with protected data hashes preserved. Its first
+  2,400 buffers held the two-buffer startup-zero baseline with zero SDL
+  drops/errors, and the owner reported that the major audio bugs now appear
+  fixed. Correct audible title/menu continuity, effect/countdown sync, and
+  crackle/buzz absence across the full route still require owner listening and
+  remain release-blocking.
 - **IOS-GFX-CRASH-01 — resolved in Simulator; physical long-session proof
   remains under IOS-HARDWARE-01:** the failing design kept converted display-
   list dialect metadata in a second pointer-keyed `unordered_map`, independent
@@ -64,10 +96,25 @@
   all secondary stick/rumble/gyro/LED sections remain reachable. Gameplay
   controls and ••• are absent while the editor/menu owns the screen, then
   restore neutrally after close. Both maintained patches clean-replay.
-- **IOS-HARDWARE-01 — physical mobile acceptance externally blocked here:** the
-  current Mac reports no connected device and zero valid signing identities.
-  Simulator and unsigned device-SDK builds do not establish physical rendering,
-  controller, touch, audible audio, saves, lifecycle, performance, or thermals.
+- **IOS-COURSE-PREVIEW-01 — corrected; physical visual acceptance pending:**
+  every course-select preview used the intended `0.25` model scale, but
+  `guScale()` packed the stock N64 `Mtx` layout while the PORT renderer decoded
+  the lane-swapped `Matrix_ToMtx` layout. The scale consequently decoded as
+  zero and the six 3D course models appeared greatly enlarged and cropped.
+  PORT now builds that same 0.25 matrix through the existing host-safe matrix
+  builder; console and non-PORT behavior remain unchanged. The rebuilt Mac app
+  reached mode 10, held on the six-map preview, rendered the full interval, and
+  exited normally. Final framing acceptance remains a physical-iPad visual gate.
+- **IOS-HARDWARE-01 — physical mobile acceptance is in progress:** a signed
+  Debug build has been installed and launched in place on the attached iPad.
+  Pre/post-install hashes match for the local ROM, `fzerox.o2r`, save, config,
+  extraction state, ImGui settings, and tablet touch preferences. The clean app
+  passed strict deep signature verification, used the intended application
+  identifier, and contained no retail ROM or save. This closes signing,
+  installation, launch, and data-preservation checks only. Major audio behavior
+  and the current tablet layout have owner acceptance; complete audible-route,
+  corrected-preview, multi-touch/gameplay, lifecycle, performance, thermals,
+  and long-session stability still require physical testing.
 
 - **MAC-PRESENT-02 — stale duplicate bundle likely explained the continuing strobe:**
   the renderer fixes remain supported by the original 0/120 race, 0/80 resize,

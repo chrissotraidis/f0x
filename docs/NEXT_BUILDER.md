@@ -69,17 +69,47 @@ the exact evidence artifact before relying on a path or process ID.
 - The reproduced pre-race null-texture warning is closed by preserving untouched
   partial-overlap TMEM metadata; `gdx_tmem_load_map_tests` passes and the exact
   packaged machine-settings route no longer reports a null texture address.
-- Menu-audio review found one title-to-select BGM transition, ordered one-for-one
-  rapid navigation effects, same-frame confirmation coalescing to one consumed
-  effect, and no producer/DSP-specific duplication. Corrected ADPCM vectors now
-  pass 23/23 tests and 608/608 sub-checks without a production decoder change.
+- A clean signed arm64 build is installed on the attached physical iPad. In-place
+  updates preserved exact SHA-256 for the local ROM (`2be0f861...`), archive
+  (`7d60d975...`), save (`9d231971...`), and tablet preferences (`d91581ef...`).
+- The physical title-demo permanent-silence defect was traced to a stale
+  `BGM_TITLE` cache after attract-mode teardown. The focused restart correction
+  crossed repeated title/GP/VS returns in the final clean binary through 10,800
+  buffers with zero SDL drops/errors and no permanent silence.
+- A later deterministic Simulator PCM capture found a second, deeper cartridge
+  audio defect: the 64-bit font converter read instrument offsets from byte `+8`
+  instead of byte `+4`, shifting every title/menu instrument by one. The focused
+  `+8 -> +4` correction produced continuous 21.67-second title-to-menu PCM in
+  both LLE and HLE with no detected silence. This correction is now installed
+  and running on the physical iPad; initial owner listening reports major
+  improvement, but full-route acceptance is not complete.
+- The owner-accepted physical iPad touch profile is promoted verbatim to the
+  tablet defaults. Phone defaults remain independent and unchanged pending a
+  later physical-iPhone ergonomics pass.
+- The over-cropped six-map course preview was traced to `guScale()` producing
+  stock N64 `Mtx` packing for a PORT renderer that consumes `Matrix_ToMtx` lane
+  packing. PORT now uses the existing host-safe builder for the same 0.25 scale.
+  The deterministic course-select hold route completes; physical visual
+  acceptance remains open.
+- All maintained patches reverse-check and a fresh local pinned reconstruction
+  matches every patched path byte-for-byte. The audit found and repaired one
+  missing maintained file: `libultraship/include/fast/tmem_load_map.h`.
+- Menu-audio review found no producer/DSP-specific duplication, but that narrower
+  result did not establish correct instrument identity. The later font-layout
+  correction above supersedes it. Corrected ADPCM vectors pass 23/23 tests and
+  608/608 sub-checks without a production decoder change.
 
 ## What is explicitly not finished
 
-- Physical-device touch acceptance (multi-touch stress, controller handoff,
+- Complete owner audible acceptance on the installed corrected build: title/menu
+  continuity, effect mapping, GP countdown and race sync, and crackle/buzz
+  absence.
+- Physical-device touch acceptance (analog direction, C-left, A latch,
+  multi-touch stress, controller handoff,
   interruptions, haptics feel, long sessions, thermals).
-- Physical iPad/iPhone signing, install, launch, controller, touch, audio,
-  lifecycle, performance, thermals, or long-session evidence.
+- Broader physical iPad/iPhone controller, lifecycle, performance, thermals, and
+  long-session evidence. Signing, install, launch, protected-data preservation,
+  and sustained audio transport are no longer open on the tested iPad.
 - A player-completed macOS race; blocked on this host with an exact report in
   `docs/blockers/MAC-RACE-CONTROL-01.md` (two tap attempts, four System Events
   driver variants, and two internal-harness wall-hug probes all ended in
@@ -101,17 +131,20 @@ the exact evidence artifact before relying on a path or process ID.
 
 ## Environment boundary at handoff
 
-- No Simulator is booted. The final Simulator validation was a headless generic
-  arm64 build; rediscover and boot exactly one device before any future UI run.
-- No physical Apple device is connected (`devicectl: No devices found`).
-- No valid code-signing identity exists (`0 valid identities found`).
+- The iPad Pro 13-inch (M5) Simulator is booted and F0X was relaunched from its
+  preserved container after the owner briefly shut Simulator down. Rediscover
+  the process and container UUID before relying on them.
+- The physical iPad was reconnected after the signed hardware run. Rediscover
+  it with `devicectl` rather than relying on a stale device/session handle.
+- A local Apple Development identity and Xcode-managed wildcard profile signed
+  the tested iPad build. This does not establish distribution signing.
 - The installed Simulator container contains authorized private inputs/derived
   data. Treat them as user-owned local state; never stage, copy into docs, or
   include in a package.
 - Build products live under ignored `build/` and may be stale after source edits.
 - Process IDs and Simulator bundle/container UUIDs are ephemeral; rediscover them.
 
-## Maintained Apple source state (2026-08-13)
+## Maintained Apple source state (2026-08-14)
 
 The tested ignored checkout contains the following Apple-side implementation,
 all represented by the regenerated maintained patches, plus the display-list
@@ -137,10 +170,13 @@ prohibited files.
 
 1. Obtain owner/human macOS race completion and corrected-bundle flashing
    confirmation, or attach a controller.
-2. Resume physical iPad/iPhone acceptance, representative-course timing,
-   high-refresh/Low Power Mode, signing, and update tests when a capable device
-   and signing identity are available. This host has neither.
-3. Start Expansion Kit only after cartridge physical acceptance.
+2. Install the current preview-scale/tablet-default build in place, preserving
+   ROM, archive, save, and preferences; visually accept all six map previews.
+3. Resume physical iPad/iPhone acceptance, representative-course timing,
+   high-refresh/Low Power Mode, and update tests when the owner reconnects a
+   device. Local development signing is already verified for the tested iPad;
+   distribution signing remains separate.
+4. Start Expansion Kit only after cartridge physical acceptance.
 
 IOS-GFX-CRASH-01 is Simulator-resolved. Converted-wide dialect metadata now
 lives inside `GfxWideCache::Entry` and is copied into each queued list, instead

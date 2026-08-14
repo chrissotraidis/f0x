@@ -55,6 +55,14 @@ core on 2026-08-12 (evidence: `docs/evidence/touch-ios/2026-08-12.txt`).
 Claim touch as Simulator-verified only for the control set and game flow above;
 physical acceptance remains open.
 
+## Physical iPad default promoted on 2026-08-13
+
+The normalized `F0X.TouchLayout.tablet-v1` profile accepted by the owner on the
+physical iPad is now the source default in `kTabletSpecs`. Existing saved tablet
+profiles continue to override defaults, so an in-place update does not move the
+owner's controls; Reset or a fresh profile resolves to the accepted geometry.
+`kPhoneSpecs` was not changed and remains a separate later physical-iPhone gate.
+
 ## What to reuse from HarkinianPad
 
 Read these files before editing:
