@@ -76,9 +76,700 @@ index 6d890e90..de909556 100644
 + #if SDL_HAS_PER_MONITOR_DPI
 +         // FIXME-VIEWPORT: On MacOS SDL reports actual monitor DPI scale, ignoring OS configuration. We may want to set
 +         //  DpiScale to cocoa_window.backingScaleFactor here.
+diff --git a/src/fast/Fast3dGui.cpp b/src/fast/Fast3dGui.cpp
+index ac65f1ac..9762206f 100644
+--- a/src/fast/Fast3dGui.cpp
++++ b/src/fast/Fast3dGui.cpp
+@@ -407,7 +407,8 @@ void Fast3dGui::DrawGame() {
+         size = ImVec2(sw, size.y);
+     } else if (Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger("gEnhancements.Graphics.Widescreen",
+                                                                                1) == 0 ||
+-               gdx_get_force_fixed_aspect() != 0) {
++               gdx_get_force_fixed_aspect() != 0 ||
++               (size.y > 0.0f && size.x / size.y <= 4.0f / 3.0f)) {
+         // 4:3 pillarbox, either from the Widescreen setting or from the runtime flag the game
+         // publishes for modes that must render stock 4:3 (the Expansion Kit editors). The flag
+         // is read live because it can flip mid-dispatch and this decision has to track it within
+diff --git a/src/fast/backends/gfx_metal.cpp b/src/fast/backends/gfx_metal.cpp
+index a32a12e7..e7ff3b95 100644
+--- a/src/fast/backends/gfx_metal.cpp
++++ b/src/fast/backends/gfx_metal.cpp
+@@ -75,9 +75,19 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
+     NS::AutoreleasePool* autorelease_pool = NS::AutoreleasePool::alloc()->init();
+ 
+     mLayer = (CA::MetalLayer*)SDL_RenderGetMetalLayer(renderer);
++    if (mLayer == nullptr) {
++        SPDLOG_ERROR("[window-init] SDL_RenderGetMetalLayer returned null: {}", SDL_GetError());
++        autorelease_pool->release();
++        return false;
++    }
+     mLayer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+ 
+     mDevice = mLayer->device();
++    if (mDevice == nullptr) {
++        SPDLOG_ERROR("[window-init] Metal layer has no device");
++        autorelease_pool->release();
++        return false;
++    }
+     mCommandQueue = mDevice->newCommandQueue();
+     mReadbackQueue = mDevice->newCommandQueue();
+ 
+@@ -85,11 +95,14 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
+         MTL::Buffer* new_buffer = mDevice->newBuffer(256 * 32 * 3 * sizeof(float) * 50, MTL::ResourceStorageModeShared);
+         mVertexBufferPool[i] = new_buffer;
+     }
+-
+     autorelease_pool->release();
+     mNonUniformThreadgroupSupported = NonUniformThreadGroupSupported();
+ 
+-    return ImGui_ImplMetal_Init(mDevice);
++    const bool initialized = ImGui_ImplMetal_Init(mDevice);
++    if (!initialized) {
++        SPDLOG_ERROR("[window-init] ImGui Metal renderer initialization failed");
++    }
++    return initialized;
+ }
+ 
+ static void SetupScreenFramebuffer(uint32_t width, uint32_t height);
+@@ -936,6 +949,12 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale)
+         mFrameUniforms.noiseScale = 1.0f / noise_scale;
+     }
+ 
++    // The taskless VI presentation path can bind the window framebuffer before
++    // the interpreter's normal StartFrame call. Keep this entry point valid for
++    // that first boot frame as well as the usual renderer-driven path.
++    if (!mFrameUniformBuffer) {
++        mFrameUniformBuffer = mDevice->newBuffer(sizeof(FrameUniforms), MTL::ResourceCPUCacheModeDefaultCache);
++    }
+     memcpy(mFrameUniformBuffer->contents(), &mFrameUniforms, sizeof(FrameUniforms));
+ }
+ 
+@@ -1274,7 +1293,12 @@ void GfxRenderingAPIMetal::ReadFramebufferToCPU(int fb_id, uint32_t width, uint3
+             // First frame on main queue — can't block without deadlock.
+             // Return zeros so the caller gets black instead of garbage.
+             memset(rgba16_buf, 0, sizeof(uint16_t) * width * height);
+-            framebuffer.mUseReadbackQueue = true;
++            // Keep a live render target on the main queue. Moving it permanently
++            // to mReadbackQueue makes the window's main-queue compositor sample
++            // that texture without a cross-queue dependency, so transition
++            // captures turn subsequent presents into an intermittent black strobe.
++            // A missed synchronous snapshot is preferable to corrupting every
++            // following frame; asynchronous offscreen readback is a separate path.
+         }
+ 
+         output_buffer->release();
+diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
+index f619b462..68b67b26 100644
+--- a/src/fast/backends/gfx_sdl2.cpp
++++ b/src/fast/backends/gfx_sdl2.cpp
+@@ -265,7 +265,7 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
+         }
+     }
+ 
+-#if defined(__APPLE__)
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     // Implement fullscreening with native macOS APIs
+     if (on != isNativeMacOSFullscreenActive(mWnd)) {
+         toggleNativeMacOSFullscreen(mWnd);
+@@ -370,7 +370,10 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
+     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+ #endif
+ 
+-    SDL_Init(SDL_INIT_VIDEO);
++    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
++        SPDLOG_ERROR("[window-init] SDL video init failed: {}", SDL_GetError());
++        return;
++    }
+ 
+     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
+ 
+@@ -379,7 +382,6 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
+ #else
+     constexpr bool use_opengl = true;
+ #endif
+-
+     if (use_opengl) {
+         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+@@ -429,6 +431,10 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
+     }
+ 
+     mWnd = SDL_CreateWindow(title, posX, posY, mWindowWidth, mWindowHeight, flags);
++    if (mWnd == nullptr) {
++        SPDLOG_ERROR("[window-init] SDL window create failed: {}", SDL_GetError());
++        return;
++    }
+ #ifdef _WIN32
+     // Get Windows window handle and use it to subclass the window procedure.
+     // Needed to circumvent SDLs DPI scaling problems under windows (original does only scale *sometimes*).
+@@ -565,7 +571,7 @@ void GfxWindowBackendSDL2::SetMouseCallbacks(bool (*onMouseButtonDown)(int btn),
+ }
+ 
+ void GfxWindowBackendSDL2::GetDimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     SDL_GetWindowSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
+ #else
+     SDL_GL_GetDrawableSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
+@@ -778,7 +784,7 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
+         case SDL_WINDOWEVENT:
+             switch (event.window.event) {
+                 case SDL_WINDOWEVENT_SIZE_CHANGED:
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+                     SDL_GetWindowSize(mWnd, &mWindowWidth, &mWindowHeight);
+ #else
+                     SDL_GL_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
+@@ -813,7 +819,7 @@ void GfxWindowBackendSDL2::HandleEvents() {
+     }
+ 
+     // resync fullscreen state
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     auto nextFullscreenState = isNativeMacOSFullscreenActive(mWnd);
+     if (mFullScreen != nextFullscreenState) {
+         mFullScreen = nextFullscreenState;
+diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
+index e7501b7e..798048bd 100644
+--- a/src/fast/interpreter.cpp
++++ b/src/fast/interpreter.cpp
+@@ -27,6 +27,7 @@
+ #include <string>
+ 
+ #include "fast/interpreter.h"
++#include "fast/tmem_load_map.h"
+ #include "fast/lus_gbi.h"
+ #include "fast/backends/gfx_window_manager_api.h"
+ #include "fast/backends/gfx_rendering_api.h"
+@@ -4211,12 +4212,6 @@ void Interpreter::GfxDpLoadTlut(uint8_t tile, uint32_t high_index) {
+ }
+ 
+ void Interpreter::StoreLoadedTexture(uint16_t tmemStart, const LoadedTexture& texture) {
+-    constexpr uint32_t kTmemWordBytes = 8;
+-    constexpr uint32_t kTmemWordCount = 512;
+-    if (tmemStart >= kTmemWordCount) {
+-        return;
+-    }
+-
+     // Live getenv, not static-once: the bridge exports GDX_DIAG_SETTIMG via _putenv at the first
+     // real GFX task, and boot frames import textures before that.
+     const bool sTmemTrace = std::getenv("GDX_DIAG_SETTIMG") != nullptr;
+@@ -4229,50 +4224,7 @@ void Interpreter::StoreLoadedTexture(uint16_t tmemStart, const LoadedTexture& te
+         }
+     }
+ 
+-    const uint32_t logicalSize = texture.orig_size_bytes != 0 ? texture.orig_size_bytes : texture.size_bytes;
+-    const uint32_t requestedWords = std::max(1u, (logicalSize + kTmemWordBytes - 1u) / kTmemWordBytes);
+-    const uint32_t wordCount = std::min(requestedWords, kTmemWordCount - tmemStart);
+-    const uint32_t newEnd = tmemStart + wordCount;
+-
+-    // A TMEM upload replaces bytes, not a named texture object. Discard any
+-    // older metadata range touched by this upload so a later render tile can
+-    // never select stale DRAM data for overwritten TMEM.
+-    for (auto& existing : mRdp->loaded_texture) {
+-        if (existing.tmem_word_count == 0) {
+-            continue;
+-        }
+-        const uint32_t existingEnd = existing.tmem_start + existing.tmem_word_count;
+-        if (existing.tmem_start < newEnd && tmemStart < existingEnd) {
+-            existing = {};
+-        }
+-    }
+-
+-    // Materialize metadata at every covered TMEM word. Render tiles are legal
+-    // at offsets inside a LOADBLOCK/LOADTILE range, not only at its base.
+-    for (uint32_t word = 0; word < wordCount; ++word) {
+-        const uint32_t logicalByteOffset = word * kTmemWordBytes;
+-        const uint32_t hostByteOffset =
+-            logicalSize != 0 ? static_cast<uint32_t>((static_cast<uint64_t>(logicalByteOffset) * texture.size_bytes) /
+-                                                     logicalSize)
+-                             : logicalByteOffset;
+-        LoadedTexture entry = texture;
+-        entry.tmem_start = tmemStart;
+-        entry.tmem_word_count = static_cast<uint16_t>(wordCount);
+-        if (entry.addr != nullptr) {
+-            entry.addr += hostByteOffset;
+-        }
+-        entry.size_bytes = texture.size_bytes > hostByteOffset ? texture.size_bytes - hostByteOffset : 0;
+-        entry.orig_size_bytes =
+-            texture.orig_size_bytes > logicalByteOffset ? texture.orig_size_bytes - logicalByteOffset : 0;
+-        if (word != 0) {
+-            // An interior TMEM address starts a new render view into this upload. Its row layout
+-            // comes from the render tile, not the load base; keeping the base stride collapses
+-            // these views into one-pixel-high stripes.
+-            entry.line_size_bytes = 0;
+-            entry.full_image_line_size_bytes = 0;
+-        }
+-        mRdp->loaded_texture[tmemStart + word] = entry;
+-    }
++    StoreLoadedTextureWords(mRdp->loaded_texture, tmemStart, texture);
+ }
+ 
+ void Interpreter::GfxDpLoadBlock(uint8_t tile, uint32_t uls, uint32_t ult, uint32_t lrs, uint32_t dxt) {
+@@ -7106,7 +7058,13 @@ void Interpreter::StartFrame() {
+     // members instead of doing CVar lookups on the hot path. Run() re-latches the fixed-aspect
+     // flag per task. Widescreen == 0 pillarboxes via Fast3dGui::DrawGame, which needs the frame in
+     // an offscreen texture -- hence the forced offscreen target below even at 1x with no MSAA.
+-    mWidescreenEnabledCache = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
++    // Hor+ is meaningful only beyond the native 4:3 aspect. Applying its X scale to a
++    // portrait or otherwise narrow window produces a factor greater than one and pushes
++    // HUD anchors off-screen. Treat those windows as fixed 4:3 for this frame; Fast3dGui
++    // composites the offscreen target into a centered letterbox below.
++    const bool widescreenRequested = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
++    mWidescreenEnabledCache = widescreenRequested &&
++                              mCurDimensions.aspect_ratio > (4.0f / 3.0f);
+     mForceFixedAspectCache = sGdxForceFixedAspect != 0;
+     mWidescreenUiCache = CVarGetInteger("gEnhancements.Graphics.WidescreenUI", 0) != 0;
+     mUltrawideCache = CVarGetInteger("gEnhancements.Graphics.UltrawideMode", 0) != 0;
+diff --git a/src/fast/shaders/metal/default.shader.metal b/src/fast/shaders/metal/default.shader.metal
+index cee31eff..ac5261ee 100644
+--- a/src/fast/shaders/metal/default.shader.metal
++++ b/src/fast/shaders/metal/default.shader.metal
+@@ -9,7 +9,7 @@ struct FrameUniforms {
+     float noiseScale;
+ };
+ 
+-// Do not gate these fields behind @if. setFragmentBytes() copies sizeof(DrawUniforms) from the
++// Do not gate these fields behind a conditional directive. setFragmentBytes() copies sizeof(DrawUniforms) from the
+ // one fixed C++ layout in gfx_metal.h for every variant, so a shorter struct here reads the
+ // wrong field at the wrong offset.
+ struct DrawUniforms {
+@@ -28,11 +28,11 @@ struct FragOut {
+ struct Vertex {
+     float4 position [[attribute(@{get_vertex_index()})]];
+     @{update_floats(4)}
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             float2 texCoord@{i} [[attribute(@{get_vertex_index()})]];
+             @{update_floats(2)}
+-            @for(j in 0..2)
++            @for(j in 0 .. 2)
+                 @if(o_clamp[i][j])
+                     @if(j == 0)
+                         float texClampS@{i} [[attribute(@{get_vertex_index()})]];
+@@ -52,7 +52,7 @@ struct Vertex {
+         float4 grayscale [[attribute(@{get_vertex_index()})]];
+         @{update_floats(4)}
+     @end
+-    @for(i in 0..o_inputs)
++    @for(i in 0 .. o_inputs)
+         @if(o_alpha)
+             float4 input@{i + 1} [[attribute(@{get_vertex_index()})]];
+             @{update_floats(4)}
+@@ -64,10 +64,10 @@ struct Vertex {
+ };
+ 
+ struct ProjectedVertex {
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             float2 texCoord@{i};
+-            @for(j in 0..2)
++            @for(j in 0 .. 2)
+                 @if(o_clamp[i][j])
+                     @if(j == 0)
+                         float texClampS@{i};
+@@ -84,7 +84,7 @@ struct ProjectedVertex {
+     @if(o_grayscale)
+         float4 grayscale;
+     @end
+-    @for(i in 0..o_inputs)
++    @for(i in 0 .. o_inputs)
+         @if(o_alpha)
+             float4 input@{i + 1};
+         @else
+@@ -96,10 +96,10 @@ struct ProjectedVertex {
+ 
+ vertex ProjectedVertex vertexShader(Vertex in [[stage_in]]) {
+     ProjectedVertex out;
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             out.texCoord@{i} = in.texCoord@{i};
+-            @for(j in 0..2)
++            @for(j in 0 .. 2)
+                 @if(o_clamp[i][j])
+                     @if(j == 0)
+                         out.texClampS@{i} = in.texClampS@{i};
+@@ -116,7 +116,7 @@ vertex ProjectedVertex vertexShader(Vertex in [[stage_in]]) {
+     @if(o_grayscale)
+         out.grayscale = in.grayscale;
+     @end
+-    @for(i in 0..o_inputs)
++    @for(i in 0 .. o_inputs)
+          out.input@{i + 1} = in.input@{i + 1};
+     @end
+     out.position = in.position;
+@@ -185,7 +185,7 @@ fragment FragOut fragmentShader(
+     , texture2d<float> uTexBlend1 [[texture(5)]]
+ @end
+ ) {
+-    @for(i in 0..2)
++    @for(i in 0 .. 2)
+         @if(o_textures[i])
+             @{s = o_clamp[i][0]}
+             @{t = o_clamp[i][1]}
+@@ -230,7 +230,7 @@ fragment FragOut fragmentShader(
+         @{f_range = 1}
+     @end
+ 
+-    @for(c in 0..f_range)
++    @for(c in 0 .. f_range)
+         @if(c == 1)
+             @if(o_alpha)
+                 @if(o_c[c][1][2] == SHADER_COMBINED)
+@@ -305,4 +305,4 @@ fragment FragOut fragmentShader(
+         out.depth = drawUniforms.prim_depth;
+     @end
+     return out;
+-}
+\ No newline at end of file
++}
+diff --git a/src/libultraship/libultra/os.cpp b/src/libultraship/libultra/os.cpp
+index f0782792..6d4ef450 100644
+--- a/src/libultraship/libultra/os.cpp
++++ b/src/libultraship/libultra/os.cpp
+@@ -187,47 +187,25 @@ int32_t osAiSetNextBuffer(void* buff, size_t len) {
+         }
+     }
+ 
+-    // Underrun resilience. A long synchronous game-thread operation starves the audio fiber
+-    // (port/n64_sched.c), AudioSynth_Update misses its tick, and the buffer arriving here is
+-    // all-zero -- audible as a click. Repeat the last buffer that had audio instead, halving its
+-    // gain per consecutive miss so a long stall decays to silence rather than looping a snippet.
+-    // Symptom relief only; the starvation itself is fixed by cooperative yields in Dma_LoadAssets
+-    // and mio0_decode.
+-    static std::vector<uint8_t> sLastGoodAiBuffer;
+-    static uint32_t sConsecutiveZeroAiBuffers = 0;
+-    std::vector<uint8_t> fadedSubstitute;
++    // Preserve the game's exact PCM, including intentional all-zero buffers. An older host
++    // underrun workaround repeated and faded the last non-silent buffer here. That can turn
++    // legitimate silence between menu effects or music transitions into ghost sounds and buzz,
++    // and makes transport debugging impossible because playback no longer matches synthesis.
++    // Starvation must be fixed at the producer/scheduler boundary, never by inventing samples.
+     const uint8_t* playBuf = static_cast<const uint8_t*>(buff);
+     size_t playLen = len;
+ 
+-    // The dedicated audio thread does not share the starvation mode above, so an all-zero buffer
+-    // under it is legitimate silence and substituting a decaying copy of the last one turns that
+-    // into ghost notes. The last-good bookkeeping below stays keyed on !allZero rather than this
+-    // gate, so the fallback still has real audio to decay from if the kill switch flips at
+-    // runtime.
+-    const bool substituteFade = allZero && !gdx_audio_thread_active();
+-    if (substituteFade) {
+-        if (!sLastGoodAiBuffer.empty() && sLastGoodAiBuffer.size() == len && (len % sizeof(int16_t)) == 0) {
+-            ++sConsecutiveZeroAiBuffers;
+-            // Capped below 16 so the shift stays defined and a very long stall decays to
+-            // silence instead of looping at an audible volume.
+-            const uint32_t shift = sConsecutiveZeroAiBuffers > 15u ? 15u : sConsecutiveZeroAiBuffers;
+-            fadedSubstitute.resize(len);
+-            const int16_t* src = reinterpret_cast<const int16_t*>(sLastGoodAiBuffer.data());
+-            int16_t* dst = reinterpret_cast<int16_t*>(fadedSubstitute.data());
+-            const size_t numSamples = len / sizeof(int16_t);
+-            for (size_t s = 0; s < numSamples; s++) {
+-                dst[s] = static_cast<int16_t>(src[s] >> shift);
+-            }
+-            playBuf = fadedSubstitute.data();
+-            playLen = fadedSubstitute.size();
+-        }
+-    }
+-    if (!allZero) {
+-        sConsecutiveZeroAiBuffers = 0;
+-        if (sLastGoodAiBuffer.size() != len) {
+-            sLastGoodAiBuffer.resize(len);
+-        }
+-        std::memcpy(sLastGoodAiBuffer.data(), buff, len);
++    // Bounded synthesis-side telemetry. This distinguishes intentional/producer silence from a
++    // transport drop without logging every audio tick or touching the PCM.
++    static uint64_t sSubmittedBuffers = 0;
++    static uint64_t sSubmittedFrames = 0;
++    static uint64_t sZeroBuffers = 0;
++    sSubmittedBuffers++;
++    sSubmittedFrames += len / 4;
++    sZeroBuffers += allZero ? 1u : 0u;
++    if ((sSubmittedBuffers % 300u) == 0u) {
++        SPDLOG_INFO("AI submit: buffers={}, frames={}, zero={}, queued={} frames", sSubmittedBuffers,
++                    sSubmittedFrames, sZeroBuffers, player != nullptr ? player->Buffered() : -1);
+     }
+ 
+     if (player == nullptr || !player->IsInitialized()) {
+diff --git a/src/libultraship/window/gui/InputEditorWindow.cpp b/src/libultraship/window/gui/InputEditorWindow.cpp
+index fc3ea1b5..0db9acaa 100644
+--- a/src/libultraship/window/gui/InputEditorWindow.cpp
++++ b/src/libultraship/window/gui/InputEditorWindow.cpp
+@@ -427,6 +427,24 @@ void InputEditorWindow::DrawButtonLineEditMappingButton(uint8_t port, CONTROLLER
+ 
+ void InputEditorWindow::DrawButtonLine(const char* buttonName, uint8_t port, CONTROLLERBUTTONS_T bitmask,
+                                        ImVec4 color = CHIP_COLOR_N64_GREY) {
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    const auto tableId = StringHelper::Sprintf("buttonMappingRow##%d-%d", port, bitmask);
++    if (ImGui::BeginTable(tableId.c_str(), 2,
++                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
++                              ImGuiTableFlags_PadOuterX)) {
++        ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(66.0f));
++        ImGui::TableSetupColumn("Mappings", ImGuiTableColumnFlags_WidthStretch);
++        ImGui::TableNextRow();
++        ImGui::TableNextColumn();
++        DrawInputChip(buttonName, color);
++        ImGui::TableNextColumn();
++        for (auto id : mBitmaskToMappingIds[port][bitmask]) {
++            DrawButtonLineEditMappingButton(port, bitmask, id);
++        }
++        DrawButtonLineAddMappingButton(port, bitmask);
++        ImGui::EndTable();
++    }
++#else
+     ImGui::NewLine();
+     ImGui::SameLine(SCALE_IMGUI_SIZE(32.0f));
+     DrawInputChip(buttonName, color);
+@@ -435,6 +453,7 @@ void InputEditorWindow::DrawButtonLine(const char* buttonName, uint8_t port, CON
+         DrawButtonLineEditMappingButton(port, bitmask, id);
+     }
+     DrawButtonLineAddMappingButton(port, bitmask);
++#endif
+ }
+ 
+ void InputEditorWindow::DrawStickDirectionLineAddMappingButton(uint8_t port, uint8_t stick, Ship::Direction direction) {
+@@ -598,6 +617,28 @@ void InputEditorWindow::DrawStickDirectionLineEditMappingButton(uint8_t port, ui
+ 
+ void InputEditorWindow::DrawStickDirectionLine(const char* axisDirectionName, uint8_t port, uint8_t stick,
+                                                Ship::Direction direction, ImVec4 color = CHIP_COLOR_N64_GREY) {
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    const auto tableId = StringHelper::Sprintf("stickMappingRow##%d-%d-%d", port, stick, direction);
++    if (ImGui::BeginTable(tableId.c_str(), 2,
++                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
++                              ImGuiTableFlags_PadOuterX)) {
++        ImGui::TableSetupColumn("Direction", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(42.0f));
++        ImGui::TableSetupColumn("Mappings", ImGuiTableColumnFlags_WidthStretch);
++        ImGui::TableNextRow();
++        ImGui::TableNextColumn();
++        ImGui::BeginDisabled();
++        ImGui::PushStyleColor(ImGuiCol_Button, color);
++        ImGui::Button(axisDirectionName, ImVec2(SCALE_IMGUI_SIZE(26.0f), 0));
++        ImGui::PopStyleColor();
++        ImGui::EndDisabled();
++        ImGui::TableNextColumn();
++        for (auto id : mStickDirectionToMappingIds[port][stick][direction]) {
++            DrawStickDirectionLineEditMappingButton(port, stick, direction, id);
++        }
++        DrawStickDirectionLineAddMappingButton(port, stick, direction);
++        ImGui::EndTable();
++    }
++#else
+     ImGui::NewLine();
+     ImGui::SameLine();
+     ImGui::BeginDisabled();
+@@ -610,6 +651,7 @@ void InputEditorWindow::DrawStickDirectionLine(const char* axisDirectionName, ui
+         DrawStickDirectionLineEditMappingButton(port, stick, direction, id);
+     }
+     DrawStickDirectionLineAddMappingButton(port, stick, direction);
++#endif
+ }
+ 
+ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id, ImVec4 color = CHIP_COLOR_N64_GREY) {
+@@ -621,6 +663,24 @@ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id
+         controllerStick = Ship::Context::GetInstance()->GetControlDeck()->GetControllerByPort(port)->GetRightStick();
+     }
+     controllerStick->Process(sX, sY);
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++    const auto tableId = StringHelper::Sprintf("stickEditorLayout##%d-%d", port, id);
++    if (ImGui::BeginTable(tableId.c_str(), 2,
++                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
++                              ImGuiTableFlags_PadOuterX)) {
++        ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(116.0f));
++        ImGui::TableSetupColumn("Bindings", ImGuiTableColumnFlags_WidthStretch);
++        ImGui::TableNextRow();
++        ImGui::TableNextColumn();
++        DrawAnalogPreview(StringHelper::Sprintf("##AnalogPreview%d", id).c_str(), ImVec2(sX, sY));
++        ImGui::TableNextColumn();
++        DrawStickDirectionLine(ICON_FA_ARROW_UP, port, stick, Ship::UP, color);
++        DrawStickDirectionLine(ICON_FA_ARROW_DOWN, port, stick, Ship::DOWN, color);
++        DrawStickDirectionLine(ICON_FA_ARROW_LEFT, port, stick, Ship::LEFT, color);
++        DrawStickDirectionLine(ICON_FA_ARROW_RIGHT, port, stick, Ship::RIGHT, color);
++        ImGui::EndTable();
++    }
++#else
+     DrawAnalogPreview(StringHelper::Sprintf("##AnalogPreview%d", id).c_str(), ImVec2(sX, sY));
+ 
+     ImGui::SameLine();
+@@ -630,6 +690,7 @@ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id
+     DrawStickDirectionLine(ICON_FA_ARROW_LEFT, port, stick, Ship::LEFT, color);
+     DrawStickDirectionLine(ICON_FA_ARROW_RIGHT, port, stick, Ship::RIGHT, color);
+     ImGui::EndGroup();
++#endif
+     ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+     if (ImGui::TreeNode(StringHelper::Sprintf("Analog Stick Options##%d", id).c_str())) {
+         ImGui::Text("Sensitivity:");
+@@ -1262,6 +1323,19 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
+         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+ 
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++        const int primaryColumns = ImGui::GetContentRegionAvail().x >= SCALE_IMGUI_SIZE(700.0f) ? 2 : 1;
++        if (ImGui::BeginTable("PrimaryInputSections", primaryColumns,
++                              ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings |
++                                  ImGuiTableFlags_PadOuterX)) {
++            ImGui::TableNextRow();
++            if (primaryColumns > 1) {
++                ImGui::TableNextColumn();
++            } else {
++                ImGui::TableNextRow();
++                ImGui::TableNextColumn();
++            }
++#endif
+         if (ImGui::CollapsingHeader("Buttons", NULL, ImGuiTreeNodeFlags_DefaultOpen)) {
+             DrawButtonLine("A", portIndex, BTN_A, CHIP_COLOR_N64_BLUE);
+             DrawButtonLine("B", portIndex, BTN_B, CHIP_COLOR_N64_GREEN);
+@@ -1279,6 +1353,9 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
+                            CHIP_COLOR_N64_YELLOW);
+         }
+ 
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++            ImGui::TableNextColumn();
++#endif
+         if (ImGui::CollapsingHeader("D-Pad", NULL, ImGuiTreeNodeFlags_DefaultOpen)) {
+             DrawButtonLine(StringHelper::Sprintf("%s", ICON_FA_ARROW_UP).c_str(), portIndex, BTN_DUP);
+             DrawButtonLine(StringHelper::Sprintf("%s", ICON_FA_ARROW_DOWN).c_str(), portIndex, BTN_DDOWN);
+@@ -1290,6 +1367,11 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
+             DrawStickSection(portIndex, Ship::LEFT, 0);
+         }
+ 
++#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
++            ImGui::EndTable();
++        }
++#endif
++
+         if (ImGui::CollapsingHeader("Additional (\"Right\") Stick")) {
+             DrawStickSection(portIndex, Ship::RIGHT, 1, CHIP_COLOR_N64_YELLOW);
+         }
+diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
+index 2fe754be..ad688ce1 100644
+--- a/src/ship/Context.cpp
++++ b/src/ship/Context.cpp
+@@ -462,8 +462,10 @@ std::string Context::GetAppBundlePath() {
+ #endif
+ 
+ #ifdef __IOS__
+-    const char* home = getenv("HOME");
+-    return std::string(home) + "/Documents";
++    {
++        FolderManager folderManager;
++        return folderManager.getMainBundlePath();
++    }
+ #endif
+ 
+ #ifdef NON_PORTABLE
+diff --git a/src/ship/audio/Audio.cpp b/src/ship/audio/Audio.cpp
+index 40140b60..307178f8 100644
+--- a/src/ship/audio/Audio.cpp
++++ b/src/ship/audio/Audio.cpp
+@@ -1,6 +1,6 @@
+ #include "ship/audio/Audio.h"
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+ #include "ship/audio/CoreAudioAudioPlayer.h"
+ #endif
+ 
+@@ -21,7 +21,7 @@ void Audio::InitAudioPlayer() {
+             mAudioPlayer = std::make_shared<WasapiAudioPlayer>(this->mAudioSettings);
+             break;
+ #endif
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+         case AudioBackend::COREAUDIO:
+             mAudioPlayer = std::make_shared<CoreAudioAudioPlayer>(this->mAudioSettings);
+             break;
+@@ -48,7 +48,7 @@ void Audio::Init() {
+ #ifdef _WIN32
+     mAvailableAudioBackends->push_back(AudioBackend::WASAPI);
+ #endif
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     mAvailableAudioBackends->push_back(AudioBackend::COREAUDIO);
+ #endif
+     mAvailableAudioBackends->push_back(AudioBackend::SDL);
+@@ -97,7 +97,7 @@ AudioBackend Audio::GetSavedAudioBackend() {
+     return AudioBackend::WASAPI;
+ #endif
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+     return AudioBackend::COREAUDIO;
+ #endif
+ 
+diff --git a/src/ship/audio/SDLAudioPlayer.cpp b/src/ship/audio/SDLAudioPlayer.cpp
+index d4a3c280..0c2e0d9e 100644
+--- a/src/ship/audio/SDLAudioPlayer.cpp
++++ b/src/ship/audio/SDLAudioPlayer.cpp
+@@ -43,7 +43,13 @@ bool SDLAudioPlayer::DoInit() {
+         return false;
+     }
+ 
+-    SPDLOG_INFO("SDL Audio initialized: {} channels, {} Hz", mNumChannels, this->GetSampleRate());
++    mNumChannels = have.channels;
++    SPDLOG_INFO(
++        "SDL Audio initialized: driver={}, requested={}Hz/S16/{}ch/{} frames, "
++        "obtained={}Hz/0x{:04x}/{}ch/{} frames",
++        SDL_GetCurrentAudioDriver() != nullptr ? SDL_GetCurrentAudioDriver() : "unknown", want.freq,
++        static_cast<int>(want.channels), want.samples, have.freq, static_cast<unsigned int>(have.format),
++        static_cast<int>(have.channels), have.samples);
+ 
+     SDL_PauseAudioDevice(mDevice, 0);
+     return true;
+@@ -59,8 +65,34 @@ void SDLAudioPlayer::DoPlay(const uint8_t* buf, size_t len) {
+     // DesiredBuffered to 4096, and an over-full queue drops submissions silently. The 1024
+     // margin is one production batch, so a producer slightly ahead of schedule is not punished.
+     static const int32_t kBacklogMargin = 1024;
+-    if (Buffered() < GetDesiredBuffered() + kBacklogMargin) {
+-        SDL_QueueAudio(mDevice, buf, len);
++    static uint64_t sQueuedBuffers = 0;
++    static uint64_t sQueuedFrames = 0;
++    static uint64_t sDroppedBuffers = 0;
++    static uint64_t sQueueErrors = 0;
++    static int32_t sMaxBuffered = 0;
++
++    const int32_t bufferedBefore = Buffered();
++    if (bufferedBefore > sMaxBuffered) {
++        sMaxBuffered = bufferedBefore;
++    }
++    if (bufferedBefore < GetDesiredBuffered() + kBacklogMargin) {
++        if (SDL_QueueAudio(mDevice, buf, static_cast<Uint32>(len)) == 0) {
++            sQueuedBuffers++;
++            sQueuedFrames += len / (sizeof(int16_t) * mNumChannels);
++        } else {
++            sQueueErrors++;
++            SPDLOG_ERROR("SDL_QueueAudio failed: {}", SDL_GetError());
++        }
++    } else {
++        sDroppedBuffers++;
++    }
++
++    const uint64_t total = sQueuedBuffers + sDroppedBuffers + sQueueErrors;
++    if (total != 0 && (total % 300u) == 0u) {
++        SPDLOG_INFO("SDL queue: submitted={} buffers/{} frames, dropped={}, errors={}, "
++                    "buffered={} frames, max={} frames, target={} frames",
++                    sQueuedBuffers, sQueuedFrames, sDroppedBuffers, sQueueErrors, Buffered(),
++                    sMaxBuffered, GetDesiredBuffered());
+     }
+ }
+ } // namespace Ship
+diff --git a/src/ship/window/gui/Gui.cpp b/src/ship/window/gui/Gui.cpp
+index b2f99bde..41907c02 100644
+--- a/src/ship/window/gui/Gui.cpp
++++ b/src/ship/window/gui/Gui.cpp
+@@ -100,7 +100,6 @@ void Gui::Init() {
+     Context::GetInstance()->GetResourceManager()->GetResourceLoader()->RegisterResourceFactory(
+         std::make_shared<ResourceFactoryBinaryGuiTextureV0>(), RESOURCE_FORMAT_BINARY, "GuiTexture",
+         static_cast<uint32_t>(RESOURCE_TYPE_GUI_TEXTURE), 0);
+-
+     ImGuiWMInit();
+     ImGuiBackendInit();
+ }
 diff --git a/include/fast/tmem_load_map.h b/include/fast/tmem_load_map.h
 new file mode 100644
-index 00000000..2bff8507
+index 0000000..2bff850
 --- /dev/null
 +++ b/include/fast/tmem_load_map.h
 @@ -0,0 +1,49 @@
@@ -131,570 +822,3 @@ index 00000000..2bff8507
 +}
 +
 +} // namespace Fast
-diff --git a/src/fast/Fast3dGui.cpp b/src/fast/Fast3dGui.cpp
-index ac65f1ac..9762206f 100644
---- a/src/fast/Fast3dGui.cpp
-+++ b/src/fast/Fast3dGui.cpp
-@@ -407,7 +407,8 @@ void Fast3dGui::DrawGame() {
-         size = ImVec2(sw, size.y);
-     } else if (Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger("gEnhancements.Graphics.Widescreen",
-                                                                                1) == 0 ||
--               gdx_get_force_fixed_aspect() != 0) {
-+               gdx_get_force_fixed_aspect() != 0 ||
-+               (size.y > 0.0f && size.x / size.y <= 4.0f / 3.0f)) {
-         // 4:3 pillarbox, either from the Widescreen setting or from the runtime flag the game
-         // publishes for modes that must render stock 4:3 (the Expansion Kit editors). The flag
-         // is read live because it can flip mid-dispatch and this decision has to track it within
-diff --git a/src/fast/backends/gfx_metal.cpp b/src/fast/backends/gfx_metal.cpp
-index a32a12e7..e7ff3b95 100644
---- a/src/fast/backends/gfx_metal.cpp
-+++ b/src/fast/backends/gfx_metal.cpp
-@@ -75,9 +75,19 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
-     NS::AutoreleasePool* autorelease_pool = NS::AutoreleasePool::alloc()->init();
-
-     mLayer = (CA::MetalLayer*)SDL_RenderGetMetalLayer(renderer);
-+    if (mLayer == nullptr) {
-+        SPDLOG_ERROR("[window-init] SDL_RenderGetMetalLayer returned null: {}", SDL_GetError());
-+        autorelease_pool->release();
-+        return false;
-+    }
-     mLayer->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
-
-     mDevice = mLayer->device();
-+    if (mDevice == nullptr) {
-+        SPDLOG_ERROR("[window-init] Metal layer has no device");
-+        autorelease_pool->release();
-+        return false;
-+    }
-     mCommandQueue = mDevice->newCommandQueue();
-     mReadbackQueue = mDevice->newCommandQueue();
-
-@@ -85,11 +95,14 @@ bool GfxRenderingAPIMetal::MetalInit(SDL_Renderer* renderer) {
-         MTL::Buffer* new_buffer = mDevice->newBuffer(256 * 32 * 3 * sizeof(float) * 50, MTL::ResourceStorageModeShared);
-         mVertexBufferPool[i] = new_buffer;
-     }
--
-     autorelease_pool->release();
-     mNonUniformThreadgroupSupported = NonUniformThreadGroupSupported();
-
--    return ImGui_ImplMetal_Init(mDevice);
-+    const bool initialized = ImGui_ImplMetal_Init(mDevice);
-+    if (!initialized) {
-+        SPDLOG_ERROR("[window-init] ImGui Metal renderer initialization failed");
-+    }
-+    return initialized;
- }
-
- static void SetupScreenFramebuffer(uint32_t width, uint32_t height);
-@@ -936,6 +949,12 @@ void GfxRenderingAPIMetal::StartDrawToFramebuffer(int fb_id, float noise_scale)
-         mFrameUniforms.noiseScale = 1.0f / noise_scale;
-     }
-
-+    // The taskless VI presentation path can bind the window framebuffer before
-+    // the interpreter's normal StartFrame call. Keep this entry point valid for
-+    // that first boot frame as well as the usual renderer-driven path.
-+    if (!mFrameUniformBuffer) {
-+        mFrameUniformBuffer = mDevice->newBuffer(sizeof(FrameUniforms), MTL::ResourceCPUCacheModeDefaultCache);
-+    }
-     memcpy(mFrameUniformBuffer->contents(), &mFrameUniforms, sizeof(FrameUniforms));
- }
-
-@@ -1274,7 +1293,12 @@ void GfxRenderingAPIMetal::ReadFramebufferToCPU(int fb_id, uint32_t width, uint3
-             // First frame on main queue — can't block without deadlock.
-             // Return zeros so the caller gets black instead of garbage.
-             memset(rgba16_buf, 0, sizeof(uint16_t) * width * height);
--            framebuffer.mUseReadbackQueue = true;
-+            // Keep a live render target on the main queue. Moving it permanently
-+            // to mReadbackQueue makes the window's main-queue compositor sample
-+            // that texture without a cross-queue dependency, so transition
-+            // captures turn subsequent presents into an intermittent black strobe.
-+            // A missed synchronous snapshot is preferable to corrupting every
-+            // following frame; asynchronous offscreen readback is a separate path.
-         }
-
-         output_buffer->release();
-diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
-index f619b462..68b67b26 100644
---- a/src/fast/backends/gfx_sdl2.cpp
-+++ b/src/fast/backends/gfx_sdl2.cpp
-@@ -265,7 +265,7 @@ void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
-         }
-     }
-
--#if defined(__APPLE__)
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-     // Implement fullscreening with native macOS APIs
-     if (on != isNativeMacOSFullscreenActive(mWnd)) {
-         toggleNativeMacOSFullscreen(mWnd);
-@@ -370,7 +370,10 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
-     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
- #endif
-
--    SDL_Init(SDL_INIT_VIDEO);
-+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-+        SPDLOG_ERROR("[window-init] SDL video init failed: {}", SDL_GetError());
-+        return;
-+    }
-
-     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
-
-@@ -379,7 +382,6 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
- #else
-     constexpr bool use_opengl = true;
- #endif
--
-     if (use_opengl) {
-         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-@@ -429,6 +431,10 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
-     }
-
-     mWnd = SDL_CreateWindow(title, posX, posY, mWindowWidth, mWindowHeight, flags);
-+    if (mWnd == nullptr) {
-+        SPDLOG_ERROR("[window-init] SDL window create failed: {}", SDL_GetError());
-+        return;
-+    }
- #ifdef _WIN32
-     // Get Windows window handle and use it to subclass the window procedure.
-     // Needed to circumvent SDLs DPI scaling problems under windows (original does only scale *sometimes*).
-@@ -565,7 +571,7 @@ void GfxWindowBackendSDL2::SetMouseCallbacks(bool (*onMouseButtonDown)(int btn),
- }
-
- void GfxWindowBackendSDL2::GetDimensions(uint32_t* width, uint32_t* height, int32_t* posX, int32_t* posY) {
--#ifdef __APPLE__
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-     SDL_GetWindowSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
- #else
-     SDL_GL_GetDrawableSize(mWnd, static_cast<int*>((void*)width), static_cast<int*>((void*)height));
-@@ -778,7 +784,7 @@ void GfxWindowBackendSDL2::HandleSingleEvent(SDL_Event& event) {
-         case SDL_WINDOWEVENT:
-             switch (event.window.event) {
-                 case SDL_WINDOWEVENT_SIZE_CHANGED:
--#ifdef __APPLE__
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-                     SDL_GetWindowSize(mWnd, &mWindowWidth, &mWindowHeight);
- #else
-                     SDL_GL_GetDrawableSize(mWnd, &mWindowWidth, &mWindowHeight);
-@@ -813,7 +819,7 @@ void GfxWindowBackendSDL2::HandleEvents() {
-     }
-
-     // resync fullscreen state
--#ifdef __APPLE__
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-     auto nextFullscreenState = isNativeMacOSFullscreenActive(mWnd);
-     if (mFullScreen != nextFullscreenState) {
-         mFullScreen = nextFullscreenState;
-diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
-index e7501b7e..798048bd 100644
---- a/src/fast/interpreter.cpp
-+++ b/src/fast/interpreter.cpp
-@@ -27,6 +27,7 @@
- #include <string>
-
- #include "fast/interpreter.h"
-+#include "fast/tmem_load_map.h"
- #include "fast/lus_gbi.h"
- #include "fast/backends/gfx_window_manager_api.h"
- #include "fast/backends/gfx_rendering_api.h"
-@@ -4211,12 +4212,6 @@ void Interpreter::GfxDpLoadTlut(uint8_t tile, uint32_t high_index) {
- }
-
- void Interpreter::StoreLoadedTexture(uint16_t tmemStart, const LoadedTexture& texture) {
--    constexpr uint32_t kTmemWordBytes = 8;
--    constexpr uint32_t kTmemWordCount = 512;
--    if (tmemStart >= kTmemWordCount) {
--        return;
--    }
--
-     // Live getenv, not static-once: the bridge exports GDX_DIAG_SETTIMG via _putenv at the first
-     // real GFX task, and boot frames import textures before that.
-     const bool sTmemTrace = std::getenv("GDX_DIAG_SETTIMG") != nullptr;
-@@ -4229,50 +4224,7 @@ void Interpreter::StoreLoadedTexture(uint16_t tmemStart, const LoadedTexture& te
-         }
-     }
-
--    const uint32_t logicalSize = texture.orig_size_bytes != 0 ? texture.orig_size_bytes : texture.size_bytes;
--    const uint32_t requestedWords = std::max(1u, (logicalSize + kTmemWordBytes - 1u) / kTmemWordBytes);
--    const uint32_t wordCount = std::min(requestedWords, kTmemWordCount - tmemStart);
--    const uint32_t newEnd = tmemStart + wordCount;
--
--    // A TMEM upload replaces bytes, not a named texture object. Discard any
--    // older metadata range touched by this upload so a later render tile can
--    // never select stale DRAM data for overwritten TMEM.
--    for (auto& existing : mRdp->loaded_texture) {
--        if (existing.tmem_word_count == 0) {
--            continue;
--        }
--        const uint32_t existingEnd = existing.tmem_start + existing.tmem_word_count;
--        if (existing.tmem_start < newEnd && tmemStart < existingEnd) {
--            existing = {};
--        }
--    }
--
--    // Materialize metadata at every covered TMEM word. Render tiles are legal
--    // at offsets inside a LOADBLOCK/LOADTILE range, not only at its base.
--    for (uint32_t word = 0; word < wordCount; ++word) {
--        const uint32_t logicalByteOffset = word * kTmemWordBytes;
--        const uint32_t hostByteOffset =
--            logicalSize != 0 ? static_cast<uint32_t>((static_cast<uint64_t>(logicalByteOffset) * texture.size_bytes) /
--                                                     logicalSize)
--                             : logicalByteOffset;
--        LoadedTexture entry = texture;
--        entry.tmem_start = tmemStart;
--        entry.tmem_word_count = static_cast<uint16_t>(wordCount);
--        if (entry.addr != nullptr) {
--            entry.addr += hostByteOffset;
--        }
--        entry.size_bytes = texture.size_bytes > hostByteOffset ? texture.size_bytes - hostByteOffset : 0;
--        entry.orig_size_bytes =
--            texture.orig_size_bytes > logicalByteOffset ? texture.orig_size_bytes - logicalByteOffset : 0;
--        if (word != 0) {
--            // An interior TMEM address starts a new render view into this upload. Its row layout
--            // comes from the render tile, not the load base; keeping the base stride collapses
--            // these views into one-pixel-high stripes.
--            entry.line_size_bytes = 0;
--            entry.full_image_line_size_bytes = 0;
--        }
--        mRdp->loaded_texture[tmemStart + word] = entry;
--    }
-+    StoreLoadedTextureWords(mRdp->loaded_texture, tmemStart, texture);
- }
-
- void Interpreter::GfxDpLoadBlock(uint8_t tile, uint32_t uls, uint32_t ult, uint32_t lrs, uint32_t dxt) {
-@@ -7106,7 +7058,13 @@ void Interpreter::StartFrame() {
-     // members instead of doing CVar lookups on the hot path. Run() re-latches the fixed-aspect
-     // flag per task. Widescreen == 0 pillarboxes via Fast3dGui::DrawGame, which needs the frame in
-     // an offscreen texture -- hence the forced offscreen target below even at 1x with no MSAA.
--    mWidescreenEnabledCache = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
-+    // Hor+ is meaningful only beyond the native 4:3 aspect. Applying its X scale to a
-+    // portrait or otherwise narrow window produces a factor greater than one and pushes
-+    // HUD anchors off-screen. Treat those windows as fixed 4:3 for this frame; Fast3dGui
-+    // composites the offscreen target into a centered letterbox below.
-+    const bool widescreenRequested = CVarGetInteger("gEnhancements.Graphics.Widescreen", 1) != 0;
-+    mWidescreenEnabledCache = widescreenRequested &&
-+                              mCurDimensions.aspect_ratio > (4.0f / 3.0f);
-     mForceFixedAspectCache = sGdxForceFixedAspect != 0;
-     mWidescreenUiCache = CVarGetInteger("gEnhancements.Graphics.WidescreenUI", 0) != 0;
-     mUltrawideCache = CVarGetInteger("gEnhancements.Graphics.UltrawideMode", 0) != 0;
-diff --git a/src/fast/shaders/metal/default.shader.metal b/src/fast/shaders/metal/default.shader.metal
-index cee31eff..ac5261ee 100644
---- a/src/fast/shaders/metal/default.shader.metal
-+++ b/src/fast/shaders/metal/default.shader.metal
-@@ -9,7 +9,7 @@ struct FrameUniforms {
-     float noiseScale;
- };
-
--// Do not gate these fields behind @if. setFragmentBytes() copies sizeof(DrawUniforms) from the
-+// Do not gate these fields behind a conditional directive. setFragmentBytes() copies sizeof(DrawUniforms) from the
- // one fixed C++ layout in gfx_metal.h for every variant, so a shorter struct here reads the
- // wrong field at the wrong offset.
- struct DrawUniforms {
-@@ -28,11 +28,11 @@ struct FragOut {
- struct Vertex {
-     float4 position [[attribute(@{get_vertex_index()})]];
-     @{update_floats(4)}
--    @for(i in 0..2)
-+    @for(i in 0 .. 2)
-         @if(o_textures[i])
-             float2 texCoord@{i} [[attribute(@{get_vertex_index()})]];
-             @{update_floats(2)}
--            @for(j in 0..2)
-+            @for(j in 0 .. 2)
-                 @if(o_clamp[i][j])
-                     @if(j == 0)
-                         float texClampS@{i} [[attribute(@{get_vertex_index()})]];
-@@ -52,7 +52,7 @@ struct Vertex {
-         float4 grayscale [[attribute(@{get_vertex_index()})]];
-         @{update_floats(4)}
-     @end
--    @for(i in 0..o_inputs)
-+    @for(i in 0 .. o_inputs)
-         @if(o_alpha)
-             float4 input@{i + 1} [[attribute(@{get_vertex_index()})]];
-             @{update_floats(4)}
-@@ -64,10 +64,10 @@ struct Vertex {
- };
-
- struct ProjectedVertex {
--    @for(i in 0..2)
-+    @for(i in 0 .. 2)
-         @if(o_textures[i])
-             float2 texCoord@{i};
--            @for(j in 0..2)
-+            @for(j in 0 .. 2)
-                 @if(o_clamp[i][j])
-                     @if(j == 0)
-                         float texClampS@{i};
-@@ -84,7 +84,7 @@ struct ProjectedVertex {
-     @if(o_grayscale)
-         float4 grayscale;
-     @end
--    @for(i in 0..o_inputs)
-+    @for(i in 0 .. o_inputs)
-         @if(o_alpha)
-             float4 input@{i + 1};
-         @else
-@@ -96,10 +96,10 @@ struct ProjectedVertex {
-
- vertex ProjectedVertex vertexShader(Vertex in [[stage_in]]) {
-     ProjectedVertex out;
--    @for(i in 0..2)
-+    @for(i in 0 .. 2)
-         @if(o_textures[i])
-             out.texCoord@{i} = in.texCoord@{i};
--            @for(j in 0..2)
-+            @for(j in 0 .. 2)
-                 @if(o_clamp[i][j])
-                     @if(j == 0)
-                         out.texClampS@{i} = in.texClampS@{i};
-@@ -116,7 +116,7 @@ vertex ProjectedVertex vertexShader(Vertex in [[stage_in]]) {
-     @if(o_grayscale)
-         out.grayscale = in.grayscale;
-     @end
--    @for(i in 0..o_inputs)
-+    @for(i in 0 .. o_inputs)
-          out.input@{i + 1} = in.input@{i + 1};
-     @end
-     out.position = in.position;
-@@ -185,7 +185,7 @@ fragment FragOut fragmentShader(
-     , texture2d<float> uTexBlend1 [[texture(5)]]
- @end
- ) {
--    @for(i in 0..2)
-+    @for(i in 0 .. 2)
-         @if(o_textures[i])
-             @{s = o_clamp[i][0]}
-             @{t = o_clamp[i][1]}
-@@ -230,7 +230,7 @@ fragment FragOut fragmentShader(
-         @{f_range = 1}
-     @end
-
--    @for(c in 0..f_range)
-+    @for(c in 0 .. f_range)
-         @if(c == 1)
-             @if(o_alpha)
-                 @if(o_c[c][1][2] == SHADER_COMBINED)
-@@ -305,4 +305,4 @@ fragment FragOut fragmentShader(
-         out.depth = drawUniforms.prim_depth;
-     @end
-     return out;
--}
-\ No newline at end of file
-+}
-diff --git a/src/libultraship/window/gui/InputEditorWindow.cpp b/src/libultraship/window/gui/InputEditorWindow.cpp
-index fc3ea1b5..0db9acaa 100644
---- a/src/libultraship/window/gui/InputEditorWindow.cpp
-+++ b/src/libultraship/window/gui/InputEditorWindow.cpp
-@@ -427,6 +427,24 @@ void InputEditorWindow::DrawButtonLineEditMappingButton(uint8_t port, CONTROLLER
-
- void InputEditorWindow::DrawButtonLine(const char* buttonName, uint8_t port, CONTROLLERBUTTONS_T bitmask,
-                                        ImVec4 color = CHIP_COLOR_N64_GREY) {
-+#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-+    const auto tableId = StringHelper::Sprintf("buttonMappingRow##%d-%d", port, bitmask);
-+    if (ImGui::BeginTable(tableId.c_str(), 2,
-+                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
-+                              ImGuiTableFlags_PadOuterX)) {
-+        ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(66.0f));
-+        ImGui::TableSetupColumn("Mappings", ImGuiTableColumnFlags_WidthStretch);
-+        ImGui::TableNextRow();
-+        ImGui::TableNextColumn();
-+        DrawInputChip(buttonName, color);
-+        ImGui::TableNextColumn();
-+        for (auto id : mBitmaskToMappingIds[port][bitmask]) {
-+            DrawButtonLineEditMappingButton(port, bitmask, id);
-+        }
-+        DrawButtonLineAddMappingButton(port, bitmask);
-+        ImGui::EndTable();
-+    }
-+#else
-     ImGui::NewLine();
-     ImGui::SameLine(SCALE_IMGUI_SIZE(32.0f));
-     DrawInputChip(buttonName, color);
-@@ -435,6 +453,7 @@ void InputEditorWindow::DrawButtonLine(const char* buttonName, uint8_t port, CON
-         DrawButtonLineEditMappingButton(port, bitmask, id);
-     }
-     DrawButtonLineAddMappingButton(port, bitmask);
-+#endif
- }
-
- void InputEditorWindow::DrawStickDirectionLineAddMappingButton(uint8_t port, uint8_t stick, Ship::Direction direction) {
-@@ -598,6 +617,28 @@ void InputEditorWindow::DrawStickDirectionLineEditMappingButton(uint8_t port, ui
-
- void InputEditorWindow::DrawStickDirectionLine(const char* axisDirectionName, uint8_t port, uint8_t stick,
-                                                Ship::Direction direction, ImVec4 color = CHIP_COLOR_N64_GREY) {
-+#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-+    const auto tableId = StringHelper::Sprintf("stickMappingRow##%d-%d-%d", port, stick, direction);
-+    if (ImGui::BeginTable(tableId.c_str(), 2,
-+                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
-+                              ImGuiTableFlags_PadOuterX)) {
-+        ImGui::TableSetupColumn("Direction", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(42.0f));
-+        ImGui::TableSetupColumn("Mappings", ImGuiTableColumnFlags_WidthStretch);
-+        ImGui::TableNextRow();
-+        ImGui::TableNextColumn();
-+        ImGui::BeginDisabled();
-+        ImGui::PushStyleColor(ImGuiCol_Button, color);
-+        ImGui::Button(axisDirectionName, ImVec2(SCALE_IMGUI_SIZE(26.0f), 0));
-+        ImGui::PopStyleColor();
-+        ImGui::EndDisabled();
-+        ImGui::TableNextColumn();
-+        for (auto id : mStickDirectionToMappingIds[port][stick][direction]) {
-+            DrawStickDirectionLineEditMappingButton(port, stick, direction, id);
-+        }
-+        DrawStickDirectionLineAddMappingButton(port, stick, direction);
-+        ImGui::EndTable();
-+    }
-+#else
-     ImGui::NewLine();
-     ImGui::SameLine();
-     ImGui::BeginDisabled();
-@@ -610,6 +651,7 @@ void InputEditorWindow::DrawStickDirectionLine(const char* axisDirectionName, ui
-         DrawStickDirectionLineEditMappingButton(port, stick, direction, id);
-     }
-     DrawStickDirectionLineAddMappingButton(port, stick, direction);
-+#endif
- }
-
- void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id, ImVec4 color = CHIP_COLOR_N64_GREY) {
-@@ -621,6 +663,24 @@ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id
-         controllerStick = Ship::Context::GetInstance()->GetControlDeck()->GetControllerByPort(port)->GetRightStick();
-     }
-     controllerStick->Process(sX, sY);
-+#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-+    const auto tableId = StringHelper::Sprintf("stickEditorLayout##%d-%d", port, id);
-+    if (ImGui::BeginTable(tableId.c_str(), 2,
-+                          ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings |
-+                              ImGuiTableFlags_PadOuterX)) {
-+        ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthFixed, SCALE_IMGUI_SIZE(116.0f));
-+        ImGui::TableSetupColumn("Bindings", ImGuiTableColumnFlags_WidthStretch);
-+        ImGui::TableNextRow();
-+        ImGui::TableNextColumn();
-+        DrawAnalogPreview(StringHelper::Sprintf("##AnalogPreview%d", id).c_str(), ImVec2(sX, sY));
-+        ImGui::TableNextColumn();
-+        DrawStickDirectionLine(ICON_FA_ARROW_UP, port, stick, Ship::UP, color);
-+        DrawStickDirectionLine(ICON_FA_ARROW_DOWN, port, stick, Ship::DOWN, color);
-+        DrawStickDirectionLine(ICON_FA_ARROW_LEFT, port, stick, Ship::LEFT, color);
-+        DrawStickDirectionLine(ICON_FA_ARROW_RIGHT, port, stick, Ship::RIGHT, color);
-+        ImGui::EndTable();
-+    }
-+#else
-     DrawAnalogPreview(StringHelper::Sprintf("##AnalogPreview%d", id).c_str(), ImVec2(sX, sY));
-
-     ImGui::SameLine();
-@@ -630,6 +690,7 @@ void InputEditorWindow::DrawStickSection(uint8_t port, uint8_t stick, int32_t id
-     DrawStickDirectionLine(ICON_FA_ARROW_LEFT, port, stick, Ship::LEFT, color);
-     DrawStickDirectionLine(ICON_FA_ARROW_RIGHT, port, stick, Ship::RIGHT, color);
-     ImGui::EndGroup();
-+#endif
-     ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-     if (ImGui::TreeNode(StringHelper::Sprintf("Analog Stick Options##%d", id).c_str())) {
-         ImGui::Text("Sensitivity:");
-@@ -1262,6 +1323,19 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
-         ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-
-+#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-+        const int primaryColumns = ImGui::GetContentRegionAvail().x >= SCALE_IMGUI_SIZE(700.0f) ? 2 : 1;
-+        if (ImGui::BeginTable("PrimaryInputSections", primaryColumns,
-+                              ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings |
-+                                  ImGuiTableFlags_PadOuterX)) {
-+            ImGui::TableNextRow();
-+            if (primaryColumns > 1) {
-+                ImGui::TableNextColumn();
-+            } else {
-+                ImGui::TableNextRow();
-+                ImGui::TableNextColumn();
-+            }
-+#endif
-         if (ImGui::CollapsingHeader("Buttons", NULL, ImGuiTreeNodeFlags_DefaultOpen)) {
-             DrawButtonLine("A", portIndex, BTN_A, CHIP_COLOR_N64_BLUE);
-             DrawButtonLine("B", portIndex, BTN_B, CHIP_COLOR_N64_GREEN);
-@@ -1279,6 +1353,9 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
-                            CHIP_COLOR_N64_YELLOW);
-         }
-
-+#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-+            ImGui::TableNextColumn();
-+#endif
-         if (ImGui::CollapsingHeader("D-Pad", NULL, ImGuiTreeNodeFlags_DefaultOpen)) {
-             DrawButtonLine(StringHelper::Sprintf("%s", ICON_FA_ARROW_UP).c_str(), portIndex, BTN_DUP);
-             DrawButtonLine(StringHelper::Sprintf("%s", ICON_FA_ARROW_DOWN).c_str(), portIndex, BTN_DDOWN);
-@@ -1290,6 +1367,11 @@ void InputEditorWindow::DrawPortTab(uint8_t portIndex) {
-             DrawStickSection(portIndex, Ship::LEFT, 0);
-         }
-
-+#if defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-+            ImGui::EndTable();
-+        }
-+#endif
-+
-         if (ImGui::CollapsingHeader("Additional (\"Right\") Stick")) {
-             DrawStickSection(portIndex, Ship::RIGHT, 1, CHIP_COLOR_N64_YELLOW);
-         }
-diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
-index 2fe754be..ad688ce1 100644
---- a/src/ship/Context.cpp
-+++ b/src/ship/Context.cpp
-@@ -462,8 +462,10 @@ std::string Context::GetAppBundlePath() {
- #endif
-
- #ifdef __IOS__
--    const char* home = getenv("HOME");
--    return std::string(home) + "/Documents";
-+    {
-+        FolderManager folderManager;
-+        return folderManager.getMainBundlePath();
-+    }
- #endif
-
- #ifdef NON_PORTABLE
-diff --git a/src/ship/audio/Audio.cpp b/src/ship/audio/Audio.cpp
-index 40140b60..307178f8 100644
---- a/src/ship/audio/Audio.cpp
-+++ b/src/ship/audio/Audio.cpp
-@@ -1,6 +1,6 @@
- #include "ship/audio/Audio.h"
-
--#ifdef __APPLE__
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
- #include "ship/audio/CoreAudioAudioPlayer.h"
- #endif
-
-@@ -21,7 +21,7 @@ void Audio::InitAudioPlayer() {
-             mAudioPlayer = std::make_shared<WasapiAudioPlayer>(this->mAudioSettings);
-             break;
- #endif
--#ifdef __APPLE__
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-         case AudioBackend::COREAUDIO:
-             mAudioPlayer = std::make_shared<CoreAudioAudioPlayer>(this->mAudioSettings);
-             break;
-@@ -48,7 +48,7 @@ void Audio::Init() {
- #ifdef _WIN32
-     mAvailableAudioBackends->push_back(AudioBackend::WASAPI);
- #endif
--#ifdef __APPLE__
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-     mAvailableAudioBackends->push_back(AudioBackend::COREAUDIO);
- #endif
-     mAvailableAudioBackends->push_back(AudioBackend::SDL);
-@@ -97,7 +97,7 @@ AudioBackend Audio::GetSavedAudioBackend() {
-     return AudioBackend::WASAPI;
- #endif
-
--#ifdef __APPLE__
-+#if defined(__APPLE__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
-     return AudioBackend::COREAUDIO;
- #endif
-
-diff --git a/src/ship/window/gui/Gui.cpp b/src/ship/window/gui/Gui.cpp
-index b2f99bde..41907c02 100644
---- a/src/ship/window/gui/Gui.cpp
-+++ b/src/ship/window/gui/Gui.cpp
-@@ -100,7 +100,6 @@ void Gui::Init() {
-     Context::GetInstance()->GetResourceManager()->GetResourceLoader()->RegisterResourceFactory(
-         std::make_shared<ResourceFactoryBinaryGuiTextureV0>(), RESOURCE_FORMAT_BINARY, "GuiTexture",
-         static_cast<uint32_t>(RESOURCE_TYPE_GUI_TEXTURE), 0);
--
-     ImGuiWMInit();
-     ImGuiBackendInit();
- }

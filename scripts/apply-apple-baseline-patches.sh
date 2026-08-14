@@ -6,7 +6,10 @@ root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 apply_patch_file() {
   local checkout="$1"
   local patch_file="$2"
-  if git -C "$checkout" apply --reverse --check "$patch_file"; then
+  # A failed reverse-check is the normal "not applied yet" case. Keep its
+  # expected hunk diagnostics quiet; the forward check below still reports a
+  # real patch failure in full.
+  if git -C "$checkout" apply --reverse --check "$patch_file" >/dev/null 2>&1; then
     return
   fi
   git -C "$checkout" apply --check "$patch_file"

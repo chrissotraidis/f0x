@@ -79,6 +79,23 @@ xcrun simctl install booted \
 xcrun simctl launch --console-pty booted com.chrissotraidis.f0x
 ```
 
+Re-resolve the data-container path with `simctl get_app_container` after every
+install; Simulator may remap its UUID while preserving Documents, so a cached
+absolute path can become stale. Clean cartridge first-run requires a verified
+big-endian US rev0 `.z64` (`80 37 12 40` magic). Renaming a byte-swapped `.v64`
+does not convert it. Keep the original ROM unchanged and, when validating a
+dump you are authorized to use, make a separate 16-bit-swapped local copy:
+
+```sh
+dd if='/private/path/game.v64' of='/private/tmp/baserom.us.rev0.z64' \
+  conv=swab status=none
+xxd -l 4 /private/tmp/baserom.us.rev0.z64
+shasum -a 256 /private/tmp/baserom.us.rev0.z64
+```
+
+Copy/import only that private local file into the app's Documents container;
+never put ROM data in the source tree, app bundle, patch series, or IPA.
+
 ## Unsigned iPhoneOS/iPadOS compile
 
 ```sh
@@ -106,6 +123,76 @@ Product: `build/f0x-ios-device/port/Debug-iphoneos/F0X.app`.
 This proves compilation/package structure only. Physical installation requires
 an Apple Development identity, a provisioning profile, a controlled bundle ID,
 and a connected device. Never commit team IDs or signing material.
+
+## Signed physical iPad/iPhone development build
+
+Keep signing values local. Use a fresh device build directory: a reused output
+can retain stale `_CodeSignature` and `embedded.mobileprovision` files even when
+an unsigned compile succeeds. Resolve the CoreDevice identifier with
+`xcrun devicectl list devices`; resolve the Xcode destination UDID from the same
+device listing/details. Configure the clean tree with the same `PLATFORM=OS64`
+arguments as the unsigned build, then build for that destination:
+
+```sh
+xcodebuild \
+  -project build/f0x-ios-device/GDiffuser.xcodeproj \
+  -scheme G-Diffuser \
+  -configuration Debug \
+  -sdk iphoneos \
+  -destination 'platform=iOS,id=<DEVICE_UDID>' \
+  DEVELOPMENT_TEAM=<LOCAL_TEAM_ID> \
+  CODE_SIGN_STYLE=Automatic \
+  CODE_SIGN_IDENTITY='Apple Development' \
+  build
+
+codesign --verify --deep --strict --verbose=2 \
+  build/f0x-ios-device/port/Debug-iphoneos/F0X.app
+```
+
+Use `-allowProvisioningUpdates` only when Xcode has a valid signed-in developer
+account and profile creation/refresh is intended. A fully local build can use an
+already-installed Xcode-managed profile. Do not infer the team ID from the value
+in parentheses in a certificate's display name. Verify the certificate subject's
+`OU` and the profile's `TeamIdentifier`; those are the signing team. Also verify
+that `ProvisionedDevices` contains the target UDID and that the final entitlement
+is `<TEAM_ID>.com.chrissotraidis.f0x`. For example:
+
+```sh
+security find-identity -v -p codesigning
+security cms -D -i '<PROFILE.mobileprovision>' | \
+  plutil -extract TeamIdentifier.0 raw -o - -
+security cms -D -i '<PROFILE.mobileprovision>' | \
+  plutil -extract ProvisionedDevices json -o - -
+codesign -d --entitlements :- \
+  build/f0x-ios-device/port/Debug-iphoneos/F0X.app
+```
+
+Before replacing an installed development build, copy its app-data container to
+a private temporary directory and hash the ROM, `fzerox.o2r`, save, and settings.
+Install the signed `.app` in place; do not uninstall the existing app, because
+uninstalling removes its container:
+
+```sh
+xcrun devicectl device install app \
+  --device <COREDEVICE_ID> \
+  build/f0x-ios-device/port/Debug-iphoneos/F0X.app
+
+xcrun devicectl device process launch \
+  --device <COREDEVICE_ID> \
+  --terminate-existing \
+  com.chrissotraidis.f0x
+```
+
+Copy the post-install `Documents` directory back to another private temporary
+directory and compare the protected hashes before testing. A successful build,
+signature check, install, launch, or unchanged data-container audit does not
+establish audible audio, correct touch behavior, stable gameplay, or acceptable
+performance; those require hands-on physical-device acceptance.
+
+Copy `Documents` and `Library` separately, into already-created destinations;
+do not request source `.` and do not use `--remove-existing-content`. If a
+CoreDevice copy reports a closed network socket while the process remains live,
+retry the unchanged copy rather than rebuilding or reinstalling the app.
 
 ## Unsigned re-signable IPA
 

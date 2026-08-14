@@ -1,0 +1,21 @@
+# Deterministic course-select preview hold. Stops on the six rotating 3D course
+# maps before choosing a course, so viewport/model-scale regressions can be
+# captured without racing through the screen.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 120
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 180
+LOG course_preview_hold
+WAIT 180
+SHOT course_preview_hold
+WAIT 720
+QUIT

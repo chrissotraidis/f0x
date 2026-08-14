@@ -1,0 +1,174 @@
+F0X physical-iPad audio A/B — 2026-08-13
+
+Baseline
+- Owner compared F0X to an emulator and reported incorrect title/menu music
+  timing, mismatched menu effects, early countdown effects, race desync,
+  crackle, and buzzing. The build was judged essentially unplayable.
+- Earlier cartridge sequence/endian and synthesis parity changes made no
+  audible difference on the device.
+
+Candidate
+- iOS cartridge builds default the dedicated audio producer off and use the
+  existing frame-coupled Audio fiber. Other platform/default combinations are
+  unchanged and the diagnostic override remains available.
+- C-left is arrow-only. Holding A for one second latches it with the existing
+  bright state; tapping it releases the latch.
+
+Local verification
+- gdx_touch_merge_tests: 87/87 sub-checks passed.
+- gdx_dsp_tests: 23/23 cases, 608/608 sub-checks passed.
+- gdx_pcm_capture_tests: 5/5 cases, 28/28 sub-checks passed.
+- The signed F0X.app passed codesign --verify --deep --strict.
+- Packaging inspection found no ROM, generated archive, or save in the app.
+
+Physical deployment
+- Target: attached iPad, signed Debug build, in-place install.
+- Bundle ID: com.chrissotraidis.f0x.
+- The app launched successfully.
+- Device startup log: SDL Audio initialized, 2 channels, 32000 Hz.
+- Runtime log: dedicated thread inactive; legacy fiber path ACTIVE.
+
+Data preservation
+- baserom.us.rev0.z64: MATCH, SHA-256 2be0f861c30752bbdfa727753a454108bc973c27ad814744f191b1278c1f482d
+- fzerox.o2r: MATCH, SHA-256 7d60d975bdbce24ba544c6ed3cc3a06f365cfe88e6a8096b5a6d63940513181a
+- saves/fzerox.sav: MATCH, SHA-256 9d231971b2c8b0048807f0811dfdaebe91c48217fc743fd78152a1fd4bb4fbd3
+- gdiffuser.cfg.json: MATCH, SHA-256 008d454a1af9f1d27ca423bb3b8b7e84be9196666fe7501ad31477fa7dbc531b
+- gdx_extract_state.cfg: MATCH, SHA-256 02bd0e9df3dda4790c63f18bd10749b909227f55540a63b287fee33eae1cafda
+- imgui.ini: MATCH, SHA-256 1fe0007dd6278a74a85985cf3dd21762c33f2357894dff159f5d6ffdcb38b277
+
+Acceptance boundary
+- Build, signing, install, launch, scheduler selection, and data preservation
+  are verified.
+- Correct audible timing, effect mapping, crackle/buzz absence, A latch, C-left
+  presentation, stable gameplay, and performance are not yet accepted.
+- QuickTime was stopped before owner listening so it would not own the device
+  audio route. The preserved recording from the previous build remains local
+  and is not a release artifact.
+
+Title-demo return diagnosis
+- The clean physical trace kept SDL at 32000 Hz stereo with zero drops/errors,
+  but after attract-mode return its all-zero counter increased on every buffer.
+- A stable sequence snapshot showed player 0/channel 0 enabled, active BGM 13
+  (title), volumeScale 0, no layers, and no notes. This isolated guest sequence
+  state from the host audio transport.
+- The first change (skip the race-intro reset during title demo) failed on the
+  physical iPad. The initial Simulator sample had ended before the same boundary.
+- Root cause: the title sequence ended/muted as part of demo timing, while the
+  static BGM cache still held BGM_TITLE; returning to title skipped the restart.
+- The focused correction invalidates only that stale cache on title-demo return
+  and uses the existing Audio_RomBgmStart path.
+- Strict Simulator retest crossed the former failure boundary and continued into
+  the next attract demo. At 6900 buffers, zero remained at the 241-buffer startup
+  baseline; SDL drops/errors remained zero.
+- The signed correction was installed in place on the physical iPad. After
+  unlock it completed title -> attract race -> title -> next attract race.
+  Through 7800 physical buffers, zero stayed at the 240-buffer startup baseline;
+  SDL drops/errors stayed zero and the title return logged a fresh BGM start.
+- Post-update SHA-256 still matched the protected ROM (`2be0f861...`), archive
+  (`7d60d975...`), save (`9d231971...`), and tablet preferences (`d91581ef...`).
+- Audible owner acceptance remains open; no IPA claim is made.
+
+Clean-source physical rerun
+- Temporary always-on BGM-change and audio-thread-wake probes were removed;
+  opt-in diagnostics remain available.
+- The rebuilt signed binary was installed in place and crossed multiple GP/VS
+  attract-mode returns through 10800 buffers. SDL drops/errors remained zero.
+  Zero PCM stayed at 240 through 10500 buffers, then increased by seven during
+  the next boundary and immediately recovered; the permanent-silence failure did
+  not recur.
+- Final post-run SHA-256 matched the ROM (`2be0f861...`), archive
+  (`7d60d975...`), save (`9d231971...`), and tablet preferences
+  (`d91581ef...`).
+- Physical listening and touch/gameplay judgment remain owner acceptance gates.
+
+Simulator continuation after the physical iPad was disconnected
+- The physical app/container was not touched again. Work continued on an iPad
+  Pro 13-inch (M5), iOS 26.5 arm64 Simulator.
+- A byte-swapped `.v64` cannot be renamed to `.z64`: first-run rejected magic
+  37 80 40 12. A separate `dd conv=swab` Simulator copy produced 80 37 12 40
+  and SHA-256 2be0f861c30752bbdfa727753a454108bc973c27ad814744f191b1278c1f482d.
+  The original local ROM was unchanged.
+- Retail cartridge `A_HILOGAIN` is opcode 24; both port interpreters had the
+  Expansion Kit value 14. The ABI selection was corrected and the new focused
+  DSP test passes. Full DSP result: 24/24, 616/616.
+- The AI seam's last-good-buffer substitution on legitimate silence was removed.
+  SDL obtained exactly 32000 Hz, S16 system-endian, two channels, 1024 frames.
+- Before the iOS clock fix, 4200 generated buffers yielded 1542 submitted and
+  2658 dropped. Later samples remained about 63-67 percent dropped.
+- Apple mobile now defaults the existing absolute VI clock to 59.94 Hz and
+  migrates existing iOS configs once. After the change, buffers 300 through
+  3300 arrived in approximately five-second intervals; submitted equaled total,
+  with zero drops and zero queue errors.
+- `audio-executor.log` reported at least 3300 consecutive LLE completions, zero
+  LLE fallbacks, and zero selected HLE tasks.
+- The Simulator reached a live attract race and returned to the title. UIKit
+  reported an attached, visible, interactive touch overlay and all control
+  frames. Interactive GP-menu traversal was interrupted when Simulator keyboard
+  capture had to be stopped so the owner could regain the host keyboard; no
+  F0X input-failure conclusion is drawn from that session.
+- The corrected candidate has not been installed on physical hardware. Owner
+  speaker listening and physical touch acceptance remain open.
+
+Follow-up cartridge sequence parity and clean scripted route
+- Source audit found the port started `Audio_SESeqStart()` early from
+  `Audio_Init()` while suppressing the original cartridge
+  `Audio_GuitarSeqStart()` in `Game_ThreadEntry()`. The original call initializes
+  sequence player 1 and then the SE sequence player at the intended boot point;
+  those paths are not interchangeable.
+- Cartridge builds now preserve the original unconditional call. Only Expansion
+  Kit builds apply the live-drive guard required for DD-only `MEDIUM_LBA` data.
+- The rebuilt iPad Pro 13-inch Simulator candidate traversed modes
+  0 -> 7 -> 10 -> 8 -> 9 -> 1 with no WAITMODE timeout, held the GP race for
+  60 seconds, and completed/quit all 28 scripted commands.
+- Corrected run: 5100/5100 LLE tasks completed, 0 HLE fallback, 0 HLE selected;
+  SDL submitted 5100/5100 buffers with 0 drops and 0 queue errors.
+- Race probe: 3563 race frames across 59.72 seconds between sampled markers
+  (59.66 frames/s; target 59.94 Hz, bounded by one-second probe sampling).
+
+Final noninteractive verification
+- Maintained decomp, libultraship, and parent G-Diffuser patches are exact
+  exports of their live nested diffs and pass reverse-apply checks.
+- macOS integration app rebuilt; strict deep signature and plist checks passed.
+- Final tests: DSP 24/24 and 616/616, PCM 5/5 and 28/28, touch 87/87.
+- Generic arm64 iPhoneOS compile succeeded without accessing the iPad.
+- The reused device output retained stale signing/profile files from the prior
+  signed build and is not an audited unsigned IPA input. Use a clean build
+  directory before packaging.
+
+Cartridge sound-font instrument mapping correction
+- A deterministic raw-PCM title-to-menu test reproduced silence from 15.085
+  seconds through the end of both LLE and HLE captures, before SDL/CoreAudio.
+- Runtime note inventory proved every requested cartridge instrument was shifted
+  by one. The PORT-only 64-bit font converter began the instrument-offset array
+  at byte +8 even though the N64 header has one 32-bit drum-table pointer and
+  begins instruments at byte +4.
+- The focused +8 -> +4 correction removed all detected silence from the full
+  21.67-second menu hold in both executors. LLE PCM SHA-256:
+  e6b5bbd48a94669215dcbe36c72a519be5f48417d148112513fed263a91dcf9e.
+  HLE PCM SHA-256:
+  15f830b37aea98485db5fe49acd04bfed42c276f72a191b2f26cf18d29d2bf97.
+- Temporary runtime inventory/loop probes were removed. The maintained decomp
+  patch reverse-checks, cleanly replays from pinned fzerox
+  f7fd0fd0242f8dfb5f357f604bb73b6a4e990809, and replayed load.c is byte-identical
+  to the working source.
+- The corrected iPhoneOS Debug app built and signed successfully at
+  build/f0x-ios-device-clean2/port/Debug-iphoneos/F0X.app. Host-keychain
+  codesign verification passed; team is VKDH2T9UTF, bundle ID is
+  com.chrissotraidis.f0x, the wildcard profile includes iPad UDID
+  00008112-001D485114DBC01E, and the bundle is ROM/save/capture-free.
+- Corrected device executable SHA-256:
+  27e0c648a8e56ea08be12968cbc4bbeaf57a0f9bf45bd2e76c46f9c2c02f83cd.
+- The physical iPad was reconnected. Before installation, Documents and Library
+  were copied separately and the actual protected files were inspected and
+  hashed. The corrected binary was installed in place and launched without
+  replacing the app data container. Immediate readback matched the preinstall
+  ROM (2be0f861...), archive (7d60d975...), save (9d231971...), and preference
+  hashes exactly.
+- The corrected physical run obtained CoreAudio at the requested 32000 Hz,
+  signed 16-bit stereo, 1024-frame format. Through 2400 submitted buffers the
+  zero count stayed at its two-buffer startup baseline and SDL reported zero
+  dropped buffers and zero queue errors.
+- Initial owner listening: some major audio bugs appear fixed. This is positive
+  physical evidence, not final acceptance; menu-effect identity, full music
+  continuity, GP countdown/race sync, crackle/buzz absence, and sustained
+  gameplay still need explicit listening checks.
