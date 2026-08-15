@@ -174,6 +174,7 @@ int  gdx_touch_controls_available(void);
 void gdx_touch_controls_start(void);
 void gdx_touch_controls_tick(int menuVisible,
                              int physicalGamepadConnected,
+                             int gameplayActive,
                              int enabled,
                              float opacity);
 void gdx_touch_controls_read(GdxTouchPadState* outState);
@@ -257,6 +258,11 @@ Overlay visibility rules:
 - keep `•••` available whenever the game window is active, including when
   gameplay touch is disabled;
 - editor mode temporarily owns the overlay and disables gameplay emission.
+
+Hold-to-latch is a racing assist, not a general button behavior. The host passes
+an explicit `gameplayActive` classification to the overlay; A and Z may latch
+only in an on-track race, and leaving gameplay cancels every held/latched touch
+before a game menu can consume it.
 
 ### 5. Independent layouts
 

@@ -150,12 +150,15 @@ simulating keyboard events. It writes atomic N64 pad state directly into port
   iPad layout is the tablet default, and the separately arranged physical-iPhone
   profile is now the phone default. Reset or a clean install selects the correct
   device-class layout without changing an existing saved profile.
+- **Racing assist:** holding A for one second can lock acceleration during a
+  race. Hold-to-lock is disabled in game menus and is cleared when a race ends,
+  so menu confirmation and back/forward navigation always receive fresh taps.
 - **Input Editor:** the mobile-safe editor uses two balanced columns on iPad
   and one on iPhone, with every stick, rumble, gyro, and LED section reachable.
 
-Opening Settings or the Input Editor releases and hides gameplay input. Closing
-it restores a neutral controller state. The focused merge/profile suite passes
-87 checks, and live iPad/iPhone Simulator verification covers visual layout,
+Opening Settings or the Input Editor releases and hides gameplay input. Internal
+race/menu transitions also clear held racing assists. The focused merge/profile
+suite passes 87 checks, and live iPad/iPhone Simulator verification covers visual layout,
 menu/editor behavior, persistence, and a touch-driven route into a race.
 Ordinary physical-iPad touch gameplay and the current tablet layout are owner-
 accepted. Physical-iPhone geometry is accepted. Stress multi-touch, controller

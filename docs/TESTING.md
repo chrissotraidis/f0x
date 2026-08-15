@@ -1425,3 +1425,38 @@ inference.
   button's frame, visibility, and z-order, covering UIKit view reordering without
   rebuilding the whole gameplay overlay. It remains hidden during Settings and
   layout editing.
+
+## 2026-08-15 — repeated menu-navigation correction and iPad update
+
+- **Device evidence:** the reported irregular GP back/forward sequence did not
+  produce a new crash report. The live run continued rendering and submitting
+  audio with zero reported queue drops/errors. Port 1 was the only input source;
+  no physical SDL gamepad was present.
+- **Deterministic reproduction:** `scripts/macos-menu-churn-regression.gdx`
+  reproduced a no-input transition from Course Select (`10`) straight back to
+  Main Menu (`7`) on its second entry. This separated the game-state defect from
+  the independent touch-latch hazard.
+- **Game-state root cause:** retail N64 reloads the Course Select overlay and
+  receives zero-initialized overlay BSS. F0X statically links the overlay, so
+  `sCourseSelectState=COURSE_SELECT_EXIT` survived after backing out. The port
+  now explicitly restores `COURSE_SELECT_CUP_SELECT` in `CourseSelect_Init`.
+- **Touch correction:** the one-second A latch and Z latch are enabled only for
+  on-track race modes. Leaving gameplay cancels every live/latched touch, so a
+  racing assist cannot leak into SELECT MODE, difficulty, OK, course, machine,
+  or machine-settings screens.
+- **Regression result:** the rebuilt macOS app completed repeated Course Select
+  exit/re-entry, cup open/close, Machine Select unwind, Machine Settings unwind,
+  then reached mode `1` and logged `menu_churn_race_handoff`; exit status was 0.
+  `gdx_touch_merge_tests` remained 87/87.
+- **Diagnostic cleanup:** input logs now record only real button/stick edges or
+  mode destinations. Cached venue lookups no longer emit `[venueload]` every
+  frame; the prior physical run contained 533,830 redundant lines and grew to
+  68.1 MiB.
+- **Physical updates:** the signed arm64 iPhoneOS build succeeded and installed
+  in place on both connected devices. The iPad launched with matching pre/post
+  hashes for its ROM (`2be0f861...`), archive (`7d60d975...`), save
+  (`7835e3cb...`), and tablet preferences (`f45932c1...`). The iPhone then
+  launched as PID 1252 with its ROM, archive, save, configuration, and accepted
+  phone preferences byte-identical before and after installation; its preference
+  hash remained `7e62142f...`. Physical confirmation of the irregular touch
+  route remains the acceptance gate.

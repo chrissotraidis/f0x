@@ -1,0 +1,110 @@
+# Exercise the GP menu route backward and forward before completing a race
+# handoff. This catches stale input edges and navigation state leaking between
+# SELECT MODE, difficulty/OK, course, machine, and machine-settings screens.
+WAITTITLE 3600
+PRESS START 3
+WAITMODE 7 3600
+WAIT 120
+
+# Enter GP as Standard, reach course select, then return to SELECT MODE.
+PRESS A 3
+WAIT 90
+PRESS DOWN 3
+WAIT 30
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS B 3
+WAITMODE 7 3600
+WAIT 120
+
+# Re-enter, open and close the cup choice, then back out again.
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS B 3
+WAIT 90
+PRESS B 3
+WAITMODE 7 3600
+WAIT 120
+
+# Re-enter, advance to machine select, then unwind to SELECT MODE.
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS B 3
+WAITMODE 10 3600
+WAIT 180
+PRESS B 3
+WAITMODE 7 3600
+WAIT 120
+
+# Re-enter, visit machine settings, unwind every screen, then complete the
+# same route once more to prove the menu state is still usable.
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 9 3600
+WAIT 180
+PRESS B 3
+WAITMODE 8 3600
+WAIT 180
+PRESS B 3
+WAITMODE 10 3600
+WAIT 180
+PRESS B 3
+WAITMODE 7 3600
+WAIT 120
+
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 10 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 8 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 9 3600
+WAIT 180
+PRESS A 3
+WAIT 90
+PRESS A 3
+WAITMODE 1 5400
+LOG menu_churn_race_handoff
+QUIT

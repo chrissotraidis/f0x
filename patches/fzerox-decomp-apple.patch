@@ -188,7 +188,7 @@ index cbafd93..85e58a6 100644
  
  void* AudioHeap_AllocTemporarySampleCache(size_t size, s32 fontId, void* sampleAddr, s8 medium) {
 diff --git a/src/audio/rom/lib/load.c b/src/audio/rom/lib/load.c
-index 78091d8..bda6a75 100644
+index 78091d8..71efeb6 100644
 --- a/src/audio/rom/lib/load.c
 +++ b/src/audio/rom/lib/load.c
 @@ -300,7 +300,7 @@ void AudioLoad_InitTable(AudioTable* table, u32 romAddr, u16 diskLba) {
@@ -872,26 +872,6 @@ index 477521b..8617c68 100644
          func_8007E0CC();
  #ifndef EXPANSION_KIT
          func_8007E08C();
-diff --git a/src/overlays/course_select/course_model.c b/src/overlays/course_select/course_model.c
-index 716077f..6eafbeb 100644
---- a/src/overlays/course_select/course_model.c
-+++ b/src/overlays/course_select/course_model.c
-@@ -160,7 +160,14 @@ Gfx* func_i5_80115E64(Gfx* gfx) {
-     gSPMatrix(gfx++, D_1000000.unk_20008, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
-     gSPMatrix(gfx++, D_1000000.unk_20108, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
- 
--#ifndef EXPANSION_KIT
-+#if defined(PORT)
-+    /* guScale() packs a stock libultra Mtx, but the host interpreter consumes
-+       the GDIFFUSER_PORT Matrix_ToMtx lane layout (j ^ 1). Use the same
-+       host-safe builder as the EK path or the intended 0.25 scale decodes as
-+       zero and every course preview is drawn oversized/cropped. */
-+    Matrix_SetLockedLookAt(gGfxPool->unk_20308, NULL, 0.25f, 0.25f, 0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-+                           0.0f, 0.0f);
-+#elif !defined(EXPANSION_KIT)
-     guScale(gGfxPool->unk_20308, 0.25f, 0.25f, 0.25f);
- #else
-     Matrix_SetLockedLookAt(gGfxPool->unk_20308, NULL, 0.25f, 0.25f, 0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 diff --git a/src/game/racer.c b/src/game/racer.c
 index e62ad2e..e16231c 100644
 --- a/src/game/racer.c
@@ -912,6 +892,43 @@ index e62ad2e..e16231c 100644
                      Audio_StartDemo();
                  }
  #ifndef EXPANSION_KIT
+diff --git a/src/overlays/course_select/course_model.c b/src/overlays/course_select/course_model.c
+index 716077f..6eafbeb 100644
+--- a/src/overlays/course_select/course_model.c
++++ b/src/overlays/course_select/course_model.c
+@@ -160,7 +160,14 @@ Gfx* func_i5_80115E64(Gfx* gfx) {
+     gSPMatrix(gfx++, D_1000000.unk_20008, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+     gSPMatrix(gfx++, D_1000000.unk_20108, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+ 
+-#ifndef EXPANSION_KIT
++#if defined(PORT)
++    /* guScale() packs a stock libultra Mtx, but the host interpreter consumes
++       the GDIFFUSER_PORT Matrix_ToMtx lane layout (j ^ 1). Use the same
++       host-safe builder as the EK path or the intended 0.25 scale decodes as
++       zero and every course preview is drawn oversized/cropped. */
++    Matrix_SetLockedLookAt(gGfxPool->unk_20308, NULL, 0.25f, 0.25f, 0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
++                           0.0f, 0.0f);
++#elif !defined(EXPANSION_KIT)
+     guScale(gGfxPool->unk_20308, 0.25f, 0.25f, 0.25f);
+ #else
+     Matrix_SetLockedLookAt(gGfxPool->unk_20308, NULL, 0.25f, 0.25f, 0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+diff --git a/src/overlays/course_select/course_select.c b/src/overlays/course_select/course_select.c
+index 360e4e3..e4fb70a 100644
+--- a/src/overlays/course_select/course_select.c
++++ b/src/overlays/course_select/course_select.c
+@@ -350,7 +350,11 @@ void CourseSelect_Init(void) {
+     s32 var_v1;
+ 
+     D_800CCFE8 = 3;
+-#ifdef EXPANSION_KIT
++#if defined(EXPANSION_KIT) || defined(PORT)
++    // Retail N64 reloads this overlay and receives zero-initialized overlay
++    // BSS on every entry. The port statically links overlays, so an EXIT value
++    // otherwise survives after backing out and immediately ejects the next
++    // Course Select visit without a button press.
+     sCourseSelectState = COURSE_SELECT_CUP_SELECT;
+ #endif
+     sSelectedGhostOption = sGhostOptionTypeMap[gCurrentGhostType];
 diff --git a/src/sys/sys_audio.c b/src/sys/sys_audio.c
 index 1686093..def1fc7 100644
 --- a/src/sys/sys_audio.c
