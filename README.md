@@ -14,11 +14,12 @@
   <img alt="Metal renderer" src="https://img.shields.io/badge/renderer-Metal-5E5CE6">
   <a href="docs/STATUS.md"><img alt="Physical iPad owner accepted" src="https://img.shields.io/badge/physical%20iPad-owner%20accepted-30D158"></a>
   <a href="docs/BUILDING.md"><img alt="Native source port" src="https://img.shields.io/badge/build-native%20source%20port-007AFF"></a>
-  <a href="#install-status"><img alt="Development preview" src="https://img.shields.io/badge/status-development%20preview-FF9F0A"></a>
+  <a href="https://github.com/chrissotraidis/f0x/releases/tag/v0.1.0-preview.1"><img alt="Developer Preview 1" src="https://img.shields.io/badge/release-Preview%201-FF9F0A"></a>
   <img alt="Game data not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
 </p>
 
 <p align="center">
+  <a href="#download-the-developer-preview">Download</a> ·
   <a href="#get-started">Build</a> ·
   <a href="#supported-game-data">Game data</a> ·
   <a href="#touch-controls">Touch controls</a> ·
@@ -42,14 +43,14 @@ extraction happen locally, and nothing is uploaded.
 
 | Option | Status | What to do |
 |---|---|---|
-| Public `.ipa` | **Planned; not published yet** | A public developer-preview IPA is planned, but no downloadable build has been published. |
+| Public `.ipa` | **Developer Preview 1** | [Download the ROM-free unsigned IPA](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.1/F0X-0.1.0-preview.1-unsigned.ipa), then re-sign it with your own Apple identity before installation. |
 | App Store / TestFlight | **Not announced** | F0X has no store listing or public TestFlight. |
 | Local iPad build | **Owner-played and accepted** | The signed arm64 build has been installed, updated in place, and played on a physical 12.9-inch iPad Pro. Normal game start, touch racing, audio, and course presentation are accepted on that device. |
 | Local iPhone build | **Installed; layout accepted** | The universal build is signed and running on a physical iPhone 14 with verified local game data. Its owner-arranged touch profile is now the independent phone default; broader phone gameplay testing continues. |
 | iPhone/iPad Simulator | **Available for development** | The native arm64 app imports local game data, renders through Metal, and has completed touch/UI/race stability verification. Simulator evidence is not physical-device acceptance. |
 | Apple Silicon macOS | **Available for development** | The native `F0X.app` builds, seals locally, imports game data, persists saves, and renders a live Metal race. |
 
-F0X is close to a public developer preview, but it is not being presented as a
+F0X Developer Preview 1 is available, but it is not being presented as a
 finished release. The current physical-iPad build is owner-accepted for normal
 game start, touch gameplay, audio, course previews, and racing. The iPhone 14
 layout is also owner-arranged and promoted to independent defaults; broader
@@ -57,6 +58,24 @@ phone gameplay testing continues. Headset/Bluetooth routes, lifecycle interrupti
 controllers, stress multi-touch, and long-session coverage remain open. See the exact
 [evidence ledger](docs/STATUS.md) rather than inferring completion from a build
 or Simulator screenshot.
+
+## Download the developer preview
+
+[**Download F0X 0.1.0 Developer Preview 1 for iPhone and iPad**](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.1/F0X-0.1.0-preview.1-unsigned.ipa)
+
+This is an **unsigned, ROM-free, arm64 IPA** for iOS and iPadOS 16 or newer. It
+supports both iPhone and iPad, but it is not directly installable until you
+re-sign it with your own Apple identity using Xcode or a compatible personal
+signing method. The IPA never includes F-Zero X or extracted game assets.
+
+After installation, launch F0X and select your own legally acquired supported
+US revision 0 ROM from Files. Extraction stays on-device. When updating, install
+the new IPA over the existing `com.chrissotraidis.f0x` app; do not uninstall it
+first if you want to preserve saves, settings, and touch layouts.
+
+SHA-256:
+`e4e0f2f62b23a757cf0958d389ddfe433ceb0094ef36999d93bcc8bcbe136efd`
+([checksum file](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.1/F0X-0.1.0-preview.1-unsigned.ipa.sha256)).
 
 ## Get started
 
@@ -221,13 +240,10 @@ are recorded in [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 <details>
 <summary><strong>Where is the IPA?</strong></summary>
 
-There is no public F0X IPA yet. A public developer preview is planned. The
-unsigned arm64 iPhoneOS app compiles and
-passes a ROM-free payload audit, and `scripts/package-ios.sh` creates a
-deterministic re-signable proof artifact. A development-signed build has been
-installed and tested in place on a physical iPad, but that local build is not a
-public distribution. A future downloadable IPA must be independently audited
-and described honestly before a release link appears here. See the
+[Developer Preview 1 is available from GitHub Releases](https://github.com/chrissotraidis/f0x/releases/tag/v0.1.0-preview.1).
+It is unsigned and ROM-free, so you must re-sign it before installation and
+supply your own supported cartridge dump after launch. The downloadable IPA
+passed the same deterministic package audit described in the
 [build and package guide](docs/BUILDING.md#unsigned-re-signable-ipa).
 </details>
 
