@@ -1,8 +1,6 @@
 # F0X
 
-<p align="center">
-  <img src="assets/AppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png" alt="F0X app icon" width="160">
-</p>
+![F0X running a live race on a physical iPad with touch controls](docs/readme/f0x-ipad-gameplay.png)
 
 <p align="center">
   <strong>F-Zero X rebuilt as a native Apple app.</strong><br>
@@ -14,7 +12,7 @@
   <img alt="Apple Silicon" src="https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple">
   <img alt="iOS and iPadOS 16 or newer" src="https://img.shields.io/badge/iOS%20%2F%20iPadOS-16%2B-0A84FF?logo=apple">
   <img alt="Metal renderer" src="https://img.shields.io/badge/renderer-Metal-5E5CE6">
-  <a href="docs/STATUS.md"><img alt="Physical iPad in testing" src="https://img.shields.io/badge/physical%20iPad-in%20testing-30D158"></a>
+  <a href="docs/STATUS.md"><img alt="Physical iPad owner accepted" src="https://img.shields.io/badge/physical%20iPad-owner%20accepted-30D158"></a>
   <a href="docs/BUILDING.md"><img alt="Native source port" src="https://img.shields.io/badge/build-native%20source%20port-007AFF"></a>
   <a href="#install-status"><img alt="Development preview" src="https://img.shields.io/badge/status-development%20preview-FF9F0A"></a>
   <img alt="Game data not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
@@ -44,19 +42,19 @@ extraction happen locally, and nothing is uploaded.
 
 | Option | Status | What to do |
 |---|---|---|
-| Public `.ipa` | **Not available yet** | No downloadable developer-preview build has been published. |
+| Public `.ipa` | **Planned; not published yet** | A public developer-preview IPA is planned, but no downloadable build has been published. |
 | App Store / TestFlight | **Not announced** | F0X has no store listing or public TestFlight. |
-| Local iPhone/iPad build | **Signed development build verified locally** | Build with Xcode and your own Apple development team. An arm64 build has been signed, installed in place, and launched on a physical iPad; this is not a public distribution or complete hardware acceptance claim. |
+| Local iPad build | **Owner-played and accepted** | The signed arm64 build has been installed, updated in place, and played on a physical 12.9-inch iPad Pro. Normal game start, touch racing, audio, and course presentation are accepted on that device. |
+| Local iPhone build | **Installed; layout accepted** | The universal build is signed and running on a physical iPhone 14 with verified local game data. Its owner-arranged touch profile is now the independent phone default; broader phone gameplay testing continues. |
 | iPhone/iPad Simulator | **Available for development** | The native arm64 app imports local game data, renders through Metal, and has completed touch/UI/race stability verification. Simulator evidence is not physical-device acceptance. |
 | Apple Silicon macOS | **Available for development** | The native `F0X.app` builds, seals locally, imports game data, persists saves, and renders a live Metal race. |
 
 F0X is close to a public developer preview, but it is not being presented as a
-finished release. Physical iPad installation, launch, ROM/archive/save
-preservation, sustained audio transport, and the owner-accepted tablet control
-layout are verified locally. The cartridge sound-font mapping error behind the
-wrong menu sounds and early-ending music is corrected in the installed build;
-full-route listening, lifecycle/interruptions, thermals, controller behavior,
-and long-session gameplay remain open. See the exact
+finished release. The current physical-iPad build is owner-accepted for normal
+game start, touch gameplay, audio, course previews, and racing. The iPhone 14
+layout is also owner-arranged and promoted to independent defaults; broader
+phone gameplay testing continues. Headset/Bluetooth routes, lifecycle interruptions, thermals, physical
+controllers, stress multi-touch, and long-session coverage remain open. See the exact
 [evidence ledger](docs/STATUS.md) rather than inferring completion from a build
 or Simulator screenshot.
 
@@ -149,8 +147,9 @@ simulating keyboard events. It writes atomic N64 pad state directly into port
   controller auto-hide, haptics, opacity, and reset controls.
 - **Customize:** move, resize, show, or hide controls in independent phone and
   tablet layouts; saved layouts survive relaunch. The owner-accepted physical
-  iPad layout is now the tablet default; iPhone defaults remain independent for
-  a later phone ergonomics pass.
+  iPad layout is the tablet default, and the separately arranged physical-iPhone
+  profile is now the phone default. Reset or a clean install selects the correct
+  device-class layout without changing an existing saved profile.
 - **Input Editor:** the mobile-safe editor uses two balanced columns on iPad
   and one on iPhone, with every stick, rumble, gyro, and LED section reachable.
 
@@ -158,7 +157,9 @@ Opening Settings or the Input Editor releases and hides gameplay input. Closing
 it restores a neutral controller state. The focused merge/profile suite passes
 87 checks, and live iPad/iPhone Simulator verification covers visual layout,
 menu/editor behavior, persistence, and a touch-driven route into a race.
-Physical multi-touch ergonomics and haptic feel remain unverified.
+Ordinary physical-iPad touch gameplay and the current tablet layout are owner-
+accepted. Physical-iPhone geometry is accepted. Stress multi-touch, controller
+handoff, haptic feel, and broader phone gameplay remain under test.
 
 | Touch label | F-Zero X action |
 |---|---|
@@ -177,19 +178,19 @@ Physical multi-touch ergonomics and haptic feel remain unverified.
 | Area | Current evidence-backed result |
 |---|---|
 | Native runtime | Decompiled F-Zero X logic runs as host arm64 code; this is not an emulator frontend |
-| Rendering | libultraship/Fast3D renders through Metal on Apple Silicon macOS, iOS Simulator, and the attached physical iPad |
+| Rendering | libultraship/Fast3D renders through Metal on Apple Silicon macOS, iOS Simulator, the owner-tested physical iPad, and the launched physical iPhone build |
 | Game setup | Native picker, local validation, in-process extraction, atomic install, hot mount, and archive-only relaunch |
 | Touch | Full control set, phone/tablet layouts, customization, persistence, safe cancellation, menu access, and controller auto-hide |
 | Input Editor | Responsive iPhone/iPad layout with aligned mappings and unobstructed controls |
 | Saves | Exact 32 KiB settings-SRAM write, relaunch, load, and reversal verified on macOS |
-| Audio | Retail cartridge synthesis, corrected cartridge instrument mapping, 59.94 Hz mobile pacing, and SDL 32 kHz stereo transport verified in Simulator and deployed to the physical iPad; the owner reports the major audio faults are fixed, while complete title/menu/countdown/race listening remains the release gate |
-| Course previews | The six rotating course maps use the host-compatible packed 0.25 model scale; the deterministic course-select route renders and exits cleanly, with final visual acceptance on iPad pending |
+| Audio | Retail cartridge synthesis, corrected cartridge instrument mapping, 59.94 Hz mobile pacing, and SDL 32 kHz stereo transport; normal physical-iPad gameplay is owner-accepted, while the iPhone and alternate route/interruption matrix remain open |
+| Course previews | The six rotating course maps use the host-compatible packed 0.25 model scale and are owner-accepted on the physical iPad |
+| Physical iPhone | Signed build installed and running on iPhone 14; ROM/archive/save/control hashes and live archive/audio startup are verified, while hands-on play remains open |
 | Diagnostics | Privacy-scrubbed runtime report and native Share sheet verified on macOS and iPhone Simulator |
 | Stability | Converted display-list cache regression plus a 5:16 guarded Simulator race/transition soak with no crash |
 | Packaging | Sealed local macOS bundle plus deterministic, ROM-free unsigned arm64 iPhoneOS IPA workflow |
 
-Still open: complete owner acceptance of audible fidelity and the corrected
-course-preview framing, physical multi-touch/gameplay behavior,
+Still open: physical-iPhone gameplay and layout acceptance, stress multi-touch,
 route/interruption matrices, high-refresh and Low Power Mode behavior, release
 signing/notarization, a human-completed macOS race on this host, and Expansion
 Kit support.
@@ -217,7 +218,8 @@ are recorded in [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 <details>
 <summary><strong>Where is the IPA?</strong></summary>
 
-There is no public F0X IPA yet. The unsigned arm64 iPhoneOS app compiles and
+There is no public F0X IPA yet. A public developer preview is planned. The
+unsigned arm64 iPhoneOS app compiles and
 passes a ROM-free payload audit, and `scripts/package-ios.sh` creates a
 deterministic re-signable proof artifact. A development-signed build has been
 installed and tested in place on a physical iPad, but that local build is not a
@@ -237,12 +239,11 @@ download, distribute, or upload game data.
 <summary><strong>Does audio work?</strong></summary>
 
 The corrected cartridge path produces continuous title-to-menu PCM in both LLE
-and HLE and is installed on the physical iPad. The key defect was a PORT-only
+and HLE. Normal physical-iPad gameplay is now owner-accepted. The key defect was a PORT-only
 sound-font parser reading the instrument table four bytes late, so every request
 selected the next instrument; correcting `+8` to the N64 header's `+4` restored
-the intended menu music/effects. The owner reports the major faults are fixed.
-Complete title/menu/countdown/race listening plus headphones, Bluetooth, route
-changes, and interruption recovery remain physical-hardware tests.
+the intended menu music/effects. Physical-iPhone listening plus headphones,
+Bluetooth, route changes, and interruption recovery remain hardware tests.
 </details>
 
 <details>
@@ -286,8 +287,9 @@ endorsed by Nintendo or the upstream projects.
 | [`docs/NEXT_BUILDER.md`](docs/NEXT_BUILDER.md) | Exact continuation order for the next engineering run |
 | [`ref/`](ref/) | Ignored, disposable source/reference area; only its policy README is tracked |
 
-Generated source trees, build directories, ROMs, archives, saves, screenshots
-containing private game imagery, and signing material must never be committed.
+Generated source trees, build directories, ROMs, archives, saves, diagnostic or
+private captures, and signing material must never be committed. The promotional
+gameplay image above was explicitly approved by the owner for public use.
 
 ## Contributing and support
 

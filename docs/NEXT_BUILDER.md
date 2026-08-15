@@ -1,8 +1,7 @@
 # F0X exact next-builder handoff
 
-Last reconciled: 2026-08-13 after commits `8672a1b`, `3e67f05`, `7cfcd28`,
-`c9991ee`, and `df857a6`, plus the menu-audio and TMEM overlap work recorded
-below.
+Last reconciled: 2026-08-15 after main `33515ee` and the first physical-iPhone
+deployment recorded below.
 
 ## Read order
 
@@ -81,16 +80,24 @@ the exact evidence artifact before relying on a path or process ID.
   instead of byte `+4`, shifting every title/menu instrument by one. The focused
   `+8 -> +4` correction produced continuous 21.67-second title-to-menu PCM in
   both LLE and HLE with no detected silence. This correction is now installed
-  and running on the physical iPad; initial owner listening reports major
-  improvement, but full-route acceptance is not complete.
-- The owner-accepted physical iPad touch profile is promoted verbatim to the
-  tablet defaults. Phone defaults remain independent and unchanged pending a
-  later physical-iPhone ergonomics pass.
+  and running on the physical iPad. On 2026-08-15 the owner accepted the current
+  build for normal game start, touch gameplay, audio, course presentation, and racing.
+- The latest owner-accepted physical iPad touch profile is promoted verbatim to
+  tablet defaults, including the two 0.796 shoulder scales. Phone source defaults
+  remain independent.
 - The over-cropped six-map course preview was traced to `guScale()` producing
   stock N64 `Mtx` packing for a PORT renderer that consumes `Matrix_ToMtx` lane
   packing. PORT now uses the existing host-safe builder for the same 0.25 scale.
-  The deterministic course-select hold route completes; physical visual
-  acceptance remains open.
+  The deterministic course-select hold route completes and the corrected iPad
+  build is owner-accepted.
+- The same signed universal build is installed and running on physical iPhone 14.
+  Readback matches the iPad-derived ROM (`2be0f861...`), current archive
+  (`7d60d975...`), save (`7835e3cb...`), and current `phone-v1` profile.
+  Startup mounted the archive, opened 32000 Hz stereo CoreAudio, and submitted
+  600 buffers with two startup-zero buffers and zero drops/errors.
+- The owner-arranged physical-iPhone profile is promoted verbatim to independent
+  phone defaults. The D-pad is hidden by default, and the gameplay ••• now stays
+  in the upper-right safe area rather than the transient top-center position.
 - All maintained patches reverse-check and a fresh local pinned reconstruction
   matches every patched path byte-for-byte. The audit found and repaired one
   missing maintained file: `libultraship/include/fast/tmem_load_map.h`.
@@ -101,12 +108,10 @@ the exact evidence artifact before relying on a path or process ID.
 
 ## What is explicitly not finished
 
-- Complete owner audible acceptance on the installed corrected build: title/menu
-  continuity, effect mapping, GP countdown and race sync, and crackle/buzz
-  absence.
-- Physical-device touch acceptance (analog direction, C-left, A latch,
-  multi-touch stress, controller handoff,
-  interruptions, haptics feel, long sessions, thermals).
+- Physical-iPhone hands-on layout, audio, and gameplay acceptance. Deployment,
+  protected-data readback, archive mount, and audio transport startup are proven.
+- Stress multi-touch, controller handoff, interruptions, haptics, alternate
+  audio routes, long sessions, and thermals across the device matrix.
 - Broader physical iPad/iPhone controller, lifecycle, performance, thermals, and
   long-session evidence. Signing, install, launch, protected-data preservation,
   and sustained audio transport are no longer open on the tested iPad.
@@ -134,8 +139,8 @@ the exact evidence artifact before relying on a path or process ID.
 - The iPad Pro 13-inch (M5) Simulator is booted and F0X was relaunched from its
   preserved container after the owner briefly shut Simulator down. Rediscover
   the process and container UUID before relying on them.
-- The physical iPad was reconnected after the signed hardware run. Rediscover
-  it with `devicectl` rather than relying on a stale device/session handle.
+- The physical iPad and iPhone 14 were connected during the 2026-08-15 run.
+  Rediscover both with `devicectl` rather than relying on stale session handles.
 - A local Apple Development identity and Xcode-managed wildcard profile signed
   the tested iPad build. This does not establish distribution signing.
 - The installed Simulator container contains authorized private inputs/derived
@@ -144,7 +149,7 @@ the exact evidence artifact before relying on a path or process ID.
 - Build products live under ignored `build/` and may be stale after source edits.
 - Process IDs and Simulator bundle/container UUIDs are ephemeral; rediscover them.
 
-## Maintained Apple source state (2026-08-14)
+## Maintained Apple source state (2026-08-15)
 
 The tested ignored checkout contains the following Apple-side implementation,
 all represented by the regenerated maintained patches, plus the display-list
@@ -168,14 +173,14 @@ prohibited files.
 
 ## Highest-priority actionable work
 
-1. Obtain owner/human macOS race completion and corrected-bundle flashing
-   confirmation, or attach a controller.
-2. Install the current preview-scale/tablet-default build in place, preserving
-   ROM, archive, save, and preferences; visually accept all six map previews.
-3. Resume physical iPad/iPhone acceptance, representative-course timing,
+1. On the updated physical iPhone 14, verify the upper-right persistent ••• and
+   complete title/menu/race audio and touch gameplay.
+2. Resume broader physical iPad/iPhone acceptance, representative-course timing,
    high-refresh/Low Power Mode, and update tests when the owner reconnects a
    device. Local development signing is already verified for the tested iPad;
    distribution signing remains separate.
+3. Package/publish a public IPA only after phone acceptance and the ROM-free
+   release audit pass.
 4. Start Expansion Kit only after cartridge physical acceptance.
 
 IOS-GFX-CRASH-01 is Simulator-resolved. Converted-wide dialect metadata now

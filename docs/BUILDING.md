@@ -194,6 +194,21 @@ do not request source `.` and do not use `--remove-existing-content`. If a
 CoreDevice copy reports a closed network socket while the process remains live,
 retry the unchanged copy rather than rebuilding or reinstalling the app.
 
+### Moving an existing private test setup from iPad to iPhone
+
+For owner-authorized device-to-device testing, copy the source app's `Documents`
+and preference plist to a private temporary directory, inspect nonzero file sizes
+and hashes, install the same universal bundle on the target device, and copy only
+the required ROM/archive/save/config/preferences into its new container. Exclude
+logs, caches, screenshots, and unrelated container state. A tablet profile may be
+cloned into `F0X.TouchLayout.phone-v1` as a temporary starting point, but do not
+promote it to phone source defaults until hands-on phone ergonomics are accepted.
+Read the target files back and compare hashes before calling the transfer complete.
+
+Once accepted, promote the phone profile's exact normalized centers, scales,
+and hidden flags only to `kPhoneSpecs`; keep `kTabletSpecs` unchanged. Existing
+saved profiles remain overrides, so an in-place install preserves the test device.
+
 ## Unsigned re-signable IPA
 
 After the unsigned iPhoneOS build succeeds, audit it and create a deterministic

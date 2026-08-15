@@ -3601,10 +3601,10 @@ index 0000000..a8add2e
 +#endif // GDX_TOUCH_CONTROLS_H
 diff --git a/port/gdx_touch_controls_ios.mm b/port/gdx_touch_controls_ios.mm
 new file mode 100644
-index 0000000..c8875d3
+index 0000000..19210f3
 --- /dev/null
 +++ b/port/gdx_touch_controls_ios.mm
-@@ -0,0 +1,1539 @@
+@@ -0,0 +1,1546 @@
 +// port/gdx_touch_controls_ios.mm — iOS/iPadOS UIKit touch-controls overlay.
 +//
 +// F0X-specific adaptation of the proven HarkinianPad product patterns
@@ -3979,44 +3979,44 @@ index 0000000..c8875d3
 +    float y;
 +    float baseSize;     // square side (or pill width, see below)
 +    float baseHeight;   // pill controls only; 0 means square
++    float defaultScale;
++    bool defaultHidden;
 +} GdxBaseSpec;
 +
 +static const GdxBaseSpec kTabletSpecs[] = {
 +    // Promoted verbatim from the owner-accepted physical iPad profile on
-+    // 2026-08-13. Keep this table independent from kPhoneSpecs: phone defaults
-+    // have not yet had their physical ergonomics pass.
-+    { GDX_TOUCH_CTL_STICK,    0.142438f, 0.787780f, 150.0f, 0.0f },  // stick
-+    { GDX_TOUCH_CTL_ACCEL,    0.877195f, 0.728645f, 66.0f, 0.0f },  // A
-+    { GDX_TOUCH_CTL_BOOST,    0.827464f, 0.680022f, 66.0f, 0.0f },  // B
-+    { GDX_TOUCH_CTL_BRAKE,    0.908423f, 0.872973f, 46.0f, 0.0f },  // C-down
-+    { GDX_TOUCH_CTL_VIEW,     0.937319f, 0.833857f, 46.0f, 0.0f },  // C-right
-+    { GDX_TOUCH_CTL_LOOK,     0.908058f, 0.792805f, 46.0f, 0.0f },  // C-up
-+    { GDX_TOUCH_CTL_CLEFT,    0.877364f, 0.832904f, 46.0f, 0.0f },  // C-left
-+    { GDX_TOUCH_CTL_SLIDE_L,  0.167478f, 0.674423f, 66.0f, 0.0f },  // Z
-+    { GDX_TOUCH_CTL_SLIDE_R,  0.898472f, 0.658137f, 106.0f, 54.0f }, // R pill
-+    { GDX_TOUCH_CTL_L,        0.096767f, 0.675227f, 106.0f, 54.0f }, // L pill
-+    { GDX_TOUCH_CTL_START,    0.920369f, 0.579523f, 54.0f, 0.0f },  // Start
-+    { GDX_TOUCH_CTL_DPAD,     0.099730f, 0.513027f, 52.0f, 0.0f },  // D-pad
++    // 2026-08-15. Keep this table independent from the separately accepted
++    // physical iPhone defaults in kPhoneSpecs.
++    { GDX_TOUCH_CTL_STICK,    0.142438f, 0.787780f, 150.0f, 0.0f, 1.000f, false }, // stick
++    { GDX_TOUCH_CTL_ACCEL,    0.873169f, 0.737434f, 66.0f, 0.0f, 1.000f, false }, // A
++    { GDX_TOUCH_CTL_BOOST,    0.826732f, 0.694182f, 66.0f, 0.0f, 1.000f, false }, // B
++    { GDX_TOUCH_CTL_BRAKE,    0.908423f, 0.872973f, 46.0f, 0.0f, 1.000f, false }, // C-down
++    { GDX_TOUCH_CTL_VIEW,     0.937319f, 0.833857f, 46.0f, 0.0f, 1.000f, false }, // C-right
++    { GDX_TOUCH_CTL_LOOK,     0.908058f, 0.792805f, 46.0f, 0.0f, 1.000f, false }, // C-up
++    { GDX_TOUCH_CTL_CLEFT,    0.877364f, 0.832904f, 46.0f, 0.0f, 1.000f, false }, // C-left
++    { GDX_TOUCH_CTL_SLIDE_L,  0.874652f, 0.667099f, 66.0f, 0.0f, 1.000f, false }, // Z
++    { GDX_TOUCH_CTL_SLIDE_R,  0.929951f, 0.661555f, 106.0f, 54.0f, 0.796f, false }, // R pill
++    { GDX_TOUCH_CTL_L,        0.930954f, 0.710383f, 106.0f, 54.0f, 0.796f, false }, // L pill
++    { GDX_TOUCH_CTL_START,    0.934278f, 0.593683f, 54.0f, 0.0f, 1.000f, false }, // Start
++    { GDX_TOUCH_CTL_DPAD,     0.142190f, 0.566250f, 52.0f, 0.0f, 1.000f, false }, // D-pad
 +};
 +
 +static const GdxBaseSpec kPhoneSpecs[] = {
-+    { GDX_TOUCH_CTL_STICK,    0.2145f, 0.7222f, 116.0f, 0.0f },  // stick
-+    { GDX_TOUCH_CTL_ACCEL,    0.8764f, 0.7376f, 52.0f, 0.0f },  // A
-+    { GDX_TOUCH_CTL_BOOST,    0.8057f, 0.6650f, 52.0f, 0.0f },  // B
-+    { GDX_TOUCH_CTL_BRAKE,    0.8665f, 0.5701f, 40.0f, 0.0f },  // C-down
-+    { GDX_TOUCH_CTL_VIEW,     0.9111f, 0.4863f, 40.0f, 0.0f },  // C-right
-+    { GDX_TOUCH_CTL_LOOK,     0.8669f, 0.3983f, 40.0f, 0.0f },  // C-up
-+    { GDX_TOUCH_CTL_CLEFT,    0.8239f, 0.4855f, 40.0f, 0.0f },  // C-left
-+    { GDX_TOUCH_CTL_SLIDE_L,  0.2425f, 0.4991f, 52.0f, 0.0f },  // Z
-+    // These four centers are the normalized result of HarkinianPad's compact
-+    // safe-area rail math on the accepted iPhone 17 Pro landscape canvas
-+    // (874 x 402 points, 62-point side insets). Keeping the entire controls,
-+    // rather than only their centers, inside that rail prevents the R/Start
-+    // collision and the clipped D-pad seen in IOS-TOUCH-VISUAL-01.
-+    { GDX_TOUCH_CTL_SLIDE_R,  0.8741f, 0.1443f, 76.0f, 44.0f }, // R pill
-+    { GDX_TOUCH_CTL_L,        0.1259f, 0.1443f, 76.0f, 44.0f }, // L pill
-+    { GDX_TOUCH_CTL_START,    0.7963f, 0.1443f, 44.0f, 0.0f },  // Start
-+    { GDX_TOUCH_CTL_DPAD,     0.1442f, 0.3980f, 44.0f, 0.0f },  // D-pad
++    // Promoted verbatim from the owner-accepted physical iPhone 14 profile on
++    // 2026-08-15. The D-pad is hidden by default but remains available in the
++    // editor; kTabletSpecs stays independent.
++    { GDX_TOUCH_CTL_STICK,    0.192201f, 0.761538f, 116.0f, 0.0f, 1.000f, false }, // stick
++    { GDX_TOUCH_CTL_ACCEL,    0.873169f, 0.811793f, 52.0f, 0.0f, 1.377f, false }, // A
++    { GDX_TOUCH_CTL_BOOST,    0.807380f, 0.707002f, 52.0f, 0.0f, 1.000f, false }, // B
++    { GDX_TOUCH_CTL_BRAKE,    0.152104f, 0.566135f, 40.0f, 0.0f, 1.000f, false }, // C-down
++    { GDX_TOUCH_CTL_VIEW,     0.189968f, 0.475737f, 40.0f, 0.0f, 1.000f, false }, // C-right
++    { GDX_TOUCH_CTL_LOOK,     0.152843f, 0.393659f, 40.0f, 0.0f, 1.000f, false }, // C-up
++    { GDX_TOUCH_CTL_CLEFT,    0.111961f, 0.479058f, 40.0f, 0.0f, 1.000f, false }, // C-left
++    { GDX_TOUCH_CTL_SLIDE_L,  0.878996f, 0.632911f, 52.0f, 0.0f, 1.000f, false }, // Z
++    { GDX_TOUCH_CTL_SLIDE_R,  0.903735f, 0.411982f, 76.0f, 44.0f, 0.796f, false }, // R pill
++    { GDX_TOUCH_CTL_L,        0.903735f, 0.508674f, 76.0f, 44.0f, 0.796f, false }, // L pill
++    { GDX_TOUCH_CTL_START,    0.913507f, 0.286845f, 44.0f, 0.0f, 1.000f, false }, // Start
++    { GDX_TOUCH_CTL_DPAD,     0.338073f, 0.580342f, 44.0f, 0.0f, 1.000f, true }, // D-pad
 +};
 +
 +static const float kDpadRadius = 48.0f; // tablet center-to-button distance
@@ -4203,8 +4203,8 @@ index 0000000..c8875d3
 +        spec.controlId = bases[i].controlId;
 +        spec.centerX = bases[i].x;
 +        spec.centerY = bases[i].y;
-+        spec.scale = 1.0f;
-+        spec.hidden = 0;
++        spec.scale = bases[i].defaultScale;
++        spec.hidden = bases[i].defaultHidden ? 1 : 0;
 +        defaults.push_back(spec);
 +    }
 +
@@ -4219,7 +4219,7 @@ index 0000000..c8875d3
 +        spec.controlId = bases[i].controlId;
 +        spec.centerX = (center.count == 2) ? center[0].floatValue : bases[i].x;
 +        spec.centerY = (center.count == 2) ? center[1].floatValue : bases[i].y;
-+        spec.scale = (self.layoutScales[key] != nil) ? self.layoutScales[key].floatValue : 1.0f;
++        spec.scale = (self.layoutScales[key] != nil) ? self.layoutScales[key].floatValue : bases[i].defaultScale;
 +        spec.hidden = [self.hiddenControls containsObject:key] ? 1 : 0;
 +        overrides.push_back(spec);
 +    }
@@ -4853,13 +4853,12 @@ index 0000000..c8875d3
 +    }
 +    sMenuButton.hidden = NO;
 +    if (compact) {
-+        // Phone: top-center during gameplay, clear of the Dynamic Island
-+        // (which sits at a landscape corner).
-+        const CGFloat y = safe.top + 8.0;
-+        sMenuButton.frame = CGRectMake(width * 0.5 - size * 0.5, y, size, size);
++        // Phone: persistent upper-right affordance, fully inside the live safe
++        // area so it cannot clip against a landscape corner or the display cutout.
++        sMenuButton.frame =
++            CGRectMake(width - safe.right - size - 8.0, safe.top + 8.0, size, size);
 +        sMenuButton.autoresizingMask =
-+            UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin |
-+            UIViewAutoresizingFlexibleBottomMargin;
++            UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleBottomMargin;
 +    } else {
 +        // Tablet: upper-right safe area, clear of the menu content.
 +        sMenuButton.frame =
@@ -5043,6 +5042,14 @@ index 0000000..c8875d3
 +        }
 +        if (changed || !sStarted) {
 +            gdx_apply_touch_state();
++        } else {
++            // UIKit surfaces can be reordered during orientation and game/menu
++            // transitions without changing the host flags. Reassert only this
++            // small permanent affordance so it stays visible and tappable.
++            UIWindow* window = gdx_active_ui_window();
++            if (window != nil) {
++                gdx_install_menu_button(window);
++            }
 +        }
 +        // Debounced input-state evidence: while any touch input is live, publish
 +        // the exact N64 state the game will read this frame (buttons + stick) at

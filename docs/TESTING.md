@@ -1373,3 +1373,55 @@ inference.
   focused regression, but the file was absent from the maintained patch. The
   libultraship patch now includes it. `gdx_tmem_load_map_tests` and the full
   graphics converter/cache suite pass.
+
+## 2026-08-15 — physical-iPad acceptance and first physical-iPhone deployment
+
+- **iPad owner acceptance:** the owner reports the corrected physical-iPad build
+  is good to go for normal game start, touch gameplay, audio, course presentation,
+  and racing. The approved README hero visibly shows a live lap-one race with the
+  accepted overlay; two additional supplied captures show machine settings and
+  lap-two gameplay. These are public presentation evidence, not bundled game data.
+- **Latest tablet defaults:** fresh iPad preferences captured
+  `F0X.TouchLayout.tablet-v1` with 12 controls. Those centers are now the tablet
+  source defaults; a `defaultScale` field preserves the accepted 0.796 R/L pill
+  sizes without changing persisted-profile scale semantics. `kPhoneSpecs` is
+  unchanged.
+- **iPhone build/install:** the universal Debug arm64 iPhoneOS app rebuilt for
+  the connected iPhone 14, passed strict deep signature verification, installed
+  as `com.chrissotraidis.f0x`, and launched as PID 1204.
+- **Private transfer:** the live iPad snapshot supplied the current archive,
+  save, configuration, and preference profile. Because the live container no
+  longer retained its raw ROM, the immutable `.z64` came from the earlier
+  verified iPad backup. The iPhone received only the required private files;
+  caches and 50 MB diagnostic logs were excluded. No uninstall and no
+  `--remove-existing-content` operation was used.
+- **Readback:** iPhone SHA-256 matched the source ROM (`2be0f861...`), archive
+  (`7d60d975...`), and save (`7835e3cb...`). The preference plist read back with
+  both the accepted `tablet-v1` profile and a cloned `phone-v1` starting profile.
+- **Startup:** the physical-iPhone log mounted `Documents/fzerox.o2r`, opened
+  CoreAudio at 32000 Hz signed 16-bit stereo with 1024-frame blocks, and reached
+  600 submitted buffers with two startup-zero buffers and zero drops/errors.
+- **Boundary:** install, private-data integrity, archive mount, audio transport,
+  and a live process are proven. Physical-iPhone layout, audio fidelity, touch
+  gameplay, lifecycle, thermals, controllers, and long-session acceptance remain
+  hands-on gates. No public IPA has been published.
+
+## 2026-08-15 — physical-iPhone layout promotion and menu repair
+
+- **Installed version inspected first:** the connected iPhone 14 reported F0X
+  version `0.1.0`, bundle version `0.1.0`, bundle identifier
+  `com.chrissotraidis.f0x`.
+- **Protected input backup:** individual CoreDevice reads captured the current
+  phone preference plist, ROM, archive, and save before the update. SHA-256 was
+  `7e62142f...` for preferences, `2be0f861...` for the ROM, `7d60d975...` for the
+  archive, and `7835e3cb...` for the save. A bulk `Documents` read hit a closed
+  CoreDevice socket; it was read-only and the smaller verified reads succeeded.
+- **Phone defaults:** the owner-arranged `F0X.TouchLayout.phone-v1` profile was
+  promoted exactly to `kPhoneSpecs`, preserving all normalized centers/scales.
+  This includes A at scale 1.377, R/L at 0.796, and D-pad hidden. Tablet defaults
+  were not changed.
+- **Menu affordance:** compact layout now places ••• eight points inside the
+  upper-right safe area. An unchanged host-state tick reasserts only the menu
+  button's frame, visibility, and z-order, covering UIKit view reordering without
+  rebuilding the whole gameplay overlay. It remains hidden during Settings and
+  layout editing.
