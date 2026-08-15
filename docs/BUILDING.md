@@ -227,7 +227,8 @@ valid or stale signatures, and prohibited files inside the engine archive.
 It normalizes package metadata and file order so an unchanged `.app` produces
 the same IPA SHA-256 on repeated runs.
 
-This IPA is a package/re-signing proof, not a public download and not directly
-installable on a standard iPhone or iPad. A compatible personal-signing tool or
-Xcode must sign it for an installer's device. Never publish an IPA produced
-from an app containing a maintainer profile or signature.
+The output is unsigned and not directly installable on a standard iPhone or
+iPad. A compatible personal-signing method or Xcode must sign it for the
+installer's device. Developer Preview 1 publishes this audited ROM-free output
+as `F0X-0.1.0-preview.1-unsigned.ipa`; never publish an IPA produced from an app
+containing a maintainer profile or signature.

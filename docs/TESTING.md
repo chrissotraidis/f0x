@@ -1460,3 +1460,21 @@ inference.
   phone preferences byte-identical before and after installation; its preference
   hash remained `7e62142f...`. Physical confirmation of the irregular touch
   route remains the acceptance gate.
+
+## 2026-08-15 — Developer Preview 1 IPA candidate
+
+- **Source boundary:** the runtime payload was clean-built unsigned from merged
+  `main` at `145b75c`, after PR #3 landed the menu-navigation correction.
+- **Artifact:** `F0X-0.1.0-preview.1-unsigned.ipa` is an arm64 iPhoneOS package
+  for both iPhone and iPad with minimum iOS/iPadOS 16.0. It is unsigned and must
+  be re-signed by each installer.
+- **Determinism:** two complete `scripts/package-ios.sh` runs produced the same
+  SHA-256, `e4e0f2f62b23a757cf0958d389ddfe433ceb0094ef36999d93bcc8bcbe136efd`.
+- **Audit:** ZIP integrity passed for all 85 entries. The package contains the
+  executable, both device-family icons, license/notices, and the ROM-free engine
+  archive; it contains no ROM, `fzerox.o2r`, save, signing profile, certificate,
+  key, or `_CodeSignature` directory.
+- **Release boundary:** the physical iPad build is owner-accepted and the same
+  corrected source is installed and live on the physical iPhone with protected
+  data preserved. Hands-on iPhone gameplay remains open; an IPA download does
+  not close that acceptance gate.
