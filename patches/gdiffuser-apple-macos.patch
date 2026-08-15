@@ -3385,10 +3385,10 @@ index 15e64d9..bf06685 100644
  }
 diff --git a/port/gdx_touch_controls.h b/port/gdx_touch_controls.h
 new file mode 100644
-index 0000000..a8add2e
+index 0000000..fe0409a
 --- /dev/null
 +++ b/port/gdx_touch_controls.h
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,213 @@
 +// port/gdx_touch_controls.h — cross-platform touch-controls API for F0X.
 +//
 +// One small state-oriented API is exposed to the port. Exactly one implementation
@@ -3466,9 +3466,12 @@ index 0000000..a8add2e
 +// Called once per host frame from the main loop. menuVisible is the live
 +// GdxMenu visibility; physicalGamepadConnected is 1 when the Auto-hide-with-
 +// controller policy should suppress the overlay (main.cpp folds the CVar and the
-+// real SDL gamepad presence together); enabled/opacity are the live CVars.
++// real SDL gamepad presence together); gameplayActive is 1 only during an
++// on-track race, which keeps racing-only hold assists out of game menus;
++// enabled/opacity are the live CVars.
 +GDX_TOUCH_API void gdx_touch_controls_tick(int menuVisible,
 +                                           int physicalGamepadConnected,
++                                           int gameplayActive,
 +                                           int enabled,
 +                                           float opacity);
 +
@@ -3601,10 +3604,10 @@ index 0000000..a8add2e
 +#endif // GDX_TOUCH_CONTROLS_H
 diff --git a/port/gdx_touch_controls_ios.mm b/port/gdx_touch_controls_ios.mm
 new file mode 100644
-index 0000000..19210f3
+index 0000000..3a8fe4d
 --- /dev/null
 +++ b/port/gdx_touch_controls_ios.mm
-@@ -0,0 +1,1546 @@
+@@ -0,0 +1,1568 @@
 +// port/gdx_touch_controls_ios.mm — iOS/iPadOS UIKit touch-controls overlay.
 +//
 +// F0X-specific adaptation of the proven HarkinianPad product patterns
@@ -3656,6 +3659,7 @@ index 0000000..19210f3
 +static BOOL sDesiredEnabled = YES;
 +static BOOL sMenuVisible = NO;
 +static BOOL sControllerAutoHidden = NO;
++static BOOL sGameplayActive = NO;
 +static CGFloat sOpacity = 0.55f;
 +static BOOL sHapticsEnabled = YES;
 +static BOOL sEditorRequested = NO;
@@ -4119,7 +4123,10 @@ index 0000000..19210f3
 +
 +        [self.btnAccel setIdleColor:[UIColor colorWithRed:0.08 green:0.35 blue:0.88 alpha:0.58]
 +                       pressedColor:[UIColor colorWithRed:0.14 green:0.48 blue:1.00 alpha:0.88]];
-+        self.btnAccel.holdToLatch = YES;
++        // Hold-to-latch is a racing assist. gdx_apply_touch_state enables it
++        // only while the game is in an actual on-track mode so a slow menu tap
++        // can never turn A into a persistent held input.
++        self.btnAccel.holdToLatch = NO;
 +        self.btnAccel.latchDelay = 1.0;
 +        [self.btnBoost setIdleColor:[UIColor colorWithRed:0.05 green:0.55 blue:0.24 alpha:0.58]
 +                       pressedColor:[UIColor colorWithRed:0.10 green:0.76 blue:0.34 alpha:0.88]];
@@ -4133,7 +4140,7 @@ index 0000000..19210f3
 +        // slide/attack (Z): hold ~0.5 s to lock the slide on with a haptic
 +        // confirmation; tap again to release. The latch clears on every cancel
 +        // path (menu open, editor, background, interruption, release).
-+        self.btnSlideL.holdToLatch = YES;
++        self.btnSlideL.holdToLatch = NO;
 +        [self.btnSlideR setIdleColor:[UIColor colorWithWhite:0.04 alpha:0.38]
 +                        pressedColor:[UIColor colorWithWhite:0.72 alpha:0.48]];
 +        [self.btnStart setIdleColor:[UIColor colorWithRed:0.68 green:0.12 blue:0.16 alpha:0.52]
@@ -4937,6 +4944,8 @@ index 0000000..19210f3
 +        sOverlay = [[GdxTouchOverlay alloc] initWithFrame:window.bounds];
 +        sOverlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
 +    }
++    sOverlay.btnAccel.holdToLatch = sGameplayActive;
++    sOverlay.btnSlideL.holdToLatch = sGameplayActive;
 +    [sOverlay setTouchOpacity:sOpacity];
 +    if (sOverlay.superview != window) {
 +        [sOverlay removeFromSuperview];
@@ -5018,18 +5027,34 @@ index 0000000..19210f3
 +}
 +
 +void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected,
-+                             int enabled, float opacity) {
++                             int gameplayActive, int enabled, float opacity) {
 +    gdx_main_sync(^{
 +        const BOOL menuVisibleNow = menuVisible != 0;
 +        const BOOL controllerHiddenNow = physicalGamepadConnected != 0;
++        const BOOL gameplayActiveNow = gameplayActive != 0;
 +        const BOOL enabledNow = enabled != 0;
 +        const CGFloat opacityNow = std::max(0.25f, std::min(1.0f, (float)opacity));
 +        const BOOL changed = (menuVisibleNow != sMenuVisible) ||
 +                             (controllerHiddenNow != sControllerAutoHidden) ||
++                             (gameplayActiveNow != sGameplayActive) ||
 +                             (enabledNow != sDesiredEnabled) ||
 +                             (fabs(opacityNow - sOpacity) >= 0.001f);
++        if (sGameplayActive && !gameplayActiveNow) {
++            // Internal F-Zero X screens do not open GdxMenu, so their mode
++            // transitions used to bypass the existing menu/editor cancel path.
++            // Clear a racing latch before the next menu can consume it.
++            gdx_touch_state_cancel_all();
++            if (sOverlay != nil) {
++                [sOverlay cancelAllInputs];
++            }
++        }
 +        sMenuVisible = menuVisibleNow;
 +        sControllerAutoHidden = controllerHiddenNow;
++        if (gameplayActiveNow != sGameplayActive) {
++            gdx_port_logf("[touch] racing hold assists %s\n",
++                          gameplayActiveNow ? "enabled" : "disabled");
++        }
++        sGameplayActive = gameplayActiveNow;
 +        sDesiredEnabled = enabledNow;
 +        sOpacity = opacityNow;
 +        static BOOL sLoggedMenuState = NO;
@@ -5153,10 +5178,10 @@ index 0000000..19210f3
 +}
 diff --git a/port/gdx_touch_controls_stub.c b/port/gdx_touch_controls_stub.c
 new file mode 100644
-index 0000000..43774ff
+index 0000000..84fec6c
 --- /dev/null
 +++ b/port/gdx_touch_controls_stub.c
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,58 @@
 +// port/gdx_touch_controls_stub.c — neutral non-iOS touch-controls implementation.
 +//
 +// macOS, Linux, and Windows builds compile this file so every C/C++ call site
@@ -5179,9 +5204,10 @@ index 0000000..43774ff
 +void gdx_touch_controls_prepare_lifecycle(void) {}
 +
 +void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected,
-+                             int enabled, float opacity) {
++                             int gameplayActive, int enabled, float opacity) {
 +    (void)menuVisible;
 +    (void)physicalGamepadConnected;
++    (void)gameplayActive;
 +    (void)enabled;
 +    (void)opacity;
 +}
@@ -5492,7 +5518,7 @@ index 927d50d..e5c1587 100644
  
  #endif /* GDX_O2R_EXPECTED_H */
 diff --git a/port/input_bridge.c b/port/input_bridge.c
-index 5900586..4b47908 100644
+index 5900586..4e14428 100644
 --- a/port/input_bridge.c
 +++ b/port/input_bridge.c
 @@ -48,6 +48,7 @@
@@ -5503,7 +5529,16 @@ index 5900586..4b47908 100644
  #include "gdx_input_script.h" // GDX_INPUT_SCRIPT: dev-only deterministic input playback (see file header)
  #include "port_log.h"
  
-@@ -668,6 +669,20 @@ void gdx_controller_poll(void) {
+@@ -68,6 +69,8 @@
+ #endif
+ 
+ extern s32 gControllersConnected;
++extern s32 gQueuedGameMode;
++extern s16 gGameModeChangeState;
+ 
+ // Implemented in main.cpp (C++). Fills per-port N64 button bitmasks + analog sticks (-80..80) and
+ // a per-port "this port can produce input right now" flag. Returns 0 if the ControlDeck is
+@@ -668,6 +671,20 @@ void gdx_controller_poll(void) {
      // controller the game will accept.
      connected[0] = 1;
  
@@ -5524,8 +5559,38 @@ index 5900586..4b47908 100644
      // Applied after the real controller read so analog events are not overwritten by it. Both dev
      // harnesses drive PORT 1 only; giving them a port argument would change their file formats.
      gdx_autoinput_apply(&buttons[0], &stick_x[0], &stick_y[0]);
+@@ -708,4 +725,29 @@ void gdx_controller_poll(void) {
+     }
+ 
+     gdx_publish_shared_controller(connected);
++
++    // Bounded device evidence for menu-navigation failures: record only real
++    // input edges or a mode destination change, never every host frame.
++    if (gameBoundary) {
++        static s32 sLoggedMode = -1;
++        static s32 sLoggedQueuedMode = -1;
++        const int hasInputEdge = (gSharedController.buttonPressed != 0) ||
++                                 (gSharedController.buttonReleased != 0) ||
++                                 (gSharedController.stickPressed != 0) ||
++                                 (gSharedController.stickReleased != 0);
++        if (hasInputEdge || gGameMode != sLoggedMode || gQueuedGameMode != sLoggedQueuedMode) {
++            gdx_port_logf("[input-state] mode=%d queued=%d transition=%d current=0x%04X "
++                          "pressed=0x%04X released=0x%04X stick=(%d,%d) "
++                          "stickPressed=0x%02X stickReleased=0x%02X\n",
++                          (int) GET_MODE(gGameMode), (int) GET_MODE(gQueuedGameMode),
++                          (int) gGameModeChangeState, (unsigned) gSharedController.buttonCurrent,
++                          (unsigned) gSharedController.buttonPressed,
++                          (unsigned) gSharedController.buttonReleased,
++                          (int) gSharedController.stickX, (int) gSharedController.stickY,
++                          (unsigned) gSharedController.stickPressed,
++                          (unsigned) gSharedController.stickReleased);
++            sLoggedMode = gGameMode;
++            sLoggedQueuedMode = gQueuedGameMode;
++        }
++    }
+ }
 diff --git a/port/main.cpp b/port/main.cpp
-index 118ee0d..ade5950 100644
+index 118ee0d..f299e2b 100644
 --- a/port/main.cpp
 +++ b/port/main.cpp
 @@ -23,7 +23,7 @@
@@ -5546,20 +5611,21 @@ index 118ee0d..ade5950 100644
  #include "n64_gfx_bridge.h"
  #include <SDL2/SDL.h>
  
-@@ -73,6 +75,12 @@ extern "C" void gdx_disk_save_tick(void);
+@@ -73,6 +75,13 @@ extern "C" void gdx_disk_save_tick(void);
  extern "C" void gdx_disk_save_flush(void);
  extern "C" void gdx_discord_tick(void);
  extern "C" void gdx_discord_shutdown(void);
 +extern "C" void gdx_touch_controls_start(void);
 +extern "C" void gdx_touch_controls_prepare_lifecycle(void);
-+extern "C" void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected, int enabled,
-+                                        float opacity);
++extern "C" void gdx_touch_controls_tick(int menuVisible, int physicalGamepadConnected,
++                                        int gameplayActive, int enabled, float opacity);
 +extern "C" void gdx_touch_controls_set_haptics_enabled(int enabled);
 +extern "C" void gdx_touch_controls_shutdown(void);
++extern "C" int gdx_input_in_gameplay(void);
  extern "C" void gdx_pcm_capture_init(void);
  extern "C" int  gdx_pcm_capture_finished(void);
  extern "C" void gdx_pcm_capture_shutdown(void);
-@@ -143,6 +151,182 @@ static double gdx_host_now_seconds(void) {
+@@ -143,6 +152,182 @@ static double gdx_host_now_seconds(void) {
      using namespace std::chrono;
      return duration<double>(steady_clock::now() - gGdxHostClockEpoch).count();
  }
@@ -5742,7 +5808,7 @@ index 118ee0d..ade5950 100644
  // Hold the host thread until `deadlineSeconds` (same base as gdx_host_now_seconds). No-op if the
  // presents already spent the tick budget (VSync-on case). Keeps the SIM locked to 60 Hz when the
  // sub-frame loop finished early (VSync-off case) — this is interpolation's logic pacer.
-@@ -467,6 +651,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
+@@ -467,6 +652,69 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
      return 1;
  }
  
@@ -5812,7 +5878,7 @@ index 118ee0d..ade5950 100644
  // Deliberately no single-port variant: looping one over four ports would silently break the
  // wheel buffer and input-lag deque described above.
  
-@@ -498,6 +745,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
+@@ -498,6 +746,13 @@ static void addArchiveCandidateRoots(std::vector<std::filesystem::path>& roots,
          ec.clear();
      }
  
@@ -5826,7 +5892,7 @@ index 118ee0d..ade5950 100644
      for (std::filesystem::path dir = start; !dir.empty(); dir = dir.parent_path()) {
          roots.push_back(dir);
          roots.push_back(dir / "assets" / "extracted");
-@@ -662,7 +916,7 @@ int main(int argc, char** argv) {
+@@ -662,7 +917,7 @@ int main(int argc, char** argv) {
      }
  
      logStep("CreateUninitializedInstance");
@@ -5835,7 +5901,7 @@ index 118ee0d..ade5950 100644
                                                            "gdiffuser.cfg.json");
      if (ctx == nullptr) { logStep("FATAL: CreateUninitializedInstance"); return 1; }
  
-@@ -702,7 +956,15 @@ int main(int argc, char** argv) {
+@@ -702,7 +957,15 @@ int main(int argc, char** argv) {
      logStep("ControlDeck::Init");     controlDeck->Init(&sGdxControllerBits);
  
      // ResourceManager MUST init before the window is constructed/inited.
@@ -5852,7 +5918,7 @@ index 118ee0d..ade5950 100644
      for (const auto& archivePath : archivePaths) {
          gdx_port_logf("[G-Diffuser] archive: %s\n", archivePath.c_str());
      }
-@@ -826,25 +1088,39 @@ int main(int argc, char** argv) {
+@@ -826,25 +1089,39 @@ int main(int argc, char** argv) {
          // port target (cvars.cmake is include()d only inside libultraship/src).
          pgui->AddGuiWindow(std::make_shared<LUS::GfxDebuggerWindow>("gGfxDebuggerEnabled", "Gfx Debugger"));
          pgui->AddGuiWindow(
@@ -5901,7 +5967,7 @@ index 118ee0d..ade5950 100644
          if (CVarGetInteger("gdx.Migrations.FramePacingDefaultOff", 0) == 0) {
              CVarSetInteger("gdx.Migrations.FramePacingDefaultOff", 1);
              CVarSetInteger("gEnhancements.Graphics.FramePacing", 0);
-@@ -852,6 +1128,7 @@ int main(int argc, char** argv) {
+@@ -852,6 +1129,7 @@ int main(int argc, char** argv) {
              gdx_port_logf("[G-Diffuser] Frame pacer reset to OFF (new default). "
                            "Re-enable it in Settings if the game runs too fast.\n");
          }
@@ -5909,7 +5975,7 @@ index 118ee0d..ade5950 100644
  
          // From here on the CVars, not the env vars that seeded them, are the source of truth for
          // gate buckets A/B; gdx_dev_gates_refresh() re-reads once per frame.
-@@ -902,6 +1179,11 @@ int main(int argc, char** argv) {
+@@ -902,6 +1180,11 @@ int main(int argc, char** argv) {
      logStep("InitEventSystem");       ctx->InitEventSystem();
      logStep("InitFileDropMgr");       ctx->InitFileDropMgr();
  
@@ -5921,7 +5987,7 @@ index 118ee0d..ade5950 100644
      // ── In-window first-time setup (NeedsSetup path) ─────────────────────────────────────────────
      // FirstBootRun defers acquisition to here when the ROM/EK disk/IPL are missing: this is the
      // first point where the window, Gui and FileDropMgr exist while the game has NOT booted —
-@@ -919,6 +1201,34 @@ int main(int argc, char** argv) {
+@@ -919,6 +1202,34 @@ int main(int argc, char** argv) {
          firstBoot.status = gdx::FirstBootStatus::SetupComplete;
      }
  
@@ -5956,7 +6022,7 @@ index 118ee0d..ade5950 100644
      // Safe this early: the thread internally waits for gAudioContextInitialized (set once decomp's
      // Audio_Init runs, well after bootproc() below) before producing anything.
      logStep("gdx_audio_thread_start()");
-@@ -1076,6 +1386,12 @@ int main(int argc, char** argv) {
+@@ -1076,6 +1387,12 @@ int main(int argc, char** argv) {
      // FrameInterpolation is on.
      gdx_gfx_interp_set_now_fn(&gdx_host_now_seconds);
  
@@ -5969,7 +6035,7 @@ index 118ee0d..ade5950 100644
      logStep("entering frame loop");
      auto w = ctx->GetWindow();
      while (w != nullptr && w->IsRunning()) {
-@@ -1090,6 +1406,63 @@ int main(int argc, char** argv) {
+@@ -1090,6 +1407,63 @@ int main(int argc, char** argv) {
          // and the window manager crashes.
          w->HandleEvents();
          gdx::PerfPhaseEnd(gdx::PerfEvents);
@@ -6027,13 +6093,13 @@ index 118ee0d..ade5950 100644
 +            const int autoHide = CVarGetInteger("gSettings.Touch.AutoHideWithController", 1);
 +            const int controllerConnected =
 +                (autoHide != 0) ? gdx_physical_gamepads_connected() : 0;
-+            gdx_touch_controls_tick(menuVisible ? 1 : 0, controllerConnected, touchEnabled,
-+                                    touchOpacity);
++            gdx_touch_controls_tick(menuVisible ? 1 : 0, controllerConnected,
++                                    gdx_input_in_gameplay(), touchEnabled, touchOpacity);
 +        }
          gdx::PerfPhaseBegin(gdx::PerfInput);
          gdx_controller_poll();
          // Must publish the editor fixed-aspect state before this frame's gfx task runs below:
-@@ -1232,6 +1605,23 @@ int main(int argc, char** argv) {
+@@ -1232,6 +1606,23 @@ int main(int argc, char** argv) {
          gdx_gfx_interp_tick_config(interpOn ? 1 : 0, interpTickStart, kGdxInterpTickSeconds,
                                     interpMaxSubframes);
  
@@ -6057,7 +6123,7 @@ index 118ee0d..ade5950 100644
          // The game frame ACTUALLY runs here, not in gdx_dispatch() below. gdx_vi_tick posts the VI
          // retrace message, which wakes the Main scheduler thread and dispatches the game fiber
          // inline (osSendMesg -> osStartThread -> __osDispatchThread, because __osRunningThread is
-@@ -1250,14 +1640,6 @@ int main(int argc, char** argv) {
+@@ -1250,14 +1641,6 @@ int main(int argc, char** argv) {
          if (!interpOn) {
              // Default path: one tick, one Run, one present, paced by the frame pacer. Nothing on
              // this branch touches the interpolation machinery.
@@ -6072,7 +6138,7 @@ index 118ee0d..ade5950 100644
              gdx::PerfPhaseBegin(gdx::PerfDispatch);
              gdx_dispatch();  // run the decomp's game threads cooperatively until they block again
              gdx::PerfPhaseEnd(gdx::PerfDispatch);
-@@ -1269,6 +1651,7 @@ int main(int argc, char** argv) {
+@@ -1269,6 +1652,7 @@ int main(int argc, char** argv) {
              // staleness notes), so this is the only window where a sample reflects this frame's
              // post-update truth.
              gdx_discord_tick();
@@ -6080,7 +6146,7 @@ index 118ee0d..ade5950 100644
              gdx::PerfPhaseEnd(gdx::PerfTicks);
              gdx::PerfPhaseBegin(gdx::PerfPresent);
              // Presents the VI framebuffer's pixels when no GFX task rendered this frame (boot logo
-@@ -1296,6 +1679,7 @@ int main(int argc, char** argv) {
+@@ -1296,6 +1680,7 @@ int main(int argc, char** argv) {
              gdx::PerfPhaseBegin(gdx::PerfTicks);
              gdx_disk_save_tick();
              gdx_discord_tick(); // post-dispatch sample; see the non-interp branch's note
@@ -6088,7 +6154,7 @@ index 118ee0d..ade5950 100644
              gdx::PerfPhaseEnd(gdx::PerfTicks);
              gdx::PerfPhaseBegin(gdx::PerfPresent);
              if (gdx_gfx_interp_presented_last_tick() == 0) {
-@@ -1441,5 +1825,7 @@ int main(int argc, char** argv) {
+@@ -1441,5 +1826,7 @@ int main(int argc, char** argv) {
      // the file and folds the SHA, so it must not race a still-running audio thread calling feed().
      gdx_audio_thread_stop();
      gdx_pcm_capture_shutdown();
@@ -6125,7 +6191,7 @@ index 8dd7b55..aa45aac 100644
      GDX_A_INTERL       = 17,
      GDX_A_ENVSETUP1    = 18,
 diff --git a/port/n64_gfx_bridge.cpp b/port/n64_gfx_bridge.cpp
-index 8c63a17..e9ed1ed 100644
+index 8c63a17..7764724 100644
 --- a/port/n64_gfx_bridge.cpp
 +++ b/port/n64_gfx_bridge.cpp
 @@ -11,6 +11,12 @@
@@ -6398,7 +6464,19 @@ index 8c63a17..e9ed1ed 100644
                          const char* texCensusPath = "rawcopy"; /* [tex-census] delivery classification */
                          /* Texture-pack override. `translated` is the unified source pointer for
                             BOTH delivery paths, so one lookup here covers common assets (fonts,
-@@ -9399,6 +9516,14 @@ extern "C" void gdx_gfx_run(void* dl, size_t dl_size, GdxTaskUcode taskUcode) {
+@@ -7851,7 +7968,10 @@ extern "C" int gdx_load_venue_texture_segment(int venue) {
+         gdx_port_logf("[segment] failed to load venue=%d symbol=%08X\n", venue, symbol);
+         return 0;
+     }
+-    if (gGdxInterpNowFn != nullptr) {
++    // A cached segment is queried every rendered frame. Only a real cache/
++    // epoch change is a venue load worth tracing; logging cached lookups grew
++    // one physical-iPad session to 68 MiB and obscured the useful input lines.
++    if (gGdxInterpNowFn != nullptr && gConvertEpoch != gdxEpochBefore) {
+         gdx_port_logf("[venueload] venue=%d symbol=%08X load=%.2fms epoch %u->%u\n", venue, symbol,
+                       (gGdxInterpNowFn() - gdxVenueT0) * 1000.0, (unsigned) gdxEpochBefore,
+                       (unsigned) gConvertEpoch);
+@@ -9399,6 +9519,14 @@ extern "C" void gdx_gfx_run(void* dl, size_t dl_size, GdxTaskUcode taskUcode) {
      }
      } // end else (non-P2 path: default single Run + env-gated P0/P1 in-bridge M=2)
  
@@ -6413,7 +6491,7 @@ index 8c63a17..e9ed1ed 100644
      // A real GFX task produced this host frame — the VI-scanout fallback must
      // not also draw over it (see gdx_vi_present_fallback).
      gHostFrameGfxTaskRan = true;
-@@ -9711,8 +9836,10 @@ extern "C" void gdx_gfx_run(void* dl, size_t dl_size, GdxTaskUcode taskUcode) {
+@@ -9711,8 +9839,10 @@ extern "C" void gdx_gfx_run(void* dl, size_t dl_size, GdxTaskUcode taskUcode) {
      // plus the per-matrix scratch records), and it is built and freed once per 60 Hz tick.
      // A residual near zero exonerates teardown; a large one names it.
      gdx_perf_sub_end(GDX_PERF_SUB_FBMIRROR);

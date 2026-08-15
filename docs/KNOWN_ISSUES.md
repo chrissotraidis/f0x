@@ -21,9 +21,15 @@
   promoted independently and verbatim to their respective source defaults,
   including saved scales and the phone's hidden D-pad. The phone ••• is pinned
   inside the upper-right safe area and reasserted above transient UIKit view
-  reordering so it does not disappear. Open: broader phone gameplay, true
-  multi-touch stress, controller handoff, interruptions, haptics, and long
-  sessions. SDL finger-to-ImGui mouse translation is unchanged.
+  reordering so it does not disappear. A physical-iPad menu-churn report exposed
+  two navigation leaks: retail Course Select overlay state remained at EXIT
+  after re-entry because the port does not reload overlay BSS, and the racing A/Z
+  latch policy was active in menus. Course Select now explicitly resets on every
+  port entry; hold-to-latch is racing-only and is cancelled when gameplay ends.
+  The deterministic back/forward route now reaches GP Race after repeated exits;
+  physical-iPad acceptance of that irregular route is pending. Open: broader
+  phone gameplay, true multi-touch stress, controller handoff, interruptions,
+  haptics, and long sessions. SDL finger-to-ImGui mouse translation is unchanged.
 - **IOS-LIFECYCLE-01 — Simulator lifecycle is verified; physical acceptance
   remains:** UIKit resign/background first cancels every touch/latch, then the
   host loop flushes CVars and stops simulation/Metal submission while the
