@@ -52,16 +52,31 @@ core on 2026-08-12 (evidence: `docs/evidence/touch-ios/2026-08-12.txt`).
   suppresses gameplay controls plus ••• until closed. Physical-device
   multi-touch acceptance remains open.
 
-Claim touch as Simulator-verified only for the control set and game flow above;
-physical acceptance remains open.
+The current tablet and phone layouts are owner-accepted on their respective
+physical devices. Broader physical-iPhone gameplay plus the stress, controller,
+haptic, and interruption matrix remain open.
 
-## Physical iPad default promoted on 2026-08-13
+## Physical iPad default promoted on 2026-08-15
 
 The normalized `F0X.TouchLayout.tablet-v1` profile accepted by the owner on the
 physical iPad is now the source default in `kTabletSpecs`. Existing saved tablet
 profiles continue to override defaults, so an in-place update does not move the
 owner's controls; Reset or a fresh profile resolves to the accepted geometry.
-`kPhoneSpecs` was not changed and remains a separate later physical-iPhone gate.
+`GdxBaseSpec.defaultScale` preserves the accepted 0.796 size for the R and L
+pill controls without changing the base used by persisted profile scaling.
+
+## Physical iPhone default promoted on 2026-08-15
+
+The owner-arranged `F0X.TouchLayout.phone-v1` profile from the physical iPhone
+14 is promoted verbatim to `kPhoneSpecs`: all 12 normalized centers and scales,
+including the 1.377 accelerator, two 0.796 shoulder pills, and hidden D-pad.
+`GdxBaseSpec.defaultHidden` represents that fresh/reset default without affecting
+the tablet. Existing phone preferences continue to override the source values.
+
+The permanent gameplay ••• is placed eight points inside the upper-right safe
+area on both axes. The lightweight host tick reasserts its frame, visibility,
+and z-order even when UIKit reorders surfaces without a host menu-state change;
+it remains hidden while Settings or the editor owns the screen.
 
 ## What to reuse from HarkinianPad
 

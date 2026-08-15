@@ -2,8 +2,8 @@
 
 ## F0X-specific
 
-- **IOS-TOUCH-01 — gameplay touch controls are implemented; physical
-  acceptance remains open:** the UIKit overlay now writes direct atomic N64
+- **IOS-TOUCH-01 — physical iPad and iPhone layouts accepted; stress testing remains:**
+  the UIKit overlay writes direct atomic N64
   pad state merged at the port-1 seam, with hand-authored phone/tablet
   defaults, settings CVars, auto-hide with physical controller, opacity,
   haptics, permanent menu access, menu-state hiding, a layout editor with
@@ -16,13 +16,14 @@
   and blue fill), and cancel-clears-latch are captured live. The phone
   defaults were re-verified on the current build via the iPhone 17 Pro
   Simulator (2026-08-13): phone table selected, every control at its
-  normalized default center with edge pills safe-clamped, ••• in the phone
-  top-center slot clear of the Dynamic Island, overlay attached over a live
-  race. The owner-accepted physical iPad normalized profile is now the tablet
-  default; `kPhoneSpecs` is deliberately unchanged until a later physical
-  iPhone ergonomics pass. Open: true multi-touch contact stress, controller handoff,
-  interruptions, haptics feel, and long sessions require physical
-  iPad/iPhone acceptance. SDL finger-to-ImGui mouse translation is unchanged.
+  normalized default center with edge pills safe-clamped and the overlay attached
+  over a live race. The physical-iPad and physical-iPhone 14 profiles are now
+  promoted independently and verbatim to their respective source defaults,
+  including saved scales and the phone's hidden D-pad. The phone ••• is pinned
+  inside the upper-right safe area and reasserted above transient UIKit view
+  reordering so it does not disappear. Open: broader phone gameplay, true
+  multi-touch stress, controller handoff, interruptions, haptics, and long
+  sessions. SDL finger-to-ImGui mouse translation is unchanged.
 - **IOS-LIFECYCLE-01 — Simulator lifecycle is verified; physical acceptance
   remains:** UIKit resign/background first cancels every touch/latch, then the
   host loop flushes CVars and stops simulation/Metal submission while the
@@ -35,8 +36,8 @@
   settling, and visibly returned to Metal output. Physical interruptions,
   route changes, memory pressure, OS termination, save-at-interruption,
   Low Power Mode, and thermal behavior remain under IOS-HARDWARE-01.
-- **IOS-AUDIO-01 — two concrete faults fixed; physical audibility remains
-  unaccepted:** libultraship excludes iOS from the Apple CoreAudio default and
+- **IOS-AUDIO-01 — concrete faults fixed and normal iPad gameplay accepted;
+  phone/routes remain:** libultraship excludes iOS from the Apple CoreAudio default and
   uses SDL at two channels and 32000 Hz. On the attached physical iPad, owner
   comparison against an emulator found title/menu music transitions at the
   wrong times, incorrect or mistimed menu effects, countdown effects ahead of
@@ -69,10 +70,11 @@
   title-to-menu captures. The corrected signed build was then installed in
   place on the physical iPad with protected data hashes preserved. Its first
   2,400 buffers held the two-buffer startup-zero baseline with zero SDL
-  drops/errors, and the owner reported that the major audio bugs now appear
-  fixed. Correct audible title/menu continuity, effect/countdown sync, and
-  crackle/buzz absence across the full route still require owner listening and
-  remain release-blocking.
+  drops/errors. On 2026-08-15 the owner accepted the current physical-iPad build
+  for normal gameplay and audio. The iPhone 14 deployment independently opened
+  CoreAudio at 32000 Hz stereo and submitted 600 buffers with two startup-zero
+  buffers and zero drops/errors, but phone listening plus headphones, Bluetooth,
+  route changes, interruptions, and long-session audio remain open.
 - **IOS-GFX-CRASH-01 — resolved in Simulator; physical long-session proof
   remains under IOS-HARDWARE-01:** the failing design kept converted display-
   list dialect metadata in a second pointer-keyed `unordered_map`, independent
@@ -96,7 +98,7 @@
   all secondary stick/rumble/gyro/LED sections remain reachable. Gameplay
   controls and ••• are absent while the editor/menu owns the screen, then
   restore neutrally after close. Both maintained patches clean-replay.
-- **IOS-COURSE-PREVIEW-01 — corrected; physical visual acceptance pending:**
+- **IOS-COURSE-PREVIEW-01 — resolved and owner-accepted on physical iPad:**
   every course-select preview used the intended `0.25` model scale, but
   `guScale()` packed the stock N64 `Mtx` layout while the PORT renderer decoded
   the lane-swapped `Matrix_ToMtx` layout. The scale consequently decoded as
@@ -104,16 +106,17 @@
   PORT now builds that same 0.25 matrix through the existing host-safe matrix
   builder; console and non-PORT behavior remain unchanged. The rebuilt Mac app
   reached mode 10, held on the six-map preview, rendered the full interval, and
-  exited normally. Final framing acceptance remains a physical-iPad visual gate.
-- **IOS-HARDWARE-01 — physical mobile acceptance is in progress:** a signed
-  Debug build has been installed and launched in place on the attached iPad.
+  exited normally. The owner subsequently accepted the corrected physical-iPad build.
+- **IOS-HARDWARE-01 — iPad accepted; iPhone acceptance in progress:** a signed
+  Debug build has been installed and launched on both attached devices.
   Pre/post-install hashes match for the local ROM, `fzerox.o2r`, save, config,
   extraction state, ImGui settings, and tablet touch preferences. The clean app
   passed strict deep signature verification, used the intended application
   identifier, and contained no retail ROM or save. This closes signing,
-  installation, launch, and data-preservation checks only. Major audio behavior
-  and the current tablet layout have owner acceptance; complete audible-route,
-  corrected-preview, multi-touch/gameplay, lifecycle, performance, thermals,
+  iPad installation, data preservation, normal touch gameplay, audio, and course
+  presentation are owner-accepted. On iPhone 14, ROM/archive/save/control hashes,
+  archive mount, CoreAudio startup, and a live process are verified; hands-on
+  phone layout/audio/gameplay, lifecycle, performance, thermals, controllers,
   and long-session stability still require physical testing.
 
 - **MAC-PRESENT-02 — stale duplicate bundle likely explained the continuing strobe:**
