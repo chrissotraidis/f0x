@@ -14,7 +14,7 @@
   <img alt="Metal renderer" src="https://img.shields.io/badge/renderer-Metal-5E5CE6">
   <a href="docs/STATUS.md"><img alt="Physical iPad owner accepted" src="https://img.shields.io/badge/physical%20iPad-owner%20accepted-30D158"></a>
   <a href="docs/BUILDING.md"><img alt="Native source port" src="https://img.shields.io/badge/build-native%20source%20port-007AFF"></a>
-  <a href="https://github.com/chrissotraidis/f0x/releases/tag/v0.1.0-preview.1"><img alt="Developer Preview 1" src="https://img.shields.io/badge/release-Preview%201-FF9F0A"></a>
+  <a href="https://github.com/chrissotraidis/f0x/releases/tag/v0.1.0-preview.2"><img alt="Developer Preview 2" src="https://img.shields.io/badge/release-Preview%202-FF9F0A"></a>
   <img alt="Game data not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
 </p>
 
@@ -43,14 +43,14 @@ extraction happen locally, and nothing is uploaded.
 
 | Option | Status | What to do |
 |---|---|---|
-| Public `.ipa` | **Developer Preview 1** | [Download the ROM-free unsigned IPA](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.1/F0X-0.1.0-preview.1-unsigned.ipa), then re-sign it with your own Apple identity before installation. |
+| Public `.ipa` | **Developer Preview 2** | [Download the ROM-free unsigned IPA](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.2/F0X-0.1.0-preview.2-unsigned.ipa), then re-sign it with your own Apple identity before installation. |
 | App Store / TestFlight | **Not announced** | F0X has no store listing or public TestFlight. |
 | Local iPad build | **Owner-played and accepted** | The signed arm64 build has been installed, updated in place, and played on a physical 12.9-inch iPad Pro. Normal game start, touch racing, audio, and course presentation are accepted on that device. |
 | Local iPhone build | **Installed; layout accepted** | The universal build is signed and running on a physical iPhone 14 with verified local game data. Its owner-arranged touch profile is now the independent phone default; broader phone gameplay testing continues. |
 | iPhone/iPad Simulator | **Available for development** | The native arm64 app imports local game data, renders through Metal, and has completed touch/UI/race stability verification. Simulator evidence is not physical-device acceptance. |
 | Apple Silicon macOS | **Available for development** | The native `F0X.app` builds, seals locally, imports game data, persists saves, and renders a live Metal race. |
 
-F0X Developer Preview 1 is available, but it is not being presented as a
+F0X Developer Preview 2 is available, but it is not being presented as a
 finished release. The current physical-iPad build is owner-accepted for normal
 game start, touch gameplay, audio, course previews, and racing. The iPhone 14
 layout is also owner-arranged and promoted to independent defaults; broader
@@ -61,7 +61,7 @@ or Simulator screenshot.
 
 ## Download the developer preview
 
-[**Download F0X 0.1.0 Developer Preview 1 for iPhone and iPad**](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.1/F0X-0.1.0-preview.1-unsigned.ipa)
+[**Download F0X 0.1.0 Developer Preview 2 for iPhone and iPad**](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.2/F0X-0.1.0-preview.2-unsigned.ipa)
 
 This is an **unsigned, ROM-free, arm64 IPA** for iOS and iPadOS 16 or newer. It
 supports both iPhone and iPad, but it is not directly installable until you
@@ -74,8 +74,8 @@ the new IPA over the existing `com.chrissotraidis.f0x` app; do not uninstall it
 first if you want to preserve saves, settings, and touch layouts.
 
 SHA-256:
-`e4e0f2f62b23a757cf0958d389ddfe433ceb0094ef36999d93bcc8bcbe136efd`
-([checksum file](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.1/F0X-0.1.0-preview.1-unsigned.ipa.sha256)).
+`07b9e3bb5a47c894260b113c16629c6ac7cdbf2726d1e8398fc581490938479b`
+([checksum file](https://github.com/chrissotraidis/f0x/releases/download/v0.1.0-preview.2/F0X-0.1.0-preview.2-unsigned.ipa.sha256)).
 
 ## Get started
 
@@ -240,7 +240,7 @@ are recorded in [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 <details>
 <summary><strong>Where is the IPA?</strong></summary>
 
-[Developer Preview 1 is available from GitHub Releases](https://github.com/chrissotraidis/f0x/releases/tag/v0.1.0-preview.1).
+[Developer Preview 2 is available from GitHub Releases](https://github.com/chrissotraidis/f0x/releases/tag/v0.1.0-preview.2).
 It is unsigned and ROM-free, so you must re-sign it before installation and
 supply your own supported cartridge dump after launch. The downloadable IPA
 passed the same deterministic package audit described in the

@@ -1,0 +1,540 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8e8f550..0ce2c99 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -10,6 +10,19 @@ set(CMAKE_CXX_STANDARD 20)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_C_STANDARD 11)
+ 
++# Keep maintainer checkout/build paths out of Apple release binaries and logs.
++# Apply at the root so libultraship, Torch, SDL, and the game share the same
++# reproducible source labels.
++if(APPLE)
++    add_compile_options(
++        "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=."
++        "-fmacro-prefix-map=${CMAKE_SOURCE_DIR}=."
++        "-fdebug-prefix-map=${CMAKE_SOURCE_DIR}=."
++        "-ffile-prefix-map=${CMAKE_BINARY_DIR}=.build"
++        "-fmacro-prefix-map=${CMAKE_BINARY_DIR}=.build"
++        "-fdebug-prefix-map=${CMAKE_BINARY_DIR}=.build")
++endif()
++
+ # --- Submodule presence check -------------------------------------------------
+ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libultraship/CMakeLists.txt")
+     message(FATAL_ERROR
+diff --git a/port/CMakeLists.txt b/port/CMakeLists.txt
+index f4bfb9a..0f39a0c 100644
+--- a/port/CMakeLists.txt
++++ b/port/CMakeLists.txt
+@@ -290,6 +290,9 @@ else()
+     add_subdirectory(third_party/discord-rpc EXCLUDE_FROM_ALL)
+ endif()
+ 
++set(GDX_APP_VERSION "0.1.0")
++set(GDX_APP_BUILD "2")
++
+ add_executable(G-Diffuser
+     main.cpp
+     ${GDX_DISCORD_SOURCE}
+@@ -336,6 +339,7 @@ add_executable(G-Diffuser
+     gdx_workshop.cpp
+     mio0_wrap.c
+     gdx_diagnostics.c
++    gdx_gamepad_router.cpp
+     gdx_segment_source.c       # in the exe, not gdiffuser_game: needs symbols from AssetLoader.cpp,
+                                 # rom_buffer.cpp and gen/AssetBindings.c
+     "${CMAKE_CURRENT_SOURCE_DIR}/../torch/lib/libmio0/mio0.c"
+@@ -374,8 +378,8 @@ if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND GDX_MACOS_BUNDLE)
+     set(MACOSX_BUNDLE_EXECUTABLE_NAME "F0X")
+     set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x")
+     set(MACOSX_BUNDLE_BUNDLE_NAME "F0X")
+-    set(MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0")
+-    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0")
++    set(MACOSX_BUNDLE_BUNDLE_VERSION "${GDX_APP_BUILD}")
++    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${GDX_APP_VERSION}")
+     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/F0X-Info.plist.in"
+                    "${CMAKE_CURRENT_BINARY_DIR}/F0X-Info.plist" @ONLY)
+     set_target_properties(G-Diffuser PROPERTIES
+@@ -384,8 +388,8 @@ if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND GDX_MACOS_BUNDLE)
+         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/F0X-Info.plist"
+         MACOSX_BUNDLE_BUNDLE_NAME "F0X"
+         MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x"
+-        MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0"
+-        MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0")
++        MACOSX_BUNDLE_BUNDLE_VERSION "${GDX_APP_BUILD}"
++        MACOSX_BUNDLE_SHORT_VERSION_STRING "${GDX_APP_VERSION}")
+     target_compile_definitions(G-Diffuser PRIVATE GDX_MACOS_BUNDLE=1)
+     set(GDIFFUSER_PACKAGE_DATA_DIR "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Resources")
+     set(GDIFFUSER_PACKAGE_HELPER_DIR "$<TARGET_BUNDLE_DIR:G-Diffuser>/Contents/Helpers")
+@@ -408,8 +412,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+     set(MACOSX_BUNDLE_EXECUTABLE_NAME "F0X")
+     set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x")
+     set(MACOSX_BUNDLE_BUNDLE_NAME "F0X")
+-    set(MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0")
+-    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0")
++    set(MACOSX_BUNDLE_BUNDLE_VERSION "${GDX_APP_BUILD}")
++    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${GDX_APP_VERSION}")
+     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/F0X-iOS-Info.plist.in"
+                    "${CMAKE_CURRENT_BINARY_DIR}/F0X-iOS-Info.plist" @ONLY)
+     set_target_properties(G-Diffuser PROPERTIES
+@@ -418,8 +422,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/F0X-iOS-Info.plist"
+         MACOSX_BUNDLE_BUNDLE_NAME "F0X"
+         MACOSX_BUNDLE_GUI_IDENTIFIER "com.chrissotraidis.f0x"
+-        MACOSX_BUNDLE_BUNDLE_VERSION "0.1.0"
+-        MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1.0"
++        MACOSX_BUNDLE_BUNDLE_VERSION "${GDX_APP_BUILD}"
++        MACOSX_BUNDLE_SHORT_VERSION_STRING "${GDX_APP_VERSION}"
+         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.chrissotraidis.f0x"
+         XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+@@ -773,6 +777,24 @@ elseif(GDX_PORT_WARN_FLAGS)
+     target_compile_options(gdx_touch_merge_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
+ endif()
+ 
++# Controller lifecycle regression: SDL's virtual gamepads exercise the real
++# libultraship device manager without hardware, while the production F0X router
++# proves stable player ownership and player-1 reclamation.
++if(TARGET libultraship)
++    add_executable(gdx_controller_lifecycle_tests
++        tests/controller_lifecycle_tests.cpp
++        gdx_gamepad_router.cpp)
++    target_include_directories(gdx_controller_lifecycle_tests PRIVATE
++        "${CMAKE_CURRENT_SOURCE_DIR}"
++        "${CMAKE_SOURCE_DIR}/libultraship/include")
++    target_link_libraries(gdx_controller_lifecycle_tests PRIVATE libultraship)
++    if(MSVC)
++        target_compile_options(gdx_controller_lifecycle_tests PRIVATE /W3)
++    elseif(GDX_PORT_WARN_FLAGS)
++        target_compile_options(gdx_controller_lifecycle_tests PRIVATE ${GDX_PORT_WARN_FLAGS})
++    endif()
++endif()
++
+ # Diagnostic report regression: compiles gdx_diagnostics.c UNMODIFIED and drives
+ # the deterministic formatter/privacy checks the app runs.
+ add_executable(gdx_diagnostics_tests
+diff --git a/port/main.cpp b/port/main.cpp
+index f299e2b..cda3083 100644
+--- a/port/main.cpp
++++ b/port/main.cpp
+@@ -38,6 +38,7 @@
+ #include "gdx_audio_thread.h"
+ #include "gdx_frame_pacer.h"
+ #include "gdx_diagnostics.h"
++#include "gdx_gamepad_router.h"
+ #include "gdx_touch_controls.h"
+ #include "n64_gfx_bridge.h"
+ #include <SDL2/SDL.h>
+@@ -53,7 +54,6 @@
+ #include <memory>
+ #include <string>
+ #include <thread>
+-#include <unordered_map>
+ #include <vector>
+ 
+ extern "C" void GDiffuser_LoadAllAssets(void);
+@@ -465,26 +465,30 @@ static uint8_t sGdxControllerBits = 0;
+ // ── Multi-pad routing: SDL gamepads -> LUS ControlDeck ports ─────────────────────────────────────
+ // LUS out of the box is single-player: RefreshConnectedSDLGamepads() ignores every new pad on
+ // ports 1..3, and ControlDeck::Init() seeds default mappings for port 0 only. This gives each
+-// connected gamepad its own port and seeds defaults once. Three deliberate restrictions:
+-//   * With fewer than two gamepads we do nothing — a lone pad keeps LUS's permissive port-0
+-//     default, so a phantom pad (hub/wireless receiver) cannot steal port 0 from the real one.
+-//   * Assignments are STICKY: only never-seen pads are placed (lowest free port). Re-deriving on
+-//     every hotplug would renumber survivors mid-race.
++// connected gamepad its own port and seeds defaults once. Two deliberate restrictions:
++//   * Assignments are sticky: surviving pads keep their ports and only newly seen pads take the
++//     lowest free port. A sole pad after a fully empty set therefore reclaims port 0, while a
++//     surviving player 2 is not silently promoted when player 1 sleeps.
+ //   * Default mappings are only ADDED to a port with no gamepad mapping, so hand-made Input
+ //     Editor bindings are never overwritten.
+-// LUS rebuilds its in-memory ignore lists on every hotplug refresh (why the sticky map is ours),
+-// so routing re-applies when the connected id set changes — but NOT every frame, so the Input
+-// Editor's per-port checkboxes stay usable.
+-static std::vector<int32_t> sGdxRoutedGamepadIds;              // last seen connected set, sorted
+-static std::unordered_map<int32_t, uint8_t> sGdxGamepadPorts;  // SDL instance id -> owned port
+-
+-static bool gdxPortOwnedByAGamepad(uint8_t port) {
+-    for (const auto& [instanceId, ownedPort] : sGdxGamepadPorts) {
+-        if (ownedPort == port) {
+-            return true;
+-        }
++static GdxGamepadRouter sGdxGamepadRouter(MAXCONTROLLERS);
++
++static bool gdxReconcileGamepads(const std::shared_ptr<Ship::ControlDeck>& controlDeck,
++                                 const char* reason) {
++    if (controlDeck == nullptr) {
++        return false;
+     }
+-    return false;
++    auto devices = controlDeck->GetConnectedPhysicalDeviceManager();
++    if (devices == nullptr || !devices->ReconcileConnectedSDLGamepads(reason)) {
++        return false;
++    }
++
++    auto ctx = Ship::Context::GetInstance();
++    auto window = ctx != nullptr ? ctx->GetWindow() : nullptr;
++    if (window != nullptr && window->GetGui() != nullptr) {
++        window->GetGui()->RefreshImGuiGamepads();
++    }
++    return true;
+ }
+ 
+ static void gdxSyncGamepadPortRouting(const std::shared_ptr<Ship::ControlDeck>& controlDeck) {
+@@ -501,48 +505,37 @@ static void gdxSyncGamepadPortRouting(const std::shared_ptr<Ship::ControlDeck>&
+     // order. SDL instance ids increase monotonically as devices are opened, which makes ascending
+     // order equal to plug order — so a pad that was already plugged in sorts before a newcomer.
+     std::vector<int32_t> ids;
+-    for (const auto& [instanceId, name] : devices->GetConnectedSDLGamepadNames()) {
++    const auto names = devices->GetConnectedSDLGamepadNames();
++    for (const auto& [instanceId, name] : names) {
+         ids.push_back(instanceId);
+     }
+     std::sort(ids.begin(), ids.end());
+ 
+-    if (ids == sGdxRoutedGamepadIds) {
+-        return; // connected set unchanged since the last apply — nothing to re-route.
+-    }
+-    sGdxRoutedGamepadIds = ids;
+-
+-    if (ids.size() < 2) {
+-        sGdxGamepadPorts.clear();
+-        return; // single-pad (or no-pad) setup: keep LUS's permissive port-0 default.
++    std::vector<int32_t> previousSlots(MAXCONTROLLERS, -1);
++    for (uint8_t port = 0; port < MAXCONTROLLERS; port++) {
++        previousSlots[port] = sGdxGamepadRouter.InstanceForSlot(port);
+     }
+-
+-    // Release the ports of pads that are gone, so a newcomer can reuse them.
+-    for (auto it = sGdxGamepadPorts.begin(); it != sGdxGamepadPorts.end();) {
+-        if (std::find(ids.begin(), ids.end(), it->first) == ids.end()) {
+-            it = sGdxGamepadPorts.erase(it);
+-        } else {
+-            ++it;
+-        }
++    if (!sGdxGamepadRouter.Reconcile(ids)) {
++        return; // connected set and stable assignments are unchanged.
+     }
+ 
+-    // Place pads we have not seen before into the lowest unowned port.
+-    for (int32_t instanceId : ids) {
+-        if (sGdxGamepadPorts.count(instanceId) != 0) {
+-            continue;
+-        }
+-        for (uint8_t port = 0; port < MAXCONTROLLERS; port++) {
+-            if (!gdxPortOwnedByAGamepad(port)) {
+-                sGdxGamepadPorts[instanceId] = port;
+-                break;
++    for (uint8_t port = 0; port < MAXCONTROLLERS; port++) {
++        const int32_t owner = sGdxGamepadRouter.InstanceForSlot(port);
++        if (previousSlots[port] != owner) {
++            if (previousSlots[port] >= 0) {
++                gdx_port_logf("[controller] release instance=%d player-slot=%d\n",
++                              previousSlots[port], port + 1);
++            }
++            if (owner >= 0) {
++                const auto name = names.find(owner);
++                gdx_port_logf("[controller] assign instance=%d player-slot=%d name=\"%s\"\n",
++                              owner, port + 1,
++                              name != names.end() ? name->second.c_str() : "unknown");
+             }
+         }
+-        // More pads than ports: the extras stay unassigned and are ignored on every port below.
+-    }
+ 
+-    for (uint8_t port = 0; port < MAXCONTROLLERS; port++) {
+         for (int32_t instanceId : ids) {
+-            const auto owner = sGdxGamepadPorts.find(instanceId);
+-            if (owner != sGdxGamepadPorts.end() && owner->second == port) {
++            if (instanceId == owner) {
+                 devices->UnignoreInstanceIdForPort(port, instanceId);
+             } else {
+                 devices->IgnoreInstanceIdForPort(port, instanceId);
+@@ -551,7 +544,7 @@ static void gdxSyncGamepadPortRouting(const std::shared_ptr<Ship::ControlDeck>&
+ 
+         // Port 0 always has bindings (ControlDeck::Init seeds them); ports 1..3 only get them here,
+         // and only the first time a device lands on them.
+-        if (port == 0 || !gdxPortOwnedByAGamepad(port)) {
++        if (port == 0 || owner < 0) {
+             continue;
+         }
+         auto controller = controlDeck->GetControllerByPort(port);
+@@ -562,8 +555,7 @@ static void gdxSyncGamepadPortRouting(const std::shared_ptr<Ship::ControlDeck>&
+         }
+     }
+ 
+-    gdx_port_logf("[input] %zu SDL gamepad(s) connected, %zu routed to their own port\n", ids.size(),
+-                  sGdxGamepadPorts.size());
++    gdx_port_logf("[controller] reconciliation routed %zu SDL gamepad(s)\n", ids.size());
+ }
+ 
+ // True when the ControlDeck can actually produce input for `port` this frame; a gamepad mapping
+@@ -955,6 +947,7 @@ int main(int argc, char** argv) {
+     // Context::InitControlDeck() does NOT call ControlDeck::Init() — do it explicitly, or the
+     // controllers have no mappings and read all-zero. Config + CVars exist, so it is safe now.
+     logStep("ControlDeck::Init");     controlDeck->Init(&sGdxControllerBits);
++    gdxReconcileGamepads(controlDeck, "startup");
+ 
+     // ResourceManager MUST init before the window is constructed/inited.
+     // FirstBootRun resolves argv[0] before switching cwd to Application Support.
+@@ -1419,6 +1412,8 @@ int main(int argc, char** argv) {
+                 gdx_audio_thread_set_suspended(appActive ? 0 : 1);
+                 if (!appActive) {
+                     CVarSave();
++                } else {
++                    gdxReconcileGamepads(controlDeck, "foreground");
+                 }
+                 gdx_port_logf("[lifecycle] application %s; simulation/render %s\n",
+                               appActive ? "active" : "inactive",
+@@ -1432,6 +1427,14 @@ int main(int argc, char** argv) {
+                 continue;
+             }
+         }
++        {
++            static uint64_t nextControllerCheck = 0;
++            const uint64_t now = SDL_GetTicks64();
++            if (now >= nextControllerCheck) {
++                gdxReconcileGamepads(controlDeck, "active-check");
++                nextControllerCheck = now + 1000;
++            }
++        }
+         // Touch overlay state, once per host frame and BEFORE the controller
+         // poll that merges its state: menu visibility comes from the live
+         // GdxMenu, the physical-controller policy folds the Auto-hide CVar and
+diff --git a/port/gdx_gamepad_router.h b/port/gdx_gamepad_router.h
+new file mode 100644
+index 0000000..f554336
+--- /dev/null
++++ b/port/gdx_gamepad_router.h
+@@ -0,0 +1,17 @@
++#pragma once
++
++#include <cstdint>
++#include <vector>
++
++class GdxGamepadRouter {
++  public:
++    explicit GdxGamepadRouter(uint8_t slotCount);
++
++    bool Reconcile(const std::vector<int32_t>& connectedInstanceIds);
++    int SlotForInstance(int32_t instanceId) const;
++    int32_t InstanceForSlot(uint8_t slot) const;
++    void Clear();
++
++  private:
++    std::vector<int32_t> mSlots;
++};
+diff --git a/port/gdx_gamepad_router.cpp b/port/gdx_gamepad_router.cpp
+new file mode 100644
+index 0000000..b35755d
+--- /dev/null
++++ b/port/gdx_gamepad_router.cpp
+@@ -0,0 +1,48 @@
++#include "gdx_gamepad_router.h"
++
++#include <algorithm>
++
++namespace {
++constexpr int32_t kEmptySlot = -1;
++}
++
++GdxGamepadRouter::GdxGamepadRouter(uint8_t slotCount) : mSlots(slotCount, kEmptySlot) {
++}
++
++bool GdxGamepadRouter::Reconcile(const std::vector<int32_t>& connectedInstanceIds) {
++    std::vector<int32_t> connected = connectedInstanceIds;
++    std::sort(connected.begin(), connected.end());
++    connected.erase(std::unique(connected.begin(), connected.end()), connected.end());
++
++    const std::vector<int32_t> previous = mSlots;
++    for (int32_t& instanceId : mSlots) {
++        if (instanceId != kEmptySlot &&
++            !std::binary_search(connected.begin(), connected.end(), instanceId)) {
++            instanceId = kEmptySlot;
++        }
++    }
++
++    for (int32_t instanceId : connected) {
++        if (SlotForInstance(instanceId) >= 0) {
++            continue;
++        }
++        const auto freeSlot = std::find(mSlots.begin(), mSlots.end(), kEmptySlot);
++        if (freeSlot != mSlots.end()) {
++            *freeSlot = instanceId;
++        }
++    }
++    return mSlots != previous;
++}
++
++int GdxGamepadRouter::SlotForInstance(int32_t instanceId) const {
++    const auto slot = std::find(mSlots.begin(), mSlots.end(), instanceId);
++    return slot != mSlots.end() ? static_cast<int>(std::distance(mSlots.begin(), slot)) : -1;
++}
++
++int32_t GdxGamepadRouter::InstanceForSlot(uint8_t slot) const {
++    return slot < mSlots.size() ? mSlots[slot] : kEmptySlot;
++}
++
++void GdxGamepadRouter::Clear() {
++    std::fill(mSlots.begin(), mSlots.end(), kEmptySlot);
++}
+diff --git a/port/tests/controller_lifecycle_tests.cpp b/port/tests/controller_lifecycle_tests.cpp
+new file mode 100644
+index 0000000..ecafd4c
+--- /dev/null
++++ b/port/tests/controller_lifecycle_tests.cpp
+@@ -0,0 +1,154 @@
++#include "gdx_gamepad_router.h"
++#include "ship/controller/physicaldevice/ConnectedPhysicalDeviceManager.h"
++
++#include <SDL2/SDL.h>
++#include <algorithm>
++#include <cstdint>
++#include <cstdio>
++#include <vector>
++
++namespace {
++int gChecks = 0;
++int gFailures = 0;
++
++void Check(const char* what, bool condition) {
++    ++gChecks;
++    if (!condition) {
++        ++gFailures;
++        std::printf("    [x] %s\n", what);
++    }
++}
++
++int DeviceIndexForInstance(SDL_JoystickID instanceId) {
++    for (int index = 0; index < SDL_NumJoysticks(); ++index) {
++        if (SDL_JoystickGetDeviceInstanceID(index) == instanceId) {
++            return index;
++        }
++    }
++    return -1;
++}
++
++SDL_JoystickID AttachVirtualGamepad() {
++    const int deviceIndex = SDL_JoystickAttachVirtual(
++        SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
++    Check("virtual gamepad attached", deviceIndex >= 0);
++    SDL_PumpEvents();
++    return deviceIndex >= 0 ? SDL_JoystickGetDeviceInstanceID(deviceIndex) : -1;
++}
++
++void DetachVirtualGamepad(SDL_JoystickID instanceId) {
++    const int deviceIndex = DeviceIndexForInstance(instanceId);
++    Check("virtual gamepad found for detach", deviceIndex >= 0);
++    if (deviceIndex >= 0) {
++        Check("virtual gamepad detached", SDL_JoystickDetachVirtual(deviceIndex) == 0);
++    }
++}
++
++std::vector<int32_t> ConnectedIds(Ship::ConnectedPhysicalDeviceManager& manager) {
++    std::vector<int32_t> ids;
++    for (const auto& [instanceId, name] : manager.GetConnectedSDLGamepadNames()) {
++        ids.push_back(instanceId);
++    }
++    std::sort(ids.begin(), ids.end());
++    return ids;
++}
++} // namespace
++
++int main() {
++    Check("SDL gamecontroller subsystem initialized", SDL_Init(SDL_INIT_GAMECONTROLLER) == 0);
++    if (gFailures != 0) {
++        std::printf("controller lifecycle: %d/%d checks failed (%s)\n", gFailures, gChecks,
++                    SDL_GetError());
++        return 1;
++    }
++
++    {
++        Ship::ConnectedPhysicalDeviceManager manager;
++        GdxGamepadRouter router(4);
++
++        std::printf("  case: missed removal releases held button and axis\n");
++        const SDL_JoystickID first = AttachVirtualGamepad();
++        Check("startup discovers first gamepad", manager.ReconcileConnectedSDLGamepads("startup"));
++        Check("first gamepad routed", router.Reconcile(ConnectedIds(manager)));
++        Check("first gamepad owns player 1", router.SlotForInstance(first) == 0);
++
++        auto gamepads = manager.GetConnectedSDLGamepadsForPort(0);
++        Check("player 1 has one readable handle", gamepads.size() == 1);
++        if (!gamepads.empty()) {
++            SDL_GameController* gamepad = gamepads.begin()->second;
++            SDL_Joystick* joystick = SDL_GameControllerGetJoystick(gamepad);
++            SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 1);
++            SDL_JoystickSetVirtualAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, 20000);
++            SDL_GameControllerUpdate();
++            Check("button held before missed removal",
++                  SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_A) != 0);
++            Check("axis held before missed removal",
++                  SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_LEFTX) != 0);
++        }
++
++        DetachVirtualGamepad(first); // Deliberately do not dispatch the queued removal event.
++        gamepads = manager.GetConnectedSDLGamepadsForPort(0);
++        uint8_t button = 0;
++        int16_t axis = 0;
++        for (const auto& [instanceId, gamepad] : gamepads) {
++            button |= SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_A);
++            axis = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_LEFTX);
++        }
++        Check("stale handle is unreadable before reconciliation", gamepads.empty());
++        Check("held button is neutral after missed removal", button == 0);
++        Check("held axis is neutral after missed removal", axis == 0);
++        Check("stale name is excluded immediately", manager.GetConnectedSDLGamepadNames().empty());
++        Check("active check removes stale ownership",
++              manager.ReconcileConnectedSDLGamepads("active-check"));
++        Check("router releases stale player 1", router.Reconcile(ConnectedIds(manager)));
++        Check("player 1 is free", router.InstanceForSlot(0) < 0);
++
++        std::printf("  case: sole return reclaims player 1; an additional pad takes player 2\n");
++        const SDL_JoystickID returning = AttachVirtualGamepad();
++        Check("foreground discovers returning pad",
++              manager.ReconcileConnectedSDLGamepads("foreground"));
++        router.Reconcile(ConnectedIds(manager));
++        Check("sole returning pad owns player 1", router.SlotForInstance(returning) == 0);
++
++        const SDL_JoystickID second = AttachVirtualGamepad();
++        Check("add reconciliation discovers second pad",
++              manager.ReconcileConnectedSDLGamepads("add-event"));
++        router.Reconcile(ConnectedIds(manager));
++        Check("player 1 owner is preserved", router.SlotForInstance(returning) == 0);
++        Check("additional pad owns player 2", router.SlotForInstance(second) == 1);
++
++        std::printf("  case: changing player 2 preserves player 1 and the free slot\n");
++        DetachVirtualGamepad(second);
++        manager.ReconcileConnectedSDLGamepads("remove-event");
++        router.Reconcile(ConnectedIds(manager));
++        Check("surviving player 1 remains player 1", router.SlotForInstance(returning) == 0);
++        Check("departed player 2 slot is free", router.InstanceForSlot(1) < 0);
++
++        const SDL_JoystickID replacement = AttachVirtualGamepad();
++        manager.ReconcileConnectedSDLGamepads("active-check");
++        router.Reconcile(ConnectedIds(manager));
++        Check("player 1 remains stable after replacement", router.SlotForInstance(returning) == 0);
++        Check("replacement reuses player 2", router.SlotForInstance(replacement) == 1);
++
++        std::printf("  case: foreground reconciliation finds a missed additional controller\n");
++        const SDL_JoystickID third = AttachVirtualGamepad();
++        Check("foreground detects missed add", manager.ReconcileConnectedSDLGamepads("foreground"));
++        router.Reconcile(ConnectedIds(manager));
++        Check("foreground preserves player 1", router.SlotForInstance(returning) == 0);
++        Check("foreground preserves player 2", router.SlotForInstance(replacement) == 1);
++        Check("foreground assigns next free player slot", router.SlotForInstance(third) == 2);
++
++        DetachVirtualGamepad(returning);
++        DetachVirtualGamepad(replacement);
++        DetachVirtualGamepad(third);
++        manager.ReconcileConnectedSDLGamepads("test-cleanup");
++    }
++
++    SDL_Quit();
++    if (gFailures != 0) {
++        std::printf("controller lifecycle: %d/%d checks failed\n", gFailures, gChecks);
++        return 1;
++    }
++    std::printf("controller lifecycle: %d checks passed\n", gChecks);
++    return 0;
++}

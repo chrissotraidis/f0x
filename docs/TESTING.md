@@ -1478,3 +1478,46 @@ inference.
   corrected source is installed and live on the physical iPhone with protected
   data preserved. Hands-on iPhone gameplay remains open; an IPA download does
   not close that acceptance gate.
+
+## 2026-08-18 — Controller lifecycle repair and Developer Preview 2
+
+- **Backend and defect:** controller ownership belongs to libultraship's
+  engine-managed `ControlDeck`, backed by SDL2. The manager retained non-null
+  `SDL_GameController*` handles until a remove event arrived, while F0X rebuilt
+  player routing from sorted current IDs. A removal missed during sleep or
+  background could leave stale ownership and held state, and losing player 1
+  could incorrectly promote a surviving player 2.
+- **Targeted repair:** current SDL enumeration, instance IDs, and
+  `SDL_GameControllerGetAttached()` reconcile handles without restarting the
+  subsystem. Reconciliation runs at startup, add/remove/remap events, foreground
+  resume, and a one-second bounded active check. A compact stable slot router
+  releases missing owners, preserves survivors, returns a sole pad to player 1,
+  and places additional pads in the next free slot.
+- **Automated proof:** `gdx_controller_lifecycle_tests` passed 42/42 with SDL2
+  virtual gamepads, covering missed removal with held input, neutral release,
+  player-1 reclaim, additional-player assignment, two-controller ownership, and
+  foreground reconciliation. The maintained touch (87/87), diagnostics,
+  performance, TMEM, graphics, DSP (24/24), PCM (5/5), VI fallback, fiber, and
+  big-endian RSP boot tests passed. ROM-free Simulator Release and signed
+  iPhoneOS Release builds also succeeded.
+- **Physical iPad:** version `0.1.0` build `2`, bundle
+  `com.chrissotraidis.f0x`, passed strict signature verification and installed
+  in place on the 12.9-inch iPad Pro. Separate external backups of `Documents`
+  and `Library` preceded installation. Readback SHA-256 values matched for the
+  ROM (`2be0f861...`), generated archive (`7d60d975...`), save (`7835e3cb...`),
+  game configuration (`c9cf13e4...`), extraction state (`02bd0e9d...`),
+  touch/controller UI state (`1fe0007d...`), and preferences (`f45932c1...`).
+  The new executable loaded the archive and 32 KiB save, rendered gameplay, and
+  resumed gameplay after a controlled background/foreground cycle.
+- **Physical acceptance boundary:** Bluetooth, wired, natural-sleep, full
+  mapping, held-input release, and multi-controller scenarios were not
+  physically exercised. They remain open; virtual-controller and iPad lifecycle
+  proof are not labeled as hands-on controller acceptance.
+- **IPA:** two packaging runs produced byte-identical ROM-free unsigned
+  `F0X-0.1.0-preview.2-unsigned.ipa` files. ZIP integrity, arm64/iPhoneOS 16.0
+  metadata, iPhone/iPad families, notices/licenses, and exclusion of private
+  game data, saves, logs, personal paths, credentials, provisioning, and code
+  signatures passed. No `PrivacyInfo.xcprivacy` is bundled; this unsigned
+  self-signable release has not been submitted to App Store or TestFlight, so
+  store privacy-manifest acceptance is not claimed. SHA-256:
+  `07b9e3bb5a47c894260b113c16629c6ac7cdbf2726d1e8398fc581490938479b`.
