@@ -229,6 +229,6 @@ the same IPA SHA-256 on repeated runs.
 
 The output is unsigned and not directly installable on a standard iPhone or
 iPad. A compatible personal-signing method or Xcode must sign it for the
-installer's device. Developer Preview 1 publishes this audited ROM-free output
-as `F0X-0.1.0-preview.1-unsigned.ipa`; never publish an IPA produced from an app
+installer's device. Developer Preview 2 publishes this audited ROM-free output
+as `F0X-0.1.0-preview.2-unsigned.ipa`; never publish an IPA produced from an app
 containing a maintainer profile or signature.
