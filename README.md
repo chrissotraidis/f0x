@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="#download-the-developer-preview">Download</a> ·
+  <a href="#download">Download</a> ·
   <a href="#get-started">Build</a> ·
   <a href="#supported-game-data">Game data</a> ·
   <a href="#touch-controls">Touch controls</a> ·
@@ -56,8 +56,8 @@ extraction happen locally, and nothing is uploaded.
 | iPhone/iPad Simulator | **Available for development** | The native arm64 app imports local game data, renders through Metal, and has completed touch/UI/race stability verification. Simulator evidence is not physical-device acceptance. |
 | Apple Silicon macOS | **Available for development** | The native `F0X.app` builds, seals locally, imports game data, persists saves, and renders a live Metal race. |
 
-F0X Developer Preview 2 is available, but it is not being presented as a
-finished release. The current physical-iPad build is owner-accepted for normal
+F0X's developer previews have been retired while a new version is
+prepared. The current physical-iPad build is owner-accepted for normal
 game start, touch gameplay, audio, course previews, and racing. The iPhone 14
 layout is also owner-arranged and promoted to independent defaults; broader
 phone gameplay testing continues. Headset/Bluetooth routes, lifecycle interruptions, thermals, physical
@@ -65,21 +65,19 @@ controllers, stress multi-touch, and long-session coverage remain open. See the 
 [evidence ledger](docs/STATUS.md) rather than inferring completion from a build
 or Simulator screenshot.
 
-## Download the developer preview
+## Download
 
-Previous builds have been retired; a new version is in progress.
+There is no download right now: previous builds have been retired and a new
+version is in progress. Meanwhile you can [build F0X yourself](#get-started) on
+an Apple Silicon Mac. [PadMint](https://github.com/chrissotraidis/padmint) lists F0X under **Not available yet** and links back
+here until a new download is ready.
 
-This is an **unsigned, ROM-free, arm64 IPA** for iOS and iPadOS 16 or newer. It
-supports both iPhone and iPad, but it is not directly installable until you
-re-sign it with your own Apple identity using Xcode or a compatible personal
-signing method. The IPA never includes F-Zero X or extracted game assets.
-
-After installation, launch F0X and select your own legally acquired supported
-US revision 0 ROM from Files. Extraction stays on-device. When updating, install
-the new IPA over the existing `com.chrissotraidis.f0x` app; do not uninstall it
-first if you want to preserve saves, settings, and touch layouts.
-
-Previous builds have been retired; a new version is in progress.
+F0X previews are **unsigned, ROM-free, arm64 IPAs** for iPhone and iPad on iOS
+and iPadOS 16 or newer, which you re-sign with your own Apple identity. They
+never include F-Zero X or extracted game assets: after installing, select your
+own supported US revision 0 ROM from Files, and extraction stays on the device.
+When one is published, install it over the existing `com.chrissotraidis.f0x`
+app without uninstalling first, so your saves, settings and touch layouts stay.
 
 ## Get started
 
