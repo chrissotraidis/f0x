@@ -15,6 +15,7 @@
   <a href="docs/STATUS.md"><img alt="Physical iPad owner accepted" src="https://img.shields.io/badge/physical%20iPad-owner%20accepted-30D158"></a>
   <a href="docs/BUILDING.md"><img alt="Native source port" src="https://img.shields.io/badge/build-native%20source%20port-007AFF"></a>
   <img alt="Game data not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
+  <a href="https://discord.gg/xwHfUD2bxW"><img alt="Join the F0x Discord" src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&amp;logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -37,6 +38,13 @@ documentation, and original F0X artwork. It does **not** contain F-Zero X, a
 ROM, extracted Nintendo assets, saves, or a playable ROM-derived archive. You
 must supply your own legally acquired supported cartridge dump; setup and
 extraction happen locally, and nothing is uploaded.
+
+> [!NOTE]
+> **AI disclosure:** F0x uses substantial AI assistance for code, tests,
+> documentation, debugging and maintenance. Some support replies and maintenance
+> tasks are automated. There is no audited percentage of AI-generated code.
+> Build, test and device records describe what was checked. This disclosure
+> concerns F0x's workflow, not the authorship of its upstream projects.
 
 ## Install status
 
@@ -308,6 +316,16 @@ Please include exact platform, build SHA, reproduction steps, and a privacy-
 scrubbed diagnostic report with defect reports. Never attach game data, private
 paths, signing material, or ROM-derived files. Check
 [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) before opening a duplicate issue.
+
+## Community and support
+
+[Join the Discord](https://discord.gg/xwHfUD2bxW) for help and news. It is one
+community for F0x and its sibling projects, such as KartPad, BlueWake and
+MeleePad: ask about setup and installing, share how it runs on your device, and
+hear about new releases first.
+
+Found a bug? [Open an issue](https://github.com/chrissotraidis/f0x/issues) with
+your device, its OS version, and the steps that led to it.
 
 ## Legal and acknowledgements
 
