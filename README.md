@@ -337,3 +337,12 @@ decompilation project, SDL, and their contributors. Each upstream component
 retains its own license and copyright. See
 [`docs/LEGAL_AND_PROVENANCE.md`](docs/LEGAL_AND_PROVENANCE.md) for the scoped
 rights and provenance boundary.
+
+## Legal
+
+F0X is an unofficial, fan-made project. It is not affiliated with, endorsed by,
+or sponsored by Nintendo. F-Zero X and related names and marks are trademarks of
+Nintendo (and their respective owners). This repository contains no game data,
+ROMs, or extracted assets. To use it, you need your own legally obtained copy of
+the game, and you build it yourself on your own machine. Please don't share game
+files or builds made from them.
