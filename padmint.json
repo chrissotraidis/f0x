@@ -40,6 +40,31 @@
           }
         }
       ]
+    },
+    "macos": {
+      "hosts": {
+        "macos-arm64": "experimental"
+      },
+      "tools": [
+        "git",
+        "cmake",
+        "ninja"
+      ],
+      "output": "zip",
+      "check": "none",
+      "steps": [
+        {
+          "stage": "build",
+          "command": [
+            "/bin/bash",
+            "{repo}/scripts/build-padmint-macos.sh",
+            "{output}"
+          ],
+          "env": {
+            "F0X_BUILD_JOBS": "{jobs}"
+          }
+        }
+      ]
     }
   },
   "requirements": {
