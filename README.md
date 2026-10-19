@@ -67,12 +67,14 @@ or Simulator screenshot.
 
 ## Download
 
-There is no download right now: previous builds have been retired and a new
-version is in progress. Meanwhile you can [build F0X yourself](#get-started) on
-an Apple Silicon Mac. [PadMint](https://github.com/chrissotraidis/padmint) lists F0X under **Not available yet** and links back
-here until a new download is ready.
+Build your own copy with [PadMint](https://github.com/chrissotraidis/padmint/releases/latest)
+0.5.5 or newer on an Apple Silicon Mac with Xcode: choose **F-Zero X**, then
+**iPhone or iPad** or **This Mac**, and follow the page. PadMint builds F0X from
+this repository's latest release; it never reads your ROM. You choose your own
+US revision 0 ROM inside F0X the first time it opens. You can also
+[build F0X yourself](#get-started).
 
-F0X previews are **unsigned, ROM-free, arm64 IPAs** for iPhone and iPad on iOS
+Older F0X previews were **unsigned, ROM-free, arm64 IPAs** for iPhone and iPad on iOS
 and iPadOS 16 or newer, which you re-sign with your own Apple identity. They
 never include F-Zero X or extracted game assets: after installing, select your
 own supported US revision 0 ROM from Files, and extraction stays on the device.
