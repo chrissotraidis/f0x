@@ -1,7 +1,5 @@
 # F0X
 
-![F0X running a live race on a physical iPad with touch controls](docs/readme/f0x-ipad-gameplay.png)
-
 <p align="center">
   <strong>F-Zero X rebuilt as a native Apple app.</strong><br>
   Metal rendering, local game-data setup, customizable touch controls, and
