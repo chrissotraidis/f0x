@@ -34,6 +34,7 @@ apply_patch_stack "$root_dir/ref/G-Diffuser" \
   "$root_dir/patches/gdiffuser-apple-macos.patch" \
   "$root_dir/patches/gdiffuser-controller-lifecycle.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-fiber-smoketest.patch"
+apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-ios-scene-startup.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser/decomp" "$root_dir/patches/fzerox-decomp-apple.patch"
 apply_patch_stack "$root_dir/ref/G-Diffuser/libultraship" \
   "$root_dir/patches/libultraship-apple-metal.patch" \

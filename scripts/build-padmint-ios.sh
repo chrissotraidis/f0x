@@ -34,10 +34,24 @@ if [[ "$(git -C "$toolchain" rev-parse HEAD 2>/dev/null || true)" != "$toolchain
   git -C "$toolchain" checkout -q --detach FETCH_HEAD
 fi
 
+# SDL 2.32.10 plus the Pad ports UIKit scene startup commit: apps built with the
+# iOS 27 SDK must start through UIKit scenes or iOS 27 closes them at launch.
+# libultraship otherwise fetches plain release-2.32.10.
+sdl="$root/ref/SDL2"
+sdl_pin="c6756fcd3de8090a8f72ac1a0b6fb6e50f0021d1"
+if [[ "$(git -C "$sdl" rev-parse HEAD 2>/dev/null || true)" != "$sdl_pin" ]]; then
+  echo "F0X: fetching the pinned scene-capable SDL"
+  rm -rf "$sdl"
+  git init -q "$sdl"
+  git -C "$sdl" fetch -q --depth 1 https://github.com/chrissotraidis/SDL.git "$sdl_pin"
+  git -C "$sdl" checkout -q --detach FETCH_HEAD
+fi
+
 build="$root/build/f0x-ios-device"
 echo "F0X: configuring the iPhone/iPad build"
 cmake -S ref/G-Diffuser -B "$build" -G Xcode \
   -DCMAKE_TOOLCHAIN_FILE="$toolchain/ios.toolchain.cmake" \
+  -DFETCHCONTENT_SOURCE_DIR_SDL2="$sdl" \
   -DPLATFORM=OS64 \
   -DDEPLOYMENT_TARGET=16.0 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
