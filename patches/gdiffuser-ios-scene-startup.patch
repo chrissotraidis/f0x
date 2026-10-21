@@ -1,0 +1,15 @@
+diff --git a/port/F0X-iOS-Info.plist.in b/port/F0X-iOS-Info.plist.in
+--- a/port/F0X-iOS-Info.plist.in
++++ b/port/F0X-iOS-Info.plist.in
+@@ -22,6 +22,11 @@
+     <string>AppIcon</string>
+     <key>UIApplicationSupportsIndirectInputEvents</key>
+     <true/>
++    <key>UIApplicationSceneManifest</key>
++    <dict>
++        <key>UIApplicationSupportsMultipleScenes</key>
++        <false/>
++    </dict>
+     <key>UIRequiresFullScreen</key>
+     <true/>
+     <key>UILaunchScreen</key>

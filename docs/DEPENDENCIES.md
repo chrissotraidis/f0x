@@ -4,9 +4,10 @@ Baseline captured 2026-08-11. `ref/` is local-only and ignored.
 
 | Role | Repository | Pinned SHA | License | F0X modification |
 | --- | --- | --- | --- | --- |
-| Runtime foundation | `Zorkats/G-Diffuser` | `719fd82a3af605b064fb53ad6eecb020090b4c5d` | MIT | `patches/gdiffuser-apple-macos.patch`, `patches/gdiffuser-fiber-smoketest.patch` |
+| Runtime foundation | `Zorkats/G-Diffuser` | `719fd82a3af605b064fb53ad6eecb020090b4c5d` | MIT | `patches/gdiffuser-apple-macos.patch`, `patches/gdiffuser-fiber-smoketest.patch`, `patches/gdiffuser-ios-scene-startup.patch` |
 | Fast3D/runtime submodule | `Zorkats/libultraship` | `a4919b181e637193f2b8ae975e31505abbf99e71` | MIT | `patches/libultraship-apple-metal.patch` |
 | Extraction submodule | `Zorkats/Torch` | `c1bdc6fde97fbaa4495c9e859f635290840a12d3` | MIT | `patches/torch-inprocess-apple.patch` |
+| iPhone/iPad SDL (replaces libultraship's `release-2.32.10` fetch) | `chrissotraidis/SDL` | `c6756fcd3de8090a8f72ac1a0b6fb6e50f0021d1` | zlib | SDL 2.32.10 plus UIKit scene startup, so apps built with the iOS 27 SDK open on iOS 27 |
 | F-Zero X matching decomp | `Zorkats/fzerox` | `f7fd0fd0242f8dfb5f357f604bb73b6a4e990809` | CC0-1.0 | `patches/fzerox-decomp-apple.patch` |
 | Expansion Kit reference | `Zorkats/fzerox-expansion-kit` | `6cd71e6fff1714fbfbda22d61dc8bce190d9632d` | CC0-1.0 | None yet |
 | Apple product benchmark | `chrissotraidis/harkinianpad` | `1197472956cd2c4dd3f03fb6fe5f2dfb28d30ad7` | See its repository | Read-only reference |
