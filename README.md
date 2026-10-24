@@ -72,6 +72,10 @@ this repository's latest release; it never reads your ROM. You choose your own
 US revision 0 ROM inside F0X the first time it opens. You can also
 [build F0X yourself](#get-started).
 
+**No Mac?** You can build the iPhone and iPad app on GitHub's free Mac from Windows,
+Linux or any computer with a web browser: follow
+[PadMint's steps](https://github.com/chrissotraidis/padmint#no-mac-build-on-githubs-mac).
+
 Older F0X previews were **unsigned, ROM-free, arm64 IPAs** for iPhone and iPad on iOS
 and iPadOS 16 or newer, which you re-sign with your own Apple identity. They
 never include F-Zero X or extracted game assets: after installing, select your
