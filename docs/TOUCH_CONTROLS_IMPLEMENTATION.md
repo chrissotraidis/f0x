@@ -33,8 +33,9 @@ core on 2026-08-12 (evidence: `docs/evidence/touch-ios/2026-08-12.txt`).
   an original adaptation that writes the N64 pad seam directly instead of
   synthesizing keyboard events.
 - The Settings -> Controls -> Touch Controls page now renders live with every
-  widget visible (Touch Controls, Auto-hide with Physical Controller, Haptics,
-  Touch Control Opacity, Customize Touch Layout, Reset Current Layout). The
+  widget visible (Touch Controls, Auto-hide Touch Controls with Controller,
+  Show Touch Controls, Haptics, Touch Control Opacity, Customize Touch Layout,
+  Reset Current Layout). The
   layout editor opens from Customize Touch Layout and exposes the Size slider
   plus Hide/Reset/Done chrome. Live captures also cover hold-to-cancel
   (ACCEL held -> Menu press -> neutral), the Z hold-to-latch (0x2000 persists
@@ -336,7 +337,10 @@ Add a Touch Controls section under Settings → Controls in
 
 - Touch Controls checkbox;
 - Touch Control Opacity, clamped 25%–100%;
-- Auto-hide with Physical Controller;
+- Auto-hide Touch Controls with Controller;
+- Show Touch Controls button, enabled while touch is hidden: it turns Touch
+  Controls on and auto-hide off, so the controls return with the controller
+  still connected;
 - Haptics;
 - Customize Touch Layout button;
 - Reset Current Layout button with confirmation or unambiguous copy.
@@ -349,7 +353,9 @@ create a second settings store for ordinary switches; only layout geometry uses
 
 Expose a read-only physical-gamepad-present query from the existing ControlDeck
 connected-gamepad state; do not treat the pinned logical port 1 as physical
-hardware. When Auto-hide is enabled and an actual SDL gamepad is connected:
+hardware. Only a usable pad assigned to player 1 (port 0) counts: one with a
+left stick and A, B and Start; another player's pad or a menu-only profile
+never hides touch. When Auto-hide is enabled and such a gamepad is connected:
 
 - cancel touch input before hiding controls;
 - retain the permanent menu affordance if the controller cannot open the menu;

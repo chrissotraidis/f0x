@@ -1,0 +1,139 @@
+diff --git a/port/gdx_menu_registry.cpp b/port/gdx_menu_registry.cpp
+index bb7aaec..34d3404 100644
+--- a/port/gdx_menu_registry.cpp
++++ b/port/gdx_menu_registry.cpp
+@@ -47,6 +47,7 @@
+ #include "fast/Fast3dWindow.h"  // Fast::Fast3dWindow::SetTextureFilter + Fast::FilteringMode
+ 
+ #include "libultraship/bridge/consolevariablebridge.h"
++#include "gdx_touch_controls.h"
+ #include "port_log.h"
+ 
+ #include <cstdint>
+@@ -66,6 +67,7 @@ extern "C" int gdx_touch_controls_available(void);
+ extern "C" void gdx_touch_controls_begin_layout_editor(void);
+ extern "C" void gdx_touch_controls_reset_current_layout(void);
+ extern "C" void gdx_touch_controls_set_haptics_enabled(int enabled);
++extern "C" int gdx_physical_gamepads_connected(void);
+ #if defined(__APPLE__)
+ extern "C" int gdx_diagnostics_share_runtime(char* err, int errCap);
+ #endif
+@@ -633,7 +635,7 @@ void GdxMenu::RegisterMenu() {
+                   .SearchTerms("transparency alpha"));
+ 
+     AddWidget("Settings", "Controls", SECTION_COLUMN_1,
+-              WidgetInfo{ .name = "Auto-hide with Physical Controller",
++              WidgetInfo{ .name = "Auto-hide Touch Controls with Controller",
+                           .cVar = "gSettings.Touch.AutoHideWithController",
+                           .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+                   .Options(UIWidgets::CheckboxOptions().DefaultValue(true).Tooltip(
+@@ -644,6 +646,28 @@ void GdxMenu::RegisterMenu() {
+                   })
+                   .SearchTerms("gamepad pad joystick handoff auto hide"));
+ 
++    AddWidget("Settings", "Controls", SECTION_COLUMN_1,
++              WidgetInfo{ .name = "Show Touch Controls", .type = GdxUI::WIDGET_BUTTON }
++                  .Options(UIWidgets::ButtonOptions().Tooltip(
++                      "Brings back working touch controls with a controller still connected. "
++                      "Auto-hide stays off until you turn it back on."))
++                  .PreFunc([](WidgetInfo& info) {
++                      info.isHidden = !gdx_touch_controls_available();
++                      const int autoHide =
++                          CVarGetInteger("gSettings.Touch.AutoHideWithController", 1);
++                      info.options->disabled =
++                          CVarGetInteger("gSettings.Touch.Enabled", 1) != 0 &&
++                          gdx_touch_controller_suppression(
++                              autoHide, autoHide != 0 ? gdx_physical_gamepads_connected() : 0) == 0;
++                      info.options->disabledTooltip = "Touch controls are already shown.";
++                  })
++                  .Callback([](WidgetInfo&) {
++                      CVarSetInteger("gSettings.Touch.Enabled", 1);
++                      CVarSetInteger("gSettings.Touch.AutoHideWithController", 0);
++                      CVarSave();
++                  })
++                  .SearchTerms("show restore touch overlay controller"));
++
+     AddWidget("Settings", "Controls", SECTION_COLUMN_1,
+               WidgetInfo{ .name = "Haptics", .cVar = "gSettings.Touch.Haptics",
+                           .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+diff --git a/port/gdx_touch_controls.h b/port/gdx_touch_controls.h
+index fe0409a..3e6fe67 100644
+--- a/port/gdx_touch_controls.h
++++ b/port/gdx_touch_controls.h
+@@ -63,6 +63,16 @@ typedef struct GdxTouchPadState {
+ // whole Touch Controls section when this is 0, so desktop builds stay neutral.
+ GDX_TOUCH_API int gdx_touch_controls_available(void);
+ 
++// Controller auto-hide decision (main.cpp passes the result to the tick as
++// physicalGamepadConnected): the overlay is suppressed only while
++// "Auto-hide Touch Controls with Controller" is on and a usable gamepad drives
++// player 1. "Show Touch Controls" turns the overlay on and auto-hide off, so it
++// always clears this with the gamepad still connected.
++static inline int gdx_touch_controller_suppression(int autoHideWithController,
++                                                   int playerOneGamepad) {
++    return (autoHideWithController != 0 && playerOneGamepad != 0) ? 1 : 0;
++}
++
+ // Called once after the game has booted (post-setup, pre-frame-loop) so the
+ // overlay never covers first-time setup or the F0X Home surface.
+ GDX_TOUCH_API void gdx_touch_controls_start(void);
+diff --git a/port/main.cpp b/port/main.cpp
+index cda3083..631bede 100644
+--- a/port/main.cpp
++++ b/port/main.cpp
+@@ -682,7 +682,20 @@ extern "C" int gdx_physical_gamepads_connected(void) {
+         gdx_port_logf("[touch] physical SDL gamepads: %zu (%s)\n", names.size(),
+                       joined.empty() ? "none" : joined.c_str());
+     }
+-    return names.empty() ? 0 : 1;
++    // Touch drives player 1, so only a usable gamepad routed to player 1 (left
++    // stick plus A, B and Start) counts. A pad owned by another player never
++    // hides player 1's touch controls, and a menu-only profile does not count.
++    for (const auto& [instanceId, gamepad] : devices->GetConnectedSDLGamepadsForPort(0)) {
++        (void)instanceId;
++        if (gamepad != nullptr && SDL_GameControllerHasAxis(gamepad, SDL_CONTROLLER_AXIS_LEFTX) &&
++            SDL_GameControllerHasAxis(gamepad, SDL_CONTROLLER_AXIS_LEFTY) &&
++            SDL_GameControllerHasButton(gamepad, SDL_CONTROLLER_BUTTON_A) &&
++            SDL_GameControllerHasButton(gamepad, SDL_CONTROLLER_BUTTON_B) &&
++            SDL_GameControllerHasButton(gamepad, SDL_CONTROLLER_BUTTON_START)) {
++            return 1;
++        }
++    }
++    return 0;
+ }
+ 
+ // Toggles the live full-screen menu through its GuiWindow, never a bare CVar
+@@ -1462,8 +1475,8 @@ int main(int argc, char** argv) {
+             const int touchEnabled = CVarGetInteger("gSettings.Touch.Enabled", 1);
+             const float touchOpacity = CVarGetFloat("gSettings.Touch.Opacity", 0.55f);
+             const int autoHide = CVarGetInteger("gSettings.Touch.AutoHideWithController", 1);
+-            const int controllerConnected =
+-                (autoHide != 0) ? gdx_physical_gamepads_connected() : 0;
++            const int controllerConnected = gdx_touch_controller_suppression(
++                autoHide, (autoHide != 0) ? gdx_physical_gamepads_connected() : 0);
+             gdx_touch_controls_tick(menuVisible ? 1 : 0, controllerConnected,
+                                     gdx_input_in_gameplay(), touchEnabled, touchOpacity);
+         }
+diff --git a/port/tests/touch_merge_tests.c b/port/tests/touch_merge_tests.c
+index 8fa28ff..cdbbed5 100644
+--- a/port/tests/touch_merge_tests.c
++++ b/port/tests/touch_merge_tests.c
+@@ -309,8 +309,18 @@ static void case_profile_roundtrip(void) {
+     checkEq("future version rejected cleanly", count, 0);
+ }
+ 
++/* Controller auto-hide: only auto-hide plus a usable player 1 gamepad
++ * suppresses the overlay; Show (auto-hide off) clears it while connected. */
++static void case_controller_suppression(void) {
++    checkEq("no player 1 gamepad keeps touch", gdx_touch_controller_suppression(1, 0), 0);
++    checkEq("auto-hide with a player 1 gamepad hides touch", gdx_touch_controller_suppression(1, 1), 1);
++    checkEq("auto-hide off restores touch while connected", gdx_touch_controller_suppression(0, 1), 0);
++    checkEq("auto-hide off without a gamepad keeps touch", gdx_touch_controller_suppression(0, 0), 0);
++}
++
+ int main(void) {
+     printf("gdx_touch_merge_tests: N64 touch merge/cancel/stick/layout core\n");
++    case_controller_suppression();
+     case_button_merge_every_bit();
+     case_stick_mapping();
+     case_stick_deadzone_and_release();

@@ -35,6 +35,9 @@ apply_patch_stack "$root_dir/ref/G-Diffuser" \
   "$root_dir/patches/gdiffuser-controller-lifecycle.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-fiber-smoketest.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-ios-scene-startup.patch"
+# Touch auto-hide upgrade, applied last so checkouts patched by an earlier
+# stack receive it too (the stack above skips once its overlay is present).
+apply_patch_file "$root_dir/ref/G-Diffuser" "$root_dir/patches/gdiffuser-touch-autohide.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser/decomp" "$root_dir/patches/fzerox-decomp-apple.patch"
 apply_patch_stack "$root_dir/ref/G-Diffuser/libultraship" \
   "$root_dir/patches/libultraship-apple-metal.patch" \
