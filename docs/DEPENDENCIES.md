@@ -4,7 +4,7 @@ Baseline captured 2026-08-11. `ref/` is local-only and ignored.
 
 | Role | Repository | Pinned SHA | License | F0X modification |
 | --- | --- | --- | --- | --- |
-| Runtime foundation | `Zorkats/G-Diffuser` | `719fd82a3af605b064fb53ad6eecb020090b4c5d` | MIT | `patches/gdiffuser-apple-macos.patch`, `patches/gdiffuser-fiber-smoketest.patch`, `patches/gdiffuser-ios-scene-startup.patch` |
+| Runtime foundation | `Zorkats/G-Diffuser` | `719fd82a3af605b064fb53ad6eecb020090b4c5d` | MIT | `patches/gdiffuser-apple-macos.patch`, `patches/gdiffuser-fiber-smoketest.patch`, `patches/gdiffuser-ios-scene-startup.patch`, `patches/gdiffuser-touch-autohide.patch` |
 | Fast3D/runtime submodule | `Zorkats/libultraship` | `a4919b181e637193f2b8ae975e31505abbf99e71` | MIT | `patches/libultraship-apple-metal.patch` |
 | Extraction submodule | `Zorkats/Torch` | `c1bdc6fde97fbaa4495c9e859f635290840a12d3` | MIT | `patches/torch-inprocess-apple.patch` |
 | iPhone/iPad SDL (replaces libultraship's `release-2.32.10` fetch) | `chrissotraidis/SDL` | `c6756fcd3de8090a8f72ac1a0b6fb6e50f0021d1` | zlib | SDL 2.32.10 plus UIKit scene startup, so apps built with the iOS 27 SDK open on iOS 27 |
