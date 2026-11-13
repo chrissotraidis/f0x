@@ -38,7 +38,7 @@ fi
 # iOS 27 SDK must start through UIKit scenes or iOS 27 closes them at launch.
 # libultraship otherwise fetches plain release-2.32.10.
 sdl="$root/ref/SDL2"
-sdl_pin="c6756fcd3de8090a8f72ac1a0b6fb6e50f0021d1"
+sdl_pin="090b0c5ade61395078f9ac0756474d9e475f7fa7"
 if [[ "$(git -C "$sdl" rev-parse HEAD 2>/dev/null || true)" != "$sdl_pin" ]]; then
   echo "F0X: fetching the pinned scene-capable SDL"
   rm -rf "$sdl"
