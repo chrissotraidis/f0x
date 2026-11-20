@@ -12,4 +12,4 @@ diff --git a/port/F0X-iOS-Info.plist.in b/port/F0X-iOS-Info.plist.in
 +    </dict>
      <key>UIRequiresFullScreen</key>
      <true/>
-     <key>UILaunchScreen</key>
+     <key>UIRequiresFullScreenIgnoredStartingWithVersion</key>

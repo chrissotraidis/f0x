@@ -42,6 +42,9 @@ apply_patch_file "$root_dir/ref/G-Diffuser/decomp" "$root_dir/patches/fzerox-dec
 apply_patch_stack "$root_dir/ref/G-Diffuser/libultraship" \
   "$root_dir/patches/libultraship-apple-metal.patch" \
   "$root_dir/patches/libultraship-controller-lifecycle.patch"
+# iOS windows are already full-screen; switching SDL display modes used the
+# iPad's own mode and left an external display (a TV) black. As in HarkinianPad.
+apply_patch_file "$root_dir/ref/G-Diffuser/libultraship" "$root_dir/patches/libultraship-ios-fullscreen-guard.patch"
 apply_patch_file "$root_dir/ref/G-Diffuser/torch" "$root_dir/patches/torch-inprocess-apple.patch"
 
 icon_source="$root_dir/assets/AppIcon.xcassets"

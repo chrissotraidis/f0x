@@ -235,7 +235,7 @@ index cab4365..f4bfb9a 100644
 +        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
 +        XCODE_ATTRIBUTE_INFOPLIST_KEY_UILaunchScreen_Generation YES
 +        XCODE_ATTRIBUTE_INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad
-+            "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
++            "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
 +        XCODE_ATTRIBUTE_INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone
 +            "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight")
 +    # CMake 4.4's Xcode generator emits TARGET_FILE_DIR with an escaped
@@ -605,7 +605,7 @@ new file mode 100644
 index 0000000..1fe08ed
 --- /dev/null
 +++ b/port/F0X-iOS-Info.plist.in
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,44 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
@@ -632,6 +632,8 @@ index 0000000..1fe08ed
 +    <true/>
 +    <key>UIRequiresFullScreen</key>
 +    <true/>
++    <key>UIRequiresFullScreenIgnoredStartingWithVersion</key>
++    <string>26</string>
 +    <key>UILaunchScreen</key>
 +    <dict/>
 +    <key>UISupportedInterfaceOrientations</key>
@@ -641,6 +643,8 @@ index 0000000..1fe08ed
 +    </array>
 +    <key>UISupportedInterfaceOrientations~ipad</key>
 +    <array>
++        <string>UIInterfaceOrientationPortrait</string>
++        <string>UIInterfaceOrientationPortraitUpsideDown</string>
 +        <string>UIInterfaceOrientationLandscapeLeft</string>
 +        <string>UIInterfaceOrientationLandscapeRight</string>
 +    </array>
